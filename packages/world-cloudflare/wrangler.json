@@ -5,10 +5,43 @@
   "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
-      "binding": "BINDING_NAME",
-      "database_name": "YOUR_DB_NAME",
-      "database_id": "YOUR_DB_ID",
+      "binding": "DB",
+      "database_name": "workflow-db",
+      "database_id": "YOUR_D1_DATABASE_ID",
       "migrations_dir": "src/drizzle/migrations"
     }
-  ]
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_QUEUE",
+        "queue": "workflow-queue"
+      },
+      {
+        "binding": "STEP_QUEUE",
+        "queue": "step-queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "workflow-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      },
+      {
+        "queue": "step-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      }
+    ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "STREAM_BUCKET",
+      "bucket_name": "workflow-streams"
+    }
+  ],
+  "vars": {
+    "DEPLOYMENT_ID": "dev"
+  }
 }
