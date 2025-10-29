@@ -675,6 +675,46 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11
 
+  packages/world-cloudflare:
+    dependencies:
+      '@vercel/queue':
+        specifier: 0.0.0-alpha.23
+        version: 0.0.0-alpha.23
+      '@workflow/errors':
+        specifier: workspace:*
+        version: link:../errors
+      '@workflow/world':
+        specifier: workspace:*
+        version: link:../world
+      '@workflow/world-local':
+        specifier: workspace:*
+        version: link:../world-local
+      drizzle-orm:
+        specifier: ^0.31.2
+        version: 0.31.4(@opentelemetry/api@1.9.0)(@types/react@19.1.13)(better-sqlite3@11.10.0)(pg@8.16.3)(postgres@3.4.7)(react@19.2.0)
+      ulid:
+        specifier: ^3.0.1
+        version: 3.0.1
+      zod:
+        specifier: 'catalog:'
+        version: 4.1.11
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.6.2
+      '@workflow/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@workflow/world-testing':
+        specifier: workspace:*
+        version: link:../world-testing
+      drizzle-kit:
+        specifier: ^0.22.7
+        version: 0.22.8
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.6.2)(jiti@2.6.1)(lightningcss@1.30.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.0)
+
   packages/world-local:
     dependencies:
       '@vercel/queue':
