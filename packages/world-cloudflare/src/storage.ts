@@ -2,6 +2,7 @@ import { WorkflowAPIError } from '@workflow/errors';
 import type {
   Event,
   ListEventsParams,
+  ListHooksParams,
   PaginatedResponse,
   Storage,
 } from '@workflow/world';
@@ -112,7 +113,6 @@ export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
       return compact(value);
     },
     async update(id, data) {
-      // Fetch current run to check if startedAt is already set
       const [currentRun] = await drizzle
         .select()
         .from(runs)
@@ -128,7 +128,6 @@ export function createRunsStorage(drizzle: Drizzle): Storage['runs'] {
         output: data.output as SerializedContent,
       };
 
-      // Only set startedAt the first time transitioning to 'running'
       if (data.status === 'running' && !currentRun.startedAt) {
         updates.startedAt = new Date();
       }
@@ -237,6 +236,195 @@ export function createEventsStorage(drizzle: Drizzle): Storage['events'] {
         data: values.map(compact) as Event[],
         cursor: values.at(-1)?.eventId ?? null,
         hasMore: all.length > limit,
+      };
+    },
+  };
+}
+
+export function createHooksStorage(drizzle: Drizzle): Storage['hooks'] {
+  const { hooks } = Schema;
+
+  return {
+    async get(hookId) {
+      const [value] = await drizzle
+        .select()
+        .from(hooks)
+        .where(eq(hooks.hookId, hookId))
+        .limit(1);
+      return compact(value);
+    },
+    async create(runId, data) {
+      const [value] = await drizzle
+        .insert(hooks)
+        .values({
+          runId,
+          hookId: data.hookId,
+          token: data.token,
+          ownerId: '', // TODO: get from context
+          projectId: '', // TODO: get from context
+          environment: '', // TODO: get from context
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!value) {
+        throw new WorkflowAPIError(`Hook ${data.hookId} already exists`, {
+          status: 409,
+        });
+      }
+      return compact(value);
+    },
+    async getByToken(token) {
+      const [value] = await drizzle
+        .select()
+        .from(hooks)
+        .where(eq(hooks.token, token))
+        .limit(1);
+      if (!value) {
+        throw new WorkflowAPIError(`Hook not found for token: ${token}`, {
+          status: 404,
+        });
+      }
+      return compact(value);
+    },
+    async list(params: ListHooksParams) {
+      const limit = params?.pagination?.limit ?? 100;
+      const fromCursor = params?.pagination?.cursor;
+      const all = await drizzle
+        .select()
+        .from(hooks)
+        .where(
+          and(
+            map(params.runId, (id) => eq(hooks.runId, id)),
+            map(fromCursor, (c) => lt(hooks.hookId, c))
+          )
+        )
+        .orderBy(desc(hooks.hookId))
+        .limit(limit + 1);
+      const values = all.slice(0, limit);
+      const hasMore = all.length > limit;
+      return {
+        data: values.map(compact),
+        cursor: values.at(-1)?.hookId ?? null,
+        hasMore,
+      };
+    },
+    async dispose(hookId) {
+      const [value] = await drizzle
+        .delete(hooks)
+        .where(eq(hooks.hookId, hookId))
+        .returning();
+      if (!value) {
+        throw new WorkflowAPIError(`Hook not found: ${hookId}`, {
+          status: 404,
+        });
+      }
+      return compact(value);
+    },
+  };
+}
+
+export function createStepsStorage(drizzle: Drizzle): Storage['steps'] {
+  const { steps } = Schema;
+
+  return {
+    async create(runId, data) {
+      const [value] = await drizzle
+        .insert(steps)
+        .values({
+          runId,
+          stepId: data.stepId,
+          stepName: data.stepName,
+          input: data.input as SerializedContent,
+          status: 'pending',
+          attempt: 1,
+        })
+        .onConflictDoNothing()
+        .returning();
+      if (!value) {
+        throw new WorkflowAPIError(`Step ${data.stepId} already exists`, {
+          status: 409,
+        });
+      }
+      return compact(value);
+    },
+    async get(runId, stepId) {
+      const whereClause = runId
+        ? and(eq(steps.stepId, stepId), eq(steps.runId, runId))
+        : eq(steps.stepId, stepId);
+
+      const [value] = await drizzle
+        .select()
+        .from(steps)
+        .where(whereClause)
+        .limit(1);
+      if (!value) {
+        throw new WorkflowAPIError(`Step not found: ${stepId}`, {
+          status: 404,
+        });
+      }
+      return compact(value);
+    },
+    async update(runId, stepId, data) {
+      const [currentStep] = await drizzle
+        .select()
+        .from(steps)
+        .where(and(eq(steps.stepId, stepId), eq(steps.runId, runId)))
+        .limit(1);
+
+      if (!currentStep) {
+        throw new WorkflowAPIError(`Step not found: ${stepId}`, {
+          status: 404,
+        });
+      }
+
+      const updates: Partial<typeof steps.$inferInsert> = {
+        ...data,
+        output: data.output as SerializedContent,
+      };
+      const now = new Date();
+
+      if (data.status === 'running' && !currentStep.startedAt) {
+        updates.startedAt = now;
+      }
+      if (data.status === 'completed' || data.status === 'failed') {
+        updates.completedAt = now;
+      }
+
+      const [value] = await drizzle
+        .update(steps)
+        .set(updates)
+        .where(and(eq(steps.stepId, stepId), eq(steps.runId, runId)))
+        .returning();
+
+      if (!value) {
+        throw new WorkflowAPIError(`Step not found: ${stepId}`, {
+          status: 404,
+        });
+      }
+
+      return compact(value);
+    },
+    async list(params) {
+      const limit = params?.pagination?.limit ?? 20;
+      const fromCursor = params?.pagination?.cursor;
+      const all = await drizzle
+        .select()
+        .from(steps)
+        .where(
+          and(
+            eq(steps.runId, params.runId),
+            map(fromCursor, (c) => lt(steps.stepId, c))
+          )
+        )
+        .orderBy(desc(steps.stepId))
+        .limit(limit + 1);
+      const values = all.slice(0, limit);
+      const hasMore = all.length > limit;
+
+      return {
+        data: values.map(compact),
+        hasMore,
+        cursor: values.at(-1)?.stepId ?? null,
       };
     },
   };
