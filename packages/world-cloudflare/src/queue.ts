@@ -33,11 +33,10 @@ export function createQueue(env: CloudflareEnv): Queue {
 
   const queue: Queue['queue'] = async (queueName, message, opts) => {
     const [prefix, queueId] = parseQueueName(queueName);
-
     const cfQueue =
       prefix === '__wkf_workflow_' ? env.WORKFLOW_QUEUE : env.STEP_QUEUE;
-
     const messageId = MessageId.parse(`msg_${generateMessageId()}`);
+
     await cfQueue.send(
       {
         queueName,
