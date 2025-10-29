@@ -41,7 +41,8 @@
     "@workflow/tsconfig": "workspace:*",
     "@workflow/world-testing": "workspace:*",
     "drizzle-kit": "^0.22.7",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "wrangler": "^4.45.2"
   },
   "keywords": [],
   "author": "",
