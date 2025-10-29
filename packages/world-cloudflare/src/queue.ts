@@ -77,7 +77,7 @@ const parseQueueName = (name: ValidQueueName): [QueuePrefix, string] => {
  */
 export async function handleQueueMessage(
   batch: MessageBatch,
-  env: CloudflareEnv
+  env: CloudflareEnv // TODO: look into this
 ): Promise<void> {
   const embeddedWorld = createEmbeddedWorld({ dataDir: undefined });
 
