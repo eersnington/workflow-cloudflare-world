@@ -35,6 +35,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251014.0",
     "@types/node": "catalog:",
     "@workflow/errors": "workspace:*",
     "@workflow/tsconfig": "workspace:*",
