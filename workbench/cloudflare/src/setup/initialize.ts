@@ -8,7 +8,7 @@ import {
 } from '@/core/state.js';
 import { showBanner, showInfo } from '@/core/ui.js';
 import { BackgroundPoller } from '@/server/poller.js';
-import { WorkerClient } from '@/server/worker-client.js';
+import { WorkerClient, type WorkflowRun } from '@/server/worker-client.js';
 
 export interface AppContext {
   state: CLIState;
@@ -88,7 +88,8 @@ async function loadInitialRuns(
       state: setRuns(state, result.runs),
       canPoll: true,
     };
-  } catch {
+  } catch (error) {
+    console.error('Failed to load runs during init:', error);
     spinner.warn('Database not initialized yet');
     console.log(
       chalk.gray('   Run history will be available after first workflow')
@@ -102,7 +103,7 @@ async function loadInitialRuns(
 
 function startPolling(
   client: WorkerClient,
-  onUpdate: (runs: import('../server/worker-client.js').WorkflowRun[]) => void,
+  onUpdate: (runs: WorkflowRun[]) => void,
   enabled: boolean
 ): BackgroundPoller {
   const poller = new BackgroundPoller();
