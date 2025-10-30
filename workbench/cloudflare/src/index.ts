@@ -37,31 +37,29 @@ async function showIntro() {
     const leftPadding = 4;
     const shadowOffset = 1;
 
-    for (let row = 0; row < text.length; row++) {
-      // placeholder to keep consistent height (not drawing row by row here)
-    }
-
-    // Print shadow layer
     console.log('\n'.repeat(topPadding));
-    console.log(
-      ' '.repeat(leftPadding + shadowOffset) +
-        shadow.bold(
-          text
-            .split('')
-            .map((c) => (c === ' ' ? '  ' : '██'))
-            .join('')
-        )
-    );
 
-    console.log(
-      ' '.repeat(leftPadding) +
-        color.bold(
-          text
-            .split('')
-            .map((c) => (c === ' ' ? '  ' : '██'))
-            .join('')
-        )
-    );
+    const lines = text.trimEnd().split('\n');
+    const totalLines = lines.length;
+
+    // Print shadow layer first
+    lines.forEach((line, index) => {
+      if (index > 0) process.stdout.write('\n');
+      process.stdout.write(
+        ' '.repeat(leftPadding + shadowOffset) + shadow.dim(line)
+      );
+    });
+
+    // Move cursor up to render the colored text on top
+    process.stdout.write(`\x1b[${totalLines}A`);
+
+    // Print colored text layer
+    lines.forEach((line) => {
+      process.stdout.write('\n');
+      process.stdout.write(' '.repeat(leftPadding) + color(line));
+    });
+
+    console.log();
   }
 
   renderShadowText(cloudflare, orange);
