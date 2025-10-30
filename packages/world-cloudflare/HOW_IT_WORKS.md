@@ -142,20 +142,20 @@ Be aware of Cloudflare Workers limits:
 
 ```bash
 # Start local dev server with D1
-wrangler dev --local
+pnpm wrangler dev 
 
-# Apply migrations to local D1
-wrangler d1 migrations apply workflow-db --local
+# Apply migrations to D1
+pnpm wrangler d1 migrations apply workflow-db 
 ```
 
 ### Production Deployment
 
 ```bash
 # Apply migrations to production
-wrangler d1 migrations apply workflow-db
+pnpm wrangler d1 migrations apply workflow-db
 
 # Deploy Worker
-wrangler deploy
+pnpm wrangler deploy
 ```
 
 ### Queue Testing
@@ -164,7 +164,7 @@ Test queue consumers locally:
 
 ```bash
 # Send test message to queue
-wrangler queues producer send workflow-queue '{"test": "message"}'
+pnpm wrangler queues producer send workflow-queue '{"test": "message"}'
 ```
 
 ## Comparison with Other Worlds
