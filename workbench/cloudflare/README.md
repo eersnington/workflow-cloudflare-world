@@ -14,12 +14,14 @@ The CLI automatically starts the Cloudflare Worker dev server and presents an in
 
 ## Features
 
-✅ **Zero Configuration** - Auto-starts Wrangler dev server  
-✅ **Interactive Menu** - LazyGit-style navigation with @inquirer/prompts  
-✅ **Real-Time Updates** - Background polling keeps run status current  
-✅ **Self-Contained** - No manual server management needed  
-✅ **Clean Architecture** - Feature-based modular structure  
-✅ **Cloudflare Theme** - Orange/white/gray color scheme  
+✅ **Zero Configuration** - Auto-starts Wrangler dev server
+✅ **Interactive Menu** - Interactive navigation with @inquirer/prompts
+✅ **Real-Time Updates** - Background polling keeps run status current
+✅ **Self-Contained** - No manual server management needed
+✅ **Clean Architecture** - Feature-based modular structure
+✅ **Cloudflare Theme** - Orange/white/gray color scheme
+✅ **Clean UI** - Suppresses noisy dev server logs for smooth navigation
+✅ **ASCII Art Intro** - Animated Cloudflare logo with shadow effects
 
 ## Architecture
 
@@ -158,6 +160,7 @@ interface ActionContext {
 - Updates run status automatically
 - Pauses during run creation
 - Resumes after completion
+- Silent operation with no UI interference
 
 ### Server Management
 
@@ -165,6 +168,15 @@ interface ActionContext {
 - Graceful shutdown on Ctrl+C
 - Process cleanup on exit
 - Startup timeout protection
+- Clean log filtering (suppresses HTTP request spam)
+- Optional file logging via `WORKBENCH_WRANGLER_LOG=file`
+
+### Visual Polish
+
+- ASCII art introduction with Cloudflare and Workflow logos
+- Shadow effects using ANSI cursor positioning
+- Smooth animations and transitions
+- Consistent orange/white/gray color scheme
 
 ### Error Handling
 
@@ -177,7 +189,8 @@ interface ActionContext {
 - Node.js 18+
 - pnpm (or npm/yarn/bun)
 - Wrangler 4+ (auto-installed)
-- Clean ports 8787-8791
+- Clean ports 8787-8791 (or just pkill them)
+- Terminal with ANSI support for colors and cursor positioning
 
 ## Troubleshooting
 
@@ -196,9 +209,15 @@ interface ActionContext {
 - Check browser console for errors
 - Verify network connectivity
 
-## Learn More
+**ASCII art not displaying correctly**
+- Terminal must support ANSI color codes and cursor positioning
+- Try in a different terminal (VS Code, iTerm2, Terminal.app)
+- Avoid terminals that don't support full ANSI features
 
+**Noisy logs appearing during navigation**
+- Logs are automatically filtered; only critical startup messages shown
+- Set `WORKBENCH_WRANGLER_LOG=file` to capture all logs to `.logs/wrangler-dev.log`
+
+## Learn More
+- 
 - [@workflow/world-cloudflare](../../packages/world-cloudflare) - Core package
-- [Cloudflare Workers](https://workers.cloudflare.com/)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)
-- [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js) - Interactive prompts
