@@ -14,7 +14,7 @@
     "jsx": "preserve",
     "incremental": true,
     "paths": {
-      "@/*": ["./*"],
+      "@/*": ["./src/*"],
       "@workflow/world-cloudflare": [
         "../../packages/world-cloudflare/src/index.ts"
       ]
