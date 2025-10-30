@@ -1,6 +1,6 @@
 # Cloudflare Workflow Demo
 
-Interactive CLI demonstration of `@workflow/world-cloudflare` with live workflow execution.
+Interactive CLI for demonstrating `@workflow/world-cloudflare` with live workflow execution.
 
 ## Quick Start
 
@@ -10,112 +10,195 @@ pnpm install
 pnpm start
 ```
 
-That's it. The CLI automatically:
-- Starts the Cloudflare Worker dev server
-- Connects to it
-- Presents an interactive workflow demo
-
-Press `Ctrl+C` to stop everything and exit.
-
-## What It Does
-
-The demo provides:
-
-1. **Auto-Configuration**: Wrangler dev server starts automatically on an available port
-2. **Interactive Workflow Selection**: Choose from pre-configured workflow templates:
-   - **Random Sleep**: Single stage, always succeeds after random delay
-   - **Flaky Step**: ~40% failure rate to demonstrate error handling
-   - **Inspection Chain**: Three-stage workflow with detailed timeline
-3. **Real-Time Monitoring**: Watch workflow execution with live status updates
-4. **Detailed Inspection**: View steps, events timeline, and diagnostics
+The CLI automatically starts the Cloudflare Worker dev server and presents an interactive menu-driven interface.
 
 ## Features
 
-- ✅ **Zero Configuration**: No manual Wrangler setup needed
-- ✅ **Self-Contained**: Manages worker lifecycle automatically
-- ✅ **Port Detection**: Finds available port if default is in use
-- ✅ **Graceful Shutdown**: Cleans up worker process on exit
-- ✅ **Visual UI**: Orange/white Cloudflare-themed interface
+✅ **Zero Configuration** - Auto-starts Wrangler dev server  
+✅ **Interactive Menu** - LazyGit-style navigation with @inquirer/prompts  
+✅ **Real-Time Updates** - Background polling keeps run status current  
+✅ **Self-Contained** - No manual server management needed  
+✅ **Clean Architecture** - Feature-based modular structure  
+✅ **Cloudflare Theme** - Orange/white/gray color scheme  
 
-## How It Works
+## Architecture
+
+(WIP)
+
+### Design Principles
+
+1. **Single Responsibility** - Each file has one clear purpose
+2. **Feature-Based** - Actions organized by user feature
+3. **Type Safety** - Shared `ActionContext` for consistency
+4. **Modularity** - Easy to add new actions or features
+5. **Testability** - Small, focused functions
+
+### Flow
 
 ```
 pnpm start
     ↓
-[Auto-starts Wrangler]
+index.ts → Starts Wrangler server
     ↓
-[Detects worker URL]
+cli.ts → Initializes app context
     ↓
-[Runs interactive demo]
+setup/initialize.ts → Loads templates & runs
     ↓
-[User selects workflow]
+[Menu Loop] → User selects action
     ↓
-[Tracks execution in real-time]
+actions/* → Executes feature
     ↓
-[Shows results & diagnostics]
+[Return to menu]
 ```
 
-## Architecture
+## User Experience
 
-- **Worker**: Cloudflare Worker with demo workflow templates
-- **CLI**: Interactive client that:
-  - Spawns Wrangler dev server
-  - Makes HTTP requests to worker REST API
-  - Polls for workflow status updates
-  - Displays formatted results
+### Main Menu
+
+```
+╔══════════════════════════════════════════════╗
+║  ☁️  Cloudflare Workflow Demo               ║
+║  Connected to http://localhost:8787          ║
+╚══════════════════════════════════════════════╝
+
+? What would you like to do?
+  ❯ 🚀 Create New Run
+    📊 View Recent Runs (5)
+    🔍 Inspect Run Details
+    🔄 Refresh Status
+    ❌ Exit
+```
+
+### Create Run Flow
+
+1. Select workflow template
+2. Auto-tracks execution progress
+3. Displays detailed results
+4. Returns to menu
+
+### Inspect Run Flow
+
+1. Select from recent runs
+2. Shows overview, steps, events
+3. Displays diagnostics for failures
+4. Returns to menu
 
 ## Workflow Templates
 
 ### Random Sleep
+- **Purpose**: Basic execution verification
 - **Stages**: 1
-- **Failure Rate**: 0%
 - **Duration**: 500-2500ms
-- **Purpose**: Verify basic workflow execution
+- **Failure Rate**: 0%
 
 ### Flaky Step
-- **Stages**: 1
-- **Failure Rate**: 40%
+- **Purpose**: Error handling demonstration
+- **Stages**: 1  
 - **Duration**: 800-3000ms
-- **Purpose**: Demonstrate retry logic and error handling
+- **Failure Rate**: 40%
 
 ### Inspection Chain
-- **Stages**: 3
-- **Failure Rate**: 15% (varies by stage)
+- **Purpose**: Multi-stage timeline showcase
+- **Stages**: 3 (prepare → execute → finalize)
 - **Duration**: 1900-6000ms total
-- **Purpose**: Showcase event timeline and step tracking
+- **Failure Rate**: 15% (varies by stage)
 
 ## Development
 
+### Adding New Actions
+
+1. Create `src/actions/my-action.ts`:
+```typescript
+import type { ActionContext } from './types.js';
+
+export async function myAction(ctx: ActionContext): Promise<void> {
+  // Your logic here
+}
+```
+
+2. Add to `src/setup/cli.ts`:
+```typescript
+case 'myAction':
+  await myAction(ctx);
+  break;
+```
+
+3. Add to menu in `src/core/menu.ts`
+
+### Running in Development
+
 ```bash
-# Start in watch mode
+# Watch mode
 pnpm dev
 
-# Build TypeScript
+# Build
 pnpm build
+
+# Type check
+pnpm typecheck
 ```
+
+## Technical Details
+
+### State Management
+
+Immutable state updates using reducer pattern:
+
+```typescript
+interface ActionContext {
+  state: CLIState;      // Current app state
+  client: WorkerClient; // HTTP client
+  poller: BackgroundPoller; // Background updates
+}
+```
+
+### Background Polling
+
+- Polls every 2 seconds
+- Updates run status automatically
+- Pauses during run creation
+- Resumes after completion
+
+### Server Management
+
+- Auto-finds available port (8787-8791)
+- Graceful shutdown on Ctrl+C
+- Process cleanup on exit
+- Startup timeout protection
+
+### Error Handling
+
+- Network errors: Displayed with retry option
+- Server failures: Clear error messages
+- Graceful degradation: Continues without run history if needed
 
 ## Requirements
 
 - Node.js 18+
-- pnpm (or npm/yarn)
-- Wrangler 4+ (installed automatically via dependencies)
+- pnpm (or npm/yarn/bun)
+- Wrangler 4+ (auto-installed)
+- Clean ports 8787-8791
 
 ## Troubleshooting
 
-**Server fails to start**
-- Check if port 8787-8791 are available
-- Ensure Wrangler is installed: `pnpm list wrangler`
+**"Failed to start worker"**
+- Check ports 8787-8791 are available
+- Verify Wrangler installed: `pnpm list wrangler`
+- Check firewall settings
 
-**Connection errors**
-- Wait for "Worker ready on..." message before demo starts
-- Check firewall isn't blocking localhost connections
+**"Failed to connect to worker"**
+- Wait for "Worker ready" message
+- Server may still be starting
+- Check wrangler.json configuration
 
-**Workflow failures**
-- Some workflows are intentionally flaky (see template descriptions)
-- Retry feature demonstrates error recovery
+**Polling not working**
+- Server must be running
+- Check browser console for errors
+- Verify network connectivity
 
 ## Learn More
 
-- [@workflow/world-cloudflare](../../packages/world-cloudflare) - Main package
-- [Cloudflare Workers](https://workers.cloudflare.com/) - Deployment platform
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/) - Development tool
+- [@workflow/world-cloudflare](../../packages/world-cloudflare) - Core package
+- [Cloudflare Workers](https://workers.cloudflare.com/)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/)
+- [@inquirer/prompts](https://github.com/SBoudrias/Inquirer.js) - Interactive prompts
