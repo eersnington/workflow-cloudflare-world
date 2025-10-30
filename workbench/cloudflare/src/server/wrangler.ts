@@ -1,6 +1,8 @@
 import { type ChildProcess, spawn } from 'node:child_process';
 import chalk from 'chalk';
 import ora from 'ora';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join } from 'node:path';
 
 const orange = chalk.hex('#F38020');
 const MAX_PORT_ATTEMPTS = 5;
@@ -70,9 +72,41 @@ function attemptStart(port: number): Promise<ProcessInfo> {
       }
     }, 30000);
 
+    // Optional file logging setup
+    const logToFile = process.env.WORKBENCH_WRANGLER_LOG === 'file';
+    let logFile: string | null = null;
+    if (logToFile) {
+      const logDir = join(process.cwd(), '.logs');
+      if (!existsSync(logDir)) {
+        mkdirSync(logDir, { recursive: true });
+      }
+      logFile = join(logDir, 'wrangler-dev.log');
+    }
+
+    function appendLog(data: string, isError = false): void {
+      if (logFile) {
+        const timestamp = new Date().toISOString();
+        const prefix = isError ? '[ERROR]' : '[INFO]';
+        writeFileSync(logFile, `${timestamp} ${prefix} ${data}`, { flag: 'a' });
+      }
+    }
+
     wrangler.stdout?.on('data', (data: Buffer) => {
       const output = data.toString();
-      process.stdout.write(chalk.gray(output));
+
+      // Filter out noisy HTTP request logs
+      const isHttpLog =
+        /^\[wrangler:info\]\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+/i.test(
+          output
+        );
+
+      if (!isHttpLog) {
+        // Only show non-HTTP logs to TTY (startup messages, errors)
+        process.stdout.write(chalk.gray(output));
+      }
+
+      // Always log to file if enabled
+      appendLog(output);
 
       if (output.includes('Ready on')) {
         const match = output.match(/https?:\/\/[^\s]+:(\d+)/);
@@ -97,7 +131,20 @@ function attemptStart(port: number): Promise<ProcessInfo> {
 
     wrangler.stderr?.on('data', (data: Buffer) => {
       const output = data.toString();
-      process.stderr.write(chalk.red(output));
+
+      // Filter out noisy HTTP request logs from stderr too
+      const isHttpLog =
+        /^\[wrangler:info\]\s+(GET|POST|PUT|DELETE|PATCH|HEAD|OPTIONS)\s+/i.test(
+          output
+        );
+
+      if (!isHttpLog) {
+        // Only show non-HTTP errors to TTY
+        process.stderr.write(chalk.red(output));
+      }
+
+      // Always log to file if enabled
+      appendLog(output, true);
 
       if (output.toLowerCase().includes('address already in use')) {
         if (!resolved) {

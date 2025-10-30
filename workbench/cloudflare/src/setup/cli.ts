@@ -1,4 +1,4 @@
-import { select } from '@inquirer/prompts';
+import { confirm } from '@inquirer/prompts';
 import chalk from 'chalk';
 import { createRunAction } from '@/actions/create-run.js';
 import { inspectRunAction } from '@/actions/inspect-run.js';
@@ -61,8 +61,8 @@ async function executeAction(
 }
 
 async function pauseForUser(): Promise<void> {
-  await select({
-    message: 'Press Enter to return to main menu',
-    choices: [{ name: 'Continue', value: 'continue' }],
+  await confirm({
+    message: 'Return to main menu?',
+    default: true,
   });
 }
