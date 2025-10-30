@@ -1,3 +1,4 @@
+import { spawn } from 'node:child_process';
 import chalk from 'chalk';
 import ora from 'ora';
 import {
@@ -88,11 +89,30 @@ async function loadInitialRuns(
       state: setRuns(state, result.runs),
       canPoll: true,
     };
-  } catch (error) {
-    console.error('Failed to load runs during init:', error);
+  } catch {
+    // Keep output clean; avoid dumping raw errors
     spinner.warn('Database not initialized yet');
+
+    // Attempt auto-migration for local D1, then retry quietly
+    const applied = await applyLocalMigrations();
+    if (applied) {
+      try {
+        const result = await client.listRuns({ limit: 20 });
+        spinner.succeed(`Initialized DB; loaded ${result.runs.length} runs`);
+        return {
+          state: setRuns(state, result.runs),
+          canPoll: true,
+        };
+      } catch {
+        // Silent retry failure; continue with clean UI
+      }
+    }
+
     console.log(
       chalk.gray('   Run history will be available after first workflow')
+    );
+    showInfo(
+      'Tip: run "wrangler d1 migrations apply workflow-db-demo --local"'
     );
     return {
       state,
@@ -111,4 +131,31 @@ function startPolling(
     poller.start(client, onUpdate, 2000);
   }
   return poller;
+}
+
+async function applyLocalMigrations(): Promise<boolean> {
+  const spinner = ora('Applying local D1 migrations...').start();
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const proc = spawn(
+        'wrangler',
+        ['d1', 'migrations', 'apply', 'workflow-db-demo', '--local'],
+        { shell: true, stdio: ['ignore', 'pipe', 'pipe'] }
+      );
+      proc.on('error', reject);
+      proc.on('exit', (code) => {
+        if (code === 0) resolve();
+        else reject(new Error(`wrangler exited with code ${code}`));
+      });
+    });
+    spinner.succeed('Migrations applied');
+    return true;
+  } catch {
+    spinner.fail('Failed to apply migrations');
+    // keep UI clean; no raw error dump
+    showInfo(
+      'Manual fallback: wrangler d1 migrations apply workflow-db-demo --local'
+    );
+    return false;
+  }
 }
