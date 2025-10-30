@@ -12,9 +12,9 @@ export function showBanner() {
   const banner = `
 ╔═══════════════════════════════════════════════════════════╗
 ║                                                           ║
-║     ☁️   CLOUDFLARE WORKFLOW DEMO   ☁️                   ║
+║               CLOUDFLARE WORKFLOW DEMO                    ║
 ║                                                           ║
-║        Testing @workflow/world-cloudflare v4.0           ║
+║        Testing @workflow/world-cloudflare v4.0            ║
 ║                                                           ║
 ╚═══════════════════════════════════════════════════════════╝
 `;
@@ -66,7 +66,7 @@ export function createRunsTable(runs: WorkflowRun[]) {
   for (const run of runs) {
     const statusIcon = getStatusIcon(run.status);
     table.push([
-      chalk.dim(run.runId.slice(0, 12) + '...'),
+      chalk.dim(`${run.runId.slice(0, 12)}...`),
       run.workflowName,
       `${statusIcon} ${formatStatus(run.status)}`,
       new Date(run.createdAt).toLocaleTimeString(),
@@ -86,7 +86,7 @@ export function createDetailBox(title: string, data: Record<string, any>) {
     console.log(`│ ${formattedKey}: ${formattedValue}`);
   }
 
-  console.log(orange.bold('╰' + '─'.repeat(title.length + 4) + '╯'));
+  console.log(orange.bold(`╰${'─'.repeat(title.length + 4)}╯`));
   console.log();
 }
 
