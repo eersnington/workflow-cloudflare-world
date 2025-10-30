@@ -58,7 +58,7 @@ function attemptStart(port: number): Promise<ProcessInfo> {
   return new Promise((resolve, reject) => {
     const wrangler = spawn(
       'wrangler',
-      ['dev', 'src/worker.ts', '--local', '--port', port.toString()],
+      ['dev', 'src/server/worker.ts', '--local', '--port', port.toString()],
       { cwd: process.cwd(), stdio: ['ignore', 'pipe', 'pipe'], shell: true }
     );
 
