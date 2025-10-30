@@ -1,12 +1,12 @@
 import { select } from '@inquirer/prompts';
 import chalk from 'chalk';
-import { createRunAction } from '../actions/create-run.js';
-import { inspectRunAction } from '../actions/inspect-run.js';
-import { listRunsAction } from '../actions/list-runs.js';
-import { refreshAction } from '../actions/refresh.js';
-import type { ActionContext } from '../actions/types.js';
-import { type MenuAction, showMainMenu } from '../core/menu.js';
-import { showHeader, showInfo } from '../core/ui.js';
+import { createRunAction } from '@/actions/create-run.js';
+import { inspectRunAction } from '@/actions/inspect-run.js';
+import { listRunsAction } from '@/actions/list-runs.js';
+import { refreshAction } from '@/actions/refresh.js';
+import type { ActionContext } from '@/actions/types.js';
+import { type MenuAction, showMainMenu } from '@/core/menu.js';
+import { showHeader, showInfo } from '@/core/ui.js';
 import { initialize } from './initialize.js';
 
 export async function runCLI(serverUrl: string): Promise<void> {
