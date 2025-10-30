@@ -10,6 +10,7 @@
     "build": "tsc"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.9.0",
     "@workflow/world-cloudflare": "workspace:*",
     "axios": "^1.13.1",
     "chalk": "^5.6.2",
