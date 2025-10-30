@@ -1,0 +1,47 @@
+{
+  "name": "cloudflare-demo-worker",
+  "main": "src/worker.ts",
+  "compatibility_date": "2024-09-26",
+  "compatibility_flags": ["nodejs_compat"],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "workflow-db-demo",
+      "database_id": "local-demo",
+      "migrations_dir": "../../packages/world-cloudflare/src/drizzle/migrations"
+    }
+  ],
+  "queues": {
+    "producers": [
+      {
+        "binding": "WORKFLOW_QUEUE",
+        "queue": "workflow-queue"
+      },
+      {
+        "binding": "STEP_QUEUE",
+        "queue": "step-queue"
+      }
+    ],
+    "consumers": [
+      {
+        "queue": "workflow-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      },
+      {
+        "queue": "step-queue",
+        "max_batch_size": 10,
+        "max_batch_timeout": 5
+      }
+    ]
+  },
+  "r2_buckets": [
+    {
+      "binding": "STREAM_BUCKET",
+      "bucket_name": "workflow-streams"
+    }
+  ],
+  "vars": {
+    "DEPLOYMENT_ID": "demo"
+  }
+}
