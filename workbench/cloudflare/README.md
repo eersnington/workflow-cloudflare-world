@@ -1,6 +1,9 @@
 # Cloudflare Workflow Demo
 
-Interactive CLI for demonstrating `@workflow/world-cloudflare` with live workflow execution.
+<img width="990" height="558" alt="image" src="https://github.com/user-attachments/assets/769c23cc-7618-4679-890a-3fe006cbd765" />
+
+
+Interactive CLI for demonstrating [@workflow/world-cloudflare](../../packages/world-cloudflare) with live workflow execution.
 
 ## Quick Start
 
@@ -14,26 +17,14 @@ The CLI automatically starts the Cloudflare Worker dev server and presents an in
 
 ## Features
 
-✅ **Zero Configuration** - Auto-starts Wrangler dev server
-✅ **Interactive Menu** - Interactive navigation with @inquirer/prompts
-✅ **Real-Time Updates** - Background polling keeps run status current
-✅ **Self-Contained** - No manual server management needed
-✅ **Clean Architecture** - Feature-based modular structure
-✅ **Cloudflare Theme** - Orange/white/gray color scheme
-✅ **Clean UI** - Suppresses noisy dev server logs for smooth navigation
-✅ **ASCII Art Intro** - Animated Cloudflare logo with shadow effects
-
-## Architecture
-
-(WIP)
-
-### Design Principles
-
-1. **Single Responsibility** - Each file has one clear purpose
-2. **Feature-Based** - Actions organized by user feature
-3. **Type Safety** - Shared `ActionContext` for consistency
-4. **Modularity** - Easy to add new actions or features
-5. **Testability** - Small, focused functions
+- **Zero Configuration** - Auto-starts Wrangler dev server
+- **Interactive Menu** - Interactive navigation with @inquirer/prompts
+- **Real-Time Updates** - Background polling keeps run status current
+- **Self-Contained** - No manual server management needed
+- **Clean Architecture** - Feature-based modular structure
+- **Cloudflare Theme** - Orange/white/gray color scheme
+- **Clean UI** - Suppresses noisy dev server logs for smooth navigation
+- **ASCII Art Intro** - Animated Cloudflare logo with shadow effects
 
 ### Flow
 
