@@ -1,0 +1,28 @@
+{
+  "name": "world-cloudflare-demo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Visual CLI demo for @workflow/world-cloudflare",
+  "scripts": {
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc"
+  },
+  "dependencies": {
+    "@workflow/world-cloudflare": "workspace:*",
+    "axios": "^1.13.1",
+    "chalk": "^5.6.2",
+    "cli-table3": "^0.6.5",
+    "enquirer": "^2.3.6",
+    "gradient-string": "^3.0.0",
+    "ora": "^9.0.0"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251014.0",
+    "@types/cli-table3": "^0.7.4",
+    "@types/enquirer": "^2.3.10",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}
