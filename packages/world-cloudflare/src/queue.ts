@@ -75,10 +75,7 @@ const parseQueueName = (name: ValidQueueName): [QueuePrefix, string] => {
  * Queue consumer handler to be used in a Cloudflare Worker
  * This processes messages from Cloudflare Queues and forwards them to the embedded world
  */
-export async function handleQueueMessage(
-  batch: MessageBatch,
-  env: CloudflareEnv // TODO: look into this
-): Promise<void> {
+export async function handleQueueMessage(batch: MessageBatch): Promise<void> {
   const embeddedWorld = createEmbeddedWorld({ dataDir: undefined });
 
   for (const message of batch.messages) {
