@@ -83,6 +83,7 @@ Create a Cloudflare world in your Worker:
 ```typescript
 import { createWorld } from "@workflow/world-cloudflare";
 import type { CloudflareEnv } from "@workflow/world-cloudflare";
+import { handleQueueMessage } from '@workflow/world-cloudflare';
 
 export default {
   async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
@@ -99,7 +100,6 @@ export default {
   },
   
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
-    const { handleQueueMessage } = await import("@workflow/world-cloudflare");
     
     for (const message of batch.messages) {
       await handleQueueMessage(env, message);
