@@ -174,12 +174,13 @@ wrangler d1 execute workflow-db --local --command "SELECT * FROM workflow_runs"
 Queue consumers are automatically configured in `wrangler.json`. Implement the `queue()` handler in your Worker:
 
 ```typescript
+import { handleQueueMessage } from '@workflow/world-cloudflare';
+
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
-    const { handleQueueMessage } = await import("@workflow/world-cloudflare");
     
     for (const message of batch.messages) {
-      await handleQueueMessage(env, message);
+      await handleQueueMessage(message);
       message.ack(); // Acknowledge successful processing
     }
   }
