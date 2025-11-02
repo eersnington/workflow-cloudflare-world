@@ -100,6 +100,7 @@ export const steps = sqliteTable(
     attempt: integer('attempt').notNull(),
     startedAt: integer('started_at', { mode: 'timestamp' }),
     completedAt: integer('completed_at', { mode: 'timestamp' }),
+    retryAfter: integer('retry_after', { mode: 'timestamp' }),
     createdAt: integer('created_at', { mode: 'timestamp' })
       .$defaultFn(() => new Date())
       .notNull(),
