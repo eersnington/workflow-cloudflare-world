@@ -2,7 +2,11 @@ import { execSync } from 'node:child_process';
 import postgres from 'postgres';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createClient } from './drizzle/index.js';
-import { createRunsStorage, createStepsStorage } from './storage.js';
+import {
+  createRunsStorage,
+  createStepsStorage,
+  createEventsStorage,
+} from './storage.js';
 
 describe('Storage (Postgres integration)', () => {
   const connectionString =
@@ -13,6 +17,7 @@ describe('Storage (Postgres integration)', () => {
   const drizzle = createClient(sql);
   const runs = createRunsStorage(drizzle);
   const steps = createStepsStorage(drizzle);
+  const events = createEventsStorage(drizzle);
 
   async function truncateTables() {
     await sql`TRUNCATE TABLE workflow_events, workflow_steps, workflow_hooks, workflow_runs RESTART IDENTITY CASCADE`;
@@ -462,6 +467,47 @@ describe('Storage (Postgres integration)', () => {
 
         expect(page2.data).toHaveLength(2);
         expect(page2.data[0].stepId).not.toBe(page1.data[0].stepId);
+      });
+    });
+  });
+
+  describe('events', () => {
+    let testRunId: string;
+
+    beforeEach(async () => {
+      const run = await runs.create({
+        deploymentId: 'deployment-123',
+        workflowName: 'test-workflow',
+        input: [],
+      });
+      testRunId = run.runId;
+    });
+
+    describe('create', () => {
+      it('should create a new event', async () => {
+        const eventData = {
+          eventType: 'step_started' as const,
+          correlationId: 'corr_123',
+        };
+
+        const event = await events.create(testRunId, eventData);
+
+        expect(event.runId).toBe(testRunId);
+        expect(event.eventId).toMatch(/^wevt_/);
+        expect(event.eventType).toBe('step_started');
+        expect(event.correlationId).toBe('corr_123');
+        expect(event.createdAt).toBeInstanceOf(Date);
+      });
+
+      it('should handle workflow completed events', async () => {
+        const eventData = {
+          eventType: 'workflow_completed' as const,
+        };
+
+        const event = await events.create(testRunId, eventData);
+
+        expect(event.eventType).toBe('workflow_completed');
+        expect(event.correlationId).toBeUndefined();
       });
     });
   });
