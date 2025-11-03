@@ -301,7 +301,7 @@ describe('Storage (Postgres integration)', () => {
         expect(step.output).toBeUndefined();
         expect(step.error).toBeUndefined();
         expect(step.errorCode).toBeUndefined();
-        expect(step.attempt).toBe(0);
+        expect(step.attempt).toBe(1); // steps are created with attempt 1
         expect(step.startedAt).toBeUndefined();
         expect(step.completedAt).toBeUndefined();
         expect(step.createdAt).toBeInstanceOf(Date);
