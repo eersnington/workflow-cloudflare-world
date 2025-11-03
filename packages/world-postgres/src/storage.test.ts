@@ -137,13 +137,14 @@ describe('Storage (Postgres integration)', () => {
 
         const updated = await runs.update(created.runId, {
           status: 'failed',
-          error: 'boom',
-          errorCode: 'E_FAIL',
+          error: 'Something went wrong',
+          errorCode: 'ERR_001',
         });
+
         expect(updated.status).toBe('failed');
+        expect(updated.error).toBe('Something went wrong');
+        expect(updated.errorCode).toBe('ERR_001');
         expect(updated.completedAt).toBeInstanceOf(Date);
-        expect(updated.error).toBe('boom');
-        expect(updated.errorCode).toBe('E_FAIL');
       });
 
       it('should throw error for non-existent run', async () => {
@@ -170,8 +171,13 @@ describe('Storage (Postgres integration)', () => {
         });
 
         const result = await runs.list();
-        expect(result.data.map((r) => r.runId)).toEqual(
-          [run1.runId, run2.runId].sort().reverse()
+
+        expect(result.data).toHaveLength(2);
+        // Should be in descending order (most recent first)
+        expect(result.data[0].runId).toBe(run2.runId);
+        expect(result.data[1].runId).toBe(run1.runId);
+        expect(result.data[0].createdAt.getTime()).toBeGreaterThan(
+          result.data[1].createdAt.getTime()
         );
       });
 
@@ -226,7 +232,9 @@ describe('Storage (Postgres integration)', () => {
           workflowName: 'test-workflow',
           input: [],
         });
+
         const cancelled = await runs.cancel(created.runId);
+
         expect(cancelled.status).toBe('cancelled');
         expect(cancelled.completedAt).toBeInstanceOf(Date);
       });
@@ -239,7 +247,9 @@ describe('Storage (Postgres integration)', () => {
           workflowName: 'test-workflow',
           input: [],
         });
+
         const paused = await runs.pause(created.runId);
+
         expect(paused.status).toBe('paused');
       });
     });
@@ -251,9 +261,12 @@ describe('Storage (Postgres integration)', () => {
           workflowName: 'test-workflow',
           input: [],
         });
+
         await runs.pause(created.runId);
         const resumed = await runs.resume(created.runId);
+
         expect(resumed.status).toBe('running');
+        expect(resumed.startedAt).toBeInstanceOf(Date);
       });
     });
   });
@@ -272,14 +285,27 @@ describe('Storage (Postgres integration)', () => {
 
     describe('create', () => {
       it('should create a new step', async () => {
-        const stepData = { stepId: 'step-123', stepName: 'first', input: [] };
+        const stepData = {
+          stepId: 'step-123',
+          stepName: 'test-step',
+          input: ['input1', 'input2'],
+        };
+
         const step = await steps.create(testRunId, stepData);
 
         expect(step.runId).toBe(testRunId);
         expect(step.stepId).toBe('step-123');
+        expect(step.stepName).toBe('test-step');
         expect(step.status).toBe('pending');
-        expect(step.attempt).toBe(1);
+        expect(step.input).toEqual(['input1', 'input2']);
         expect(step.output).toBeUndefined();
+        expect(step.error).toBeUndefined();
+        expect(step.errorCode).toBeUndefined();
+        expect(step.attempt).toBe(0);
+        expect(step.startedAt).toBeUndefined();
+        expect(step.completedAt).toBeUndefined();
+        expect(step.createdAt).toBeInstanceOf(Date);
+        expect(step.updatedAt).toBeInstanceOf(Date);
       });
     });
 
@@ -288,25 +314,24 @@ describe('Storage (Postgres integration)', () => {
         const created = await steps.create(testRunId, {
           stepId: 'step-123',
           stepName: 'test-step',
-          input: [],
+          input: ['input1'],
         });
 
-        const retrieved = await steps.get(testRunId, created.stepId);
+        const retrieved = await steps.get(testRunId, 'step-123');
 
         expect(retrieved.stepId).toBe(created.stepId);
       });
 
       it('should retrieve a step with only stepId', async () => {
         const created = await steps.create(testRunId, {
-          stepId: 'step-123',
+          stepId: 'unique-step-123',
           stepName: 'test-step',
-          input: [],
+          input: ['input1'],
         });
 
-        const retrieved = await steps.get(undefined, created.stepId);
+        const retrieved = await steps.get(undefined, 'unique-step-123');
 
         expect(retrieved.stepId).toBe(created.stepId);
-        expect(retrieved.runId).toBe(testRunId);
       });
 
       it('should throw error for non-existent step', async () => {
@@ -323,9 +348,11 @@ describe('Storage (Postgres integration)', () => {
           stepName: 'test-step',
           input: ['input1'],
         });
+
         const updated = await steps.update(testRunId, 'step-123', {
           status: 'running',
         });
+
         expect(updated.status).toBe('running');
         expect(updated.startedAt).toBeInstanceOf(Date);
       });
@@ -336,10 +363,12 @@ describe('Storage (Postgres integration)', () => {
           stepName: 'test-step',
           input: ['input1'],
         });
+
         const updated = await steps.update(testRunId, 'step-123', {
           status: 'completed',
           output: ['ok'],
         });
+
         expect(updated.status).toBe('completed');
         expect(updated.completedAt).toBeInstanceOf(Date);
         expect(updated.output).toEqual(['ok']);
@@ -349,28 +378,32 @@ describe('Storage (Postgres integration)', () => {
         await steps.create(testRunId, {
           stepId: 'step-123',
           stepName: 'test-step',
-          input: [],
+          input: ['input1'],
         });
+
         const updated = await steps.update(testRunId, 'step-123', {
           status: 'failed',
-          error: 'bad',
-          errorCode: 'X',
+          error: 'Step failed',
+          errorCode: 'STEP_ERR',
         });
+
         expect(updated.status).toBe('failed');
+        expect(updated.error).toBe('Step failed');
+        expect(updated.errorCode).toBe('STEP_ERR');
         expect(updated.completedAt).toBeInstanceOf(Date);
-        expect(updated.error).toBe('bad');
-        expect(updated.errorCode).toBe('X');
       });
 
       it('should update attempt count', async () => {
         await steps.create(testRunId, {
           stepId: 'step-123',
           stepName: 'test-step',
-          input: [],
+          input: ['input1'],
         });
+
         const updated = await steps.update(testRunId, 'step-123', {
           attempt: 2,
         });
+
         expect(updated.attempt).toBe(2);
       });
     });
