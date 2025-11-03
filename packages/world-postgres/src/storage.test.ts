@@ -164,6 +164,9 @@ describe('Storage (Postgres integration)', () => {
           input: [],
         });
 
+        // Small delay to ensure different timestamps in createdAt
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
         const run2 = await runs.create({
           deploymentId: 'deployment-2',
           workflowName: 'workflow-2',
@@ -405,6 +408,60 @@ describe('Storage (Postgres integration)', () => {
         });
 
         expect(updated.attempt).toBe(2);
+      });
+    });
+
+    describe('list', () => {
+      it('should list all steps for a run', async () => {
+        const step1 = await steps.create(testRunId, {
+          stepId: 'step-1',
+          stepName: 'first-step',
+          input: [],
+        });
+        const step2 = await steps.create(testRunId, {
+          stepId: 'step-2',
+          stepName: 'second-step',
+          input: [],
+        });
+
+        const result = await steps.list({
+          runId: testRunId,
+        });
+
+        expect(result.data).toHaveLength(2);
+        // Should be in descending order
+        expect(result.data[0].stepId).toBe(step2.stepId);
+        expect(result.data[1].stepId).toBe(step1.stepId);
+        expect(result.data[0].createdAt.getTime()).toBeGreaterThanOrEqual(
+          result.data[1].createdAt.getTime()
+        );
+      });
+
+      it('should support pagination', async () => {
+        // Create multiple steps
+        for (let i = 0; i < 5; i++) {
+          await steps.create(testRunId, {
+            stepId: `step-${i}`,
+            stepName: `step-name-${i}`,
+            input: [],
+          });
+        }
+
+        const page1 = await steps.list({
+          runId: testRunId,
+          pagination: { limit: 2 },
+        });
+
+        expect(page1.data).toHaveLength(2);
+        expect(page1.cursor).not.toBeNull();
+
+        const page2 = await steps.list({
+          runId: testRunId,
+          pagination: { limit: 2, cursor: page1.cursor || undefined },
+        });
+
+        expect(page2.data).toHaveLength(2);
+        expect(page2.data[0].stepId).not.toBe(page1.data[0].stepId);
       });
     });
   });
