@@ -510,5 +510,88 @@ describe('Storage (Postgres integration)', () => {
         expect(event.correlationId).toBeUndefined();
       });
     });
+
+    describe('list', () => {
+      it('should list all events for a run', async () => {
+        const event1 = await events.create(testRunId, {
+          eventType: 'workflow_started' as const,
+        });
+
+        // Small delay to ensure different timestamps in event IDs
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(testRunId, {
+          eventType: 'step_started' as const,
+          correlationId: 'corr-step-1',
+        });
+
+        const result = await events.list({
+          runId: testRunId,
+          pagination: { sortOrder: 'asc' }, // Explicitly request ascending order
+        });
+
+        expect(result.data).toHaveLength(2);
+        // Should be in chronological order (oldest first)
+        expect(result.data[0].eventId).toBe(event1.eventId);
+        expect(result.data[1].eventId).toBe(event2.eventId);
+        expect(result.data[1].createdAt.getTime()).toBeGreaterThanOrEqual(
+          result.data[0].createdAt.getTime()
+        );
+      });
+
+      it('should list events in descending order when explicitly requested (newest first)', async () => {
+        const event1 = await events.create(testRunId, {
+          eventType: 'workflow_started' as const,
+        });
+
+        // Small delay to ensure different timestamps in event IDs
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(testRunId, {
+          eventType: 'step_started' as const,
+          correlationId: 'corr-step-1',
+        });
+
+        const result = await events.list({
+          runId: testRunId,
+          pagination: { sortOrder: 'desc' },
+        });
+
+        expect(result.data).toHaveLength(2);
+        // Should be in reverse chronological order (newest first)
+        expect(result.data[0].eventId).toBe(event2.eventId);
+        expect(result.data[1].eventId).toBe(event1.eventId);
+        expect(result.data[0].createdAt.getTime()).toBeGreaterThanOrEqual(
+          result.data[1].createdAt.getTime()
+        );
+      });
+
+      it('should support pagination', async () => {
+        // Create multiple events
+        for (let i = 0; i < 5; i++) {
+          await events.create(testRunId, {
+            eventType: 'step_completed',
+            correlationId: `corr_${i}`,
+            eventData: { result: i },
+          });
+        }
+
+        const page1 = await events.list({
+          runId: testRunId,
+          pagination: { limit: 2 },
+        });
+
+        expect(page1.data).toHaveLength(2);
+        expect(page1.cursor).not.toBeNull();
+
+        const page2 = await events.list({
+          runId: testRunId,
+          pagination: { limit: 2, cursor: page1.cursor || undefined },
+        });
+
+        expect(page2.data).toHaveLength(2);
+        expect(page2.data[0].eventId).not.toBe(page1.data[0].eventId);
+      });
+    });
   });
 });
