@@ -593,5 +593,275 @@ describe('Storage (Postgres integration)', () => {
         expect(page2.data[0].eventId).not.toBe(page1.data[0].eventId);
       });
     });
+
+    describe('listByCorrelationId', () => {
+      it('should list all events with a specific correlation ID', async () => {
+        const correlationId = 'step-abc123';
+
+        // Create events with the target correlation ID
+        const event1 = await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(testRunId, {
+          eventType: 'step_completed',
+          correlationId,
+          eventData: { result: 'success' },
+        });
+
+        // Create events with different correlation IDs (should be filtered out)
+        await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId: 'different-step',
+        });
+        await events.create(testRunId, {
+          eventType: 'workflow_completed',
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId,
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(2);
+        expect(result.data[0].eventId).toBe(event1.eventId);
+        expect(result.data[0].correlationId).toBe(correlationId);
+        expect(result.data[1].eventId).toBe(event2.eventId);
+        expect(result.data[1].correlationId).toBe(correlationId);
+      });
+
+      it('should list events across multiple runs with same correlation ID', async () => {
+        const correlationId = 'hook-xyz789';
+
+        // Create another run
+        const run2 = await runs.create({
+          deploymentId: 'deployment-456',
+          workflowName: 'test-workflow-2',
+          input: [],
+        });
+
+        // Create events in both runs with same correlation ID
+        const event1 = await events.create(testRunId, {
+          eventType: 'hook_created',
+          correlationId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(run2.runId, {
+          eventType: 'hook_received',
+          correlationId,
+          eventData: { payload: { data: 'test' } },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event3 = await events.create(testRunId, {
+          eventType: 'hook_disposed',
+          correlationId,
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId,
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(3);
+        expect(result.data[0].eventId).toBe(event1.eventId);
+        expect(result.data[0].runId).toBe(testRunId);
+        expect(result.data[1].eventId).toBe(event2.eventId);
+        expect(result.data[1].runId).toBe(run2.runId);
+        expect(result.data[2].eventId).toBe(event3.eventId);
+        expect(result.data[2].runId).toBe(testRunId);
+      });
+
+      it('should return empty list for non-existent correlation ID', async () => {
+        await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId: 'existing-step',
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId: 'non-existent-correlation-id',
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(0);
+        expect(result.hasMore).toBe(false);
+        expect(result.cursor).toBeNull();
+      });
+
+      it('should respect pagination parameters', async () => {
+        const correlationId = 'step_paginated';
+
+        // Create multiple events
+        await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        await events.create(testRunId, {
+          eventType: 'step_retrying',
+          correlationId,
+          eventData: { attempt: 1 },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        await events.create(testRunId, {
+          eventType: 'step_completed',
+          correlationId,
+          eventData: { result: 'success' },
+        });
+
+        // Get first page
+        const page1 = await events.listByCorrelationId({
+          correlationId,
+          pagination: { limit: 2 },
+        });
+
+        expect(page1.data).toHaveLength(2);
+        expect(page1.hasMore).toBe(true);
+        expect(page1.cursor).toBeDefined();
+
+        // Get second page
+        const page2 = await events.listByCorrelationId({
+          correlationId,
+          pagination: { limit: 2, cursor: page1.cursor || undefined },
+        });
+
+        expect(page2.data).toHaveLength(1);
+        expect(page2.hasMore).toBe(false);
+      });
+
+      it('should always return full event data', async () => {
+        await events.create(testRunId, {
+          eventType: 'step_completed',
+          correlationId: 'step-with-data',
+          eventData: { result: 'success' },
+        });
+
+        // Note: resolveData parameter is ignored by the PG World storage implementation
+        const result = await events.listByCorrelationId({
+          correlationId: 'step-with-data',
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(1);
+        expect(result.data[0].correlationId).toBe('step-with-data');
+      });
+
+      it('should return events in ascending order by default', async () => {
+        const correlationId = 'step-ordering';
+
+        // Create events with slight delays to ensure different timestamps
+        const event1 = await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(testRunId, {
+          eventType: 'step_completed',
+          correlationId,
+          eventData: { result: 'success' },
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId,
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(2);
+        expect(result.data[0].eventId).toBe(event1.eventId);
+        expect(result.data[1].eventId).toBe(event2.eventId);
+        expect(result.data[0].createdAt.getTime()).toBeLessThanOrEqual(
+          result.data[1].createdAt.getTime()
+        );
+      });
+
+      it('should support descending order', async () => {
+        const correlationId = 'step-desc-order';
+
+        const event1 = await events.create(testRunId, {
+          eventType: 'step_started',
+          correlationId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const event2 = await events.create(testRunId, {
+          eventType: 'step_completed',
+          correlationId,
+          eventData: { result: 'success' },
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId,
+          pagination: { sortOrder: 'desc' },
+        });
+
+        expect(result.data).toHaveLength(2);
+        expect(result.data[0].eventId).toBe(event2.eventId);
+        expect(result.data[1].eventId).toBe(event1.eventId);
+        expect(result.data[0].createdAt.getTime()).toBeGreaterThanOrEqual(
+          result.data[1].createdAt.getTime()
+        );
+      });
+
+      it('should handle hook lifecycle events', async () => {
+        const hookId = 'hook_test123';
+
+        // Create a typical hook lifecycle
+        const created = await events.create(testRunId, {
+          eventType: 'hook_created' as const,
+          correlationId: hookId,
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const received1 = await events.create(testRunId, {
+          eventType: 'hook_received' as const,
+          correlationId: hookId,
+          eventData: { payload: { request: 1 } },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const received2 = await events.create(testRunId, {
+          eventType: 'hook_received' as const,
+          correlationId: hookId,
+          eventData: { payload: { request: 2 } },
+        });
+
+        await new Promise((resolve) => setTimeout(resolve, 2));
+
+        const disposed = await events.create(testRunId, {
+          eventType: 'hook_disposed' as const,
+          correlationId: hookId,
+        });
+
+        const result = await events.listByCorrelationId({
+          correlationId: hookId,
+          pagination: {},
+        });
+
+        expect(result.data).toHaveLength(4);
+        expect(result.data[0].eventId).toBe(created.eventId);
+        expect(result.data[0].eventType).toBe('hook_created');
+        expect(result.data[1].eventId).toBe(received1.eventId);
+        expect(result.data[1].eventType).toBe('hook_received');
+        expect(result.data[2].eventId).toBe(received2.eventId);
+        expect(result.data[2].eventType).toBe('hook_received');
+        expect(result.data[3].eventId).toBe(disposed.eventId);
+        expect(result.data[3].eventType).toBe('hook_disposed');
+      });
+    });
   });
 });
