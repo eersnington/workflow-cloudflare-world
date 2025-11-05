@@ -22,7 +22,7 @@ this package sits alongside `@workflow/builders` and `@workflow/cli` to deliver 
 
 ```mermaid
 flowchart LR
-  subgraph host["your server (fastify, elysia, bare node, etc.)"]
+  subgraph host["server (fastify, elysia, etc.)"]
     A["incoming http request"] --> B["createRequestAdapter()"];
     B --> C["fetch-style Request"];
   end
