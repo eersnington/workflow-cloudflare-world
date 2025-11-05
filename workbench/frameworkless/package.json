@@ -1,0 +1,21 @@
+{
+  "name": "@workflow/frameworkless-app",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "license": "Apache-2.0",
+  "scripts": {
+    "workflow": "workflow",
+    "build": "workflow build --target standalone --workflow-manifest manifest.cjs",
+    "build:server": "tsc --project tsconfig.server.json",
+    "start": "pnpm run build:server && node dist/server.js"
+  },
+  "dependencies": {
+    "@workflow/standalone": "workspace:*",
+    "workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@workflow/cli": "workspace:*"
+  }
+}

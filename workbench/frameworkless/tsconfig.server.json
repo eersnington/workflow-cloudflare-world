@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "dist",
+    "declaration": false,
+    "declarationMap": false,
+    "emitDeclarationOnly": false,
+    "module": "node16",
+    "moduleResolution": "node16",
+    "target": "es2022",
+    "sourceMap": false
+  },
+  "include": ["server.ts"]
+}
