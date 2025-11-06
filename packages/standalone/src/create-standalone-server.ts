@@ -341,6 +341,8 @@ function isCommonJsInEsModuleError(error: unknown): boolean {
   const message = error.message || '';
   return (
     message.includes('module is not defined in ES module scope') ||
+    message.includes('Cannot require() ES Module') ||
+    message.includes('Unexpected module status') ||
     message.includes('module is not defined')
   );
 }

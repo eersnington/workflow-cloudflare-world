@@ -21,7 +21,6 @@ if (!existsSync(BUILD_DIR)) {
 }
 
 const port = process.env.PORT ? Number(process.env.PORT) : 3000;
-const manifest = loadManifest();
 const requestAdapter = createRequestAdapter({
   baseUrl: `http://127.0.0.1:${port}`,
 });
@@ -42,6 +41,7 @@ const { url, close } = await createStandaloneServer({
     }
 
     try {
+      const manifest = loadManifest();
       const request = await requestAdapter({
         method: req.method,
         url: req.url ?? '/api/test',
@@ -55,7 +55,7 @@ const { url, close } = await createStandaloneServer({
       const name =
         typeof payload?.name === 'string' && payload.name.length > 0
           ? payload.name
-          : 'curl';
+          : 'Pranay';
 
       const workflowEntry =
         manifest?.['workflows/hello.ts'] &&

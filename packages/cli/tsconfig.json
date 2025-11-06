@@ -6,7 +6,16 @@
     "module": "node16",
     "moduleResolution": "node16",
     "allowSyntheticDefaultImports": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "baseUrl": "./",
+    "paths": {
+      "@workflow/standalone": ["../standalone/dist/index.d.ts"],
+      "@workflow/standalone/*": ["../standalone/dist/*"],
+      "workflow": ["../workflow/dist/index.d.ts"],
+      "workflow/api": ["../workflow/dist/api.d.ts"],
+      "workflow/runtime": ["../workflow/dist/runtime.d.ts"],
+      "workflow/*": ["../workflow/dist/*"]
+    }
   },
   "include": ["src"],
   "exclude": ["node_modules"]

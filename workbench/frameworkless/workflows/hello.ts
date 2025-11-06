@@ -1,9 +1,17 @@
 import { sleep } from 'workflow';
 
-export async function hello(name = 'Pranay'): Promise<string> {
+export async function hello(name = 'Pranay') {
   'use workflow';
+
+  console.log('Starting Workflow in frameworkless webserver');
 
   await sleep('5s');
 
-  return `Wassgud, ${name}!`;
+  console.log(`Wassgud, ${name}!`);
+
+  return {
+    message: `Wassgud, ${name}!`,
+    name: name,
+    timestamp: Date.now(),
+  };
 }

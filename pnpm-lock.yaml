@@ -335,6 +335,9 @@ importers:
       '@workflow/errors':
         specifier: workspace:*
         version: link:../errors
+      '@workflow/standalone':
+        specifier: workspace:*
+        version: link:../standalone
       '@workflow/swc-plugin':
         specifier: workspace:*
         version: link:../swc-plugin-workflow
@@ -395,6 +398,9 @@ importers:
       tinyglobby:
         specifier: ^0.2.14
         version: 0.2.14
+      workflow:
+        specifier: workspace:*
+        version: link:../workflow
       xdg-app-paths:
         specifier: ^5.1.0
         version: 5.5.1

@@ -32,6 +32,15 @@ pnpm --filter @workflow/frameworkless-app start
 
 > If your environment forbids binding to that port (e.g. sandbox restrictions), try `PORT=0 pnpm --filter @workflow/frameworkless-app start` to let Node choose an ephemeral port. Use the printed URL in later steps.
 
+Or, to use the CLI with watch mode:
+
+```bash
+# inside the app directory
+pnpm workflow dev --port 3000
+```
+
+This runs the same standalone server, automatically rebuilds on file changes, and exposes the helper route described below.
+
 ## 4. Kick off a workflow via HTTP
 
 Open another terminal and POST to the helper route the server exposes:
