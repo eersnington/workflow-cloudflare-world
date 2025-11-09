@@ -32,7 +32,13 @@ Run the included CLI to scaffold the Cloudflare bindings and queue handler direc
 npx workflow-cloudflare-world
 ```
 
-It asks how you want to deploy, then (by default) creates `wrangler.json` and `src/worker.ts` in the current working directory. The generated worker file already exports `StreamCoordinator` and the queue handler so Cloudflare can bind everything automatically. Adjust the file paths or merge the output into your existing config if needed.
+It asks how you want to deploy, which built bundle file Wrangler should use as `main`, and where your D1 migrations should live. The CLI then:
+
+- Writes a `wrangler.json` stub (or prints JSON to merge)
+- Creates a queue/`StreamCoordinator` entry file (default `src/worker.ts`)
+- Drops the baseline D1 migration (`0000_workflow_cloudflare.sql`) into your chosen migrations directory
+
+Adjust the file paths or merge the output into your existing config if needed.
 
 ### Deployment Models
 
@@ -50,17 +56,15 @@ Configure your Cloudflare Worker with the required bindings in `wrangler.json`:
 ```json
 {
   "name": "my-workflow-worker",
-  "main": "src/index.ts",
+  "main": "dist/index.js",
   "compatibility_date": "2024-09-26",
-  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "workflow-db",
-      "database_id": "YOUR_D1_DATABASE_ID",
-      "migrations_dir": "src/drizzle/migrations"
+      "database_name": "workflow-db"
     }
   ],
+  "migrations_dir": "migrations",
   "durable_objects": {
     "bindings": [
       {
@@ -184,20 +188,17 @@ The Cloudflare world requires the following environment bindings:
 
 ## Database Setup
 
-This package uses Cloudflare D1 with Drizzle ORM:
+This package uses Cloudflare D1 with Drizzle ORM. The CLI copies the baseline schema migration into your chosen directory (default `migrations/0000_workflow_cloudflare.sql`). Apply it before deploying:
 
 ```bash
 # Create D1 database
 wrangler d1 create workflow-db
 
-# Generate migrations from schema
-pnpm drizzle-kit generate
-
-# Apply migrations to D1
-wrangler d1 migrations apply workflow-db --local  # for local dev
-wrangler d1 migrations apply workflow-db          # for production
+# Apply migrations to D1 (local or remote)
+wrangler d1 migrations apply workflow-db
 ```
 
+Add future schema changes by editing the Drizzle schema in this package, generating a new SQL file, and dropping it into the same migrations folder before re-running the `wrangler d1 migrations apply` command.
 ## Features
 
 - **Durable Storage**: D1 (SQLite) stores workflow runs, events, steps, and hooks
