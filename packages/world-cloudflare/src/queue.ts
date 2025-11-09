@@ -1,5 +1,4 @@
 import type { Message } from '@cloudflare/workers-types';
-import { JsonTransport } from '@vercel/queue';
 import {
   MessageId,
   type Queue,
@@ -77,7 +76,17 @@ export function createQueue(env: CloudflareEnv): Queue {
         return Response.json({ error: 'Unhandled queue' }, { status: 400 });
       }
 
-      const body = await new JsonTransport().deserialize(req.body);
+      let body: unknown;
+      try {
+        body = await req.json();
+      } catch (error) {
+        console.error('Failed to parse queue payload', error);
+        return Response.json(
+          { error: 'Invalid request body' },
+          { status: 400 }
+        );
+      }
+
       try {
         const result = await handler(body, { attempt, queueName, messageId });
         if (result && typeof result.timeoutSeconds === 'number') {
