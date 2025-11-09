@@ -88,8 +88,7 @@ Durable Objects provide version pinning and stateful coordination so every conne
 Implement the `queue()` export in your Worker to process queue messages:
 
 ```typescript
-import { handleQueueMessage } from "workflow-cloudflare-world";
-import type { CloudflareEnv } from "workflow-cloudflare-world";
+import { handleQueueMessage, type MessageBatch, type CloudflareEnv } from "workflow-cloudflare-world";
 
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
@@ -180,7 +179,7 @@ You can deploy this world in two common ways:
 
 In both cases you control versioning via normal Worker deployments, and the Durable Object keeps streaming state consistent across versions.
 
-> Need a starting snippet? Run `npx workflow-cloudflare-world` to launch an interactive helper that prints the Wrangler config for either deployment mode along with queue-consumer reminders.
+> Need a starting point? Run `npx workflow-cloudflare-world` inside your project and it will scaffold `wrangler.json` plus a queue handler (exporting `StreamCoordinator`) tailored to your answers.
 
 ## Comparison with Other Worlds
 
