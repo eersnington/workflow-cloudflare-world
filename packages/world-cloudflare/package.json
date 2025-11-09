@@ -34,7 +34,6 @@
     "@vercel/queue": "0.0.0-alpha.23",
     "@workflow/errors": "workspace:*",
     "@workflow/world": "workspace:*",
-    "@workflow/world-local": "workspace:*",
     "drizzle-orm": "^0.31.2",
     "ulid": "^3.0.1",
     "zod": "catalog:"

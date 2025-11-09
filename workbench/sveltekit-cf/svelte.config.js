@@ -1,9 +1,5 @@
-import node from '@sveltejs/adapter-node';
-import vercel from '@sveltejs/adapter-vercel';
+import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
-
-// Node adapter needed for ci tests
-const adapter = process.env.VERCEL_DEPLOYMENT_ID ? vercel() : node();
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -11,7 +7,7 @@ const config = {
   // for more information about preprocessors
   preprocess: vitePreprocess(),
   kit: {
-    adapter: adapter,
+    adapter: adapter(),
     // WARNING: CSRF protection is disabled for testing/development purposes.
     // This configuration trusts all origins and should NOT be used in production.
     // In production, specify only trusted origins or remove this configuration
