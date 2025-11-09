@@ -26,13 +26,13 @@ export WORKFLOW_TARGET_WORLD="workflow-cloudflare-world"
 
 ### CLI Helper
 
-Run the included CLI to generate Wrangler snippets and deployment instructions tailored to your project:
+Run the included CLI to scaffold the Cloudflare bindings and queue handler directly in your project:
 
 ```bash
 npx workflow-cloudflare-world
 ```
 
-It will ask a few questions (deployment mode, binding names) and then write a `wrangler.generated.json` (or a path you choose) with the full config plus exact code snippets for exporting `StreamCoordinator` and wiring the queue consumer. Review that file and merge it into your actual `wrangler.json`.
+It asks how you want to deploy, then (by default) creates `wrangler.json` and `src/worker.ts` in the current working directory. The generated worker file already exports `StreamCoordinator` and the queue handler so Cloudflare can bind everything automatically. Adjust the file paths or merge the output into your existing config if needed.
 
 ### Deployment Models
 
@@ -120,6 +120,7 @@ import {
   createWorld,
   handleQueueMessage,
   type CloudflareEnv,
+  type MessageBatch,
 } from "workflow-cloudflare-world";
 
 export default {
@@ -235,7 +236,7 @@ wrangler d1 execute workflow-db --local --command "SELECT * FROM workflow_runs"
 Queue consumers are automatically configured in `wrangler.json`. Implement the `queue()` handler in your Worker:
 
 ```typescript
-import { handleQueueMessage } from 'workflow-cloudflare-world';
+import { handleQueueMessage, type MessageBatch } from 'workflow-cloudflare-world';
 
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
