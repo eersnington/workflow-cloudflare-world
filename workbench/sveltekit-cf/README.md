@@ -18,6 +18,7 @@ This example bundles the `workflow-cloudflare-world` package directly into a Sve
    - An R2 bucket bound as `STREAM_BUCKET`
    - A Durable Object namespace + migration for `StreamCoordinator`
    - Optional `WORKFLOW_DISPATCH` service binding (recommended) or `WORKFLOW_DISPATCH_URL`
+   > Tip: run `npx workflow-cloudflare-world` from the repo root; it will write a `wrangler.generated.json` you can merge into this project and shows the exact code to export `StreamCoordinator` + queue handlers.
 
 ## Wiring the Worker
 
