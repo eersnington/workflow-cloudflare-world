@@ -40,6 +40,7 @@ It asks how you want to deploy, which built bundle file Wrangler should use as `
 - Adds an `assets` binding (default `.cloudflare/assets`) so adapter-cloudflare builds deploy without extra edits
 - Enables the `nodejs_compat` flag to satisfy Node built-ins required by the Workflow runtime
 
+
 Adjust the file paths or merge the output into your existing config if needed.
 
 ### Deployment Models
