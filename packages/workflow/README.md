@@ -5,20 +5,16 @@
       <img alt="Workflow DevKit logo" src="https://useworkflow.dev/workflow-circle-symbol-light.svg" height="128">
     </picture>
   </a>
-  <h1>Workflow Development Kit</h1>
+  <h1>Workflow Cloudflare World</h1>
 
 <a href="https://vercel.com"><img alt="Vercel logo" src="https://img.shields.io/badge/MADE%20BY%20Vercel-000000.svg?style=for-the-badge&logo=Vercel&labelColor=000"></a>
-<a href="https://www.npmjs.com/package/workflow"><img alt="NPM version" src="https://img.shields.io/npm/v/workflow?style=for-the-badge&labelColor=000000"></a>
+<a href="https://www.npmjs.com/package/workflow-cloudflare-world"><img alt="NPM version" src="https://img.shields.io/npm/v/workflow-cloudflare-world?style=for-the-badge&labelColor=000000"></a>
 <a href="https://github.com/vercel/workflow/blob/main/LICENSE.md"><img alt="License" src="https://img.shields.io/npm/l/workflow.svg?style=for-the-badge&labelColor=000000"></a>
 <a href="https://github.com/vercel/workflow/discussions"><img alt="Join the community on GitHub" src="https://img.shields.io/badge/Join%20the%20community-blueviolet.svg?style=for-the-badge&logo=Github&labelColor=000000&logoWidth=20"></a>
 
 </div>
 
-## Getting Started
-
-The **Workflow Development Kit** lets you easily add durability, reliability, and observability to async JavaScript. Build apps and AI Agents that can suspend, resume, and maintain state with ease.
-
-Visit [https://useworkflow.dev](https://useworkflow.dev) to view the full documentation.
+This repo hosts the Cloudflare-specific world implementation plus a SvelteKit workbench. If you’re looking for the full Workflow DevKit docs, head to [useworkflow.dev](https://useworkflow.dev).
 
 ### World Implementation for Cloudflare
 
@@ -133,34 +129,13 @@ export async function queue(batch: MessageBatch, env: CloudflareEnv) {
 - `workbench/sveltekit-cf` patches adapter-cloudflare’s `_worker.js` via `scripts/patch-worker.mjs` to merge the HTTP and queue exports. Run `pnpm build` before any Wrangler command.
 - Review `PROBLEMS.md` for the Cloudflare-specific caveats (entrypoint patching, queue provisioning, WeakRef/FinalizationRegistry polyfills, `nodejs_compat` requirement, serializer `eval` limitation, etc.).
 
-## Community
+## Troubleshooting & Limitations
 
-The Workflow DevKit community can be found on [GitHub Discussions](https://github.com/vercel/workflow/discussions) where you can ask questions, voice ideas, and share your projects with other people.
+- Check `PROBLEMS.md` for the current list of Cloudflare-specific issues (patched `_worker.js`, queue provisioning gotchas, polyfills, serializer `eval` restriction, etc.).
+- Cloudflare Workers block `eval`/`new Function`, so `dehydrateWorkflowArguments` cannot serialize certain complex types yet. Stick to JSON-safe primitives until the core runtime ships an eval-free serializer.
+- Always run `pnpm build` before `wrangler deploy` so `.svelte-kit/cloudflare/_worker.js` gets patched with the queue/DO exports.
 
-## Contributing
+## Support
 
-Contributions to Workflow DevKit are welcome and highly appreciated. Please use GitHub [issues](https://github.com/vercel/workflow/issues) and [discussions](https://github.com/vercel/workflow/discussions) to collaborate with the team and the wider community.
-
-## Authors
-
-Workflow DevKit was built by engineers at [Vercel](https://vercel.com) and the [Open Source Community](https://github.com/vercel/workflow/graphs/contributors).
-
-The initial core contributing engineers are
-
-- Adrian Lam ([@adriandlam](https://github.com/adriandlam))
-- Dillon Mulroy ([@dmmulroy](https://github.com/dmmulroy))
-- Gal Schlezinger ([@Schniz](https://github.com/Schniz))
-- JJ Kasper ([@ijjk](https://github.com/ijjk))
-- Nathan Rajlich ([@TooTallNate](https://github.com/TooTallNate))
-- Peter Wielander ([@VaguelySerious](https://github.com/VaguelySerious))
-- Pranay Prakash ([@pranaygp](https://github.com/pranaygp))
-
-The Workflow DevKit logo was designed by Cecilio Ruiz [@ceciliorz](https://x.com/ceciliorz)
-
----
-
-## Security
-
-If you believe you have found a security vulnerability in Workflow DevKit, we encourage you to **_responsibly disclose this and NOT open a public issue_**.
-
-To participate in our Open Source Software Bug Bounty program, please email [responsible.disclosure@vercel.com](mailto:responsible.disclosure@vercel.com). We will add you to the program and provide further instructions for submitting your report.
+- Questions / discussions: [GitHub Discussions](https://github.com/vercel/workflow/discussions)
+- Bugs specific to this world implementation: open an issue in this repo with details about your Worker setup, Wrangler config, and any relevant logs.
