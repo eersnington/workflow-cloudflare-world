@@ -345,7 +345,7 @@ function printOutput({
     );
   }
   bullet(
-    `Run:\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`
+    `Run:\n   \u001b[33mwrangler d1 create ${d1DatabaseName}\u001b[0m (first time only)\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`
   );
 
   bullet(
