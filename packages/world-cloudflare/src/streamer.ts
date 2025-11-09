@@ -1,85 +1,82 @@
 import type { Streamer } from '@workflow/world';
 import type { CloudflareEnv } from './config.js';
 
+const encodeChunk = (chunk: string | Uint8Array): Uint8Array =>
+  typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk;
+
+const toBodyInit = (data: Uint8Array): ArrayBuffer => data.slice().buffer;
+
 /**
- * Cloudflare Streamer implementation using R2 for stream storage
- *
- * Stores stream chunks as objects in R2 bucket, indexed by stream name and chunk number.
- * Each stream is stored as a series of objects: streams/{name}/{index}
+ * Cloudflare Streamer implementation backed by Durable Objects for fan-out and
+ * R2 for durable storage. Writers append chunks via the coordinator object,
+ * while readers receive a live stream (no polling) from the same coordinator.
  */
 export function createStreamer(env: CloudflareEnv): Streamer {
-  const bucket = env.STREAM_BUCKET;
+  const getCoordinator = (name: string): Fetcher => {
+    const id = env.STREAM_COORDINATOR.idFromName(name);
+    return env.STREAM_COORDINATOR.get(id);
+  };
 
   return {
-    async writeToStream(
-      name: string,
-      chunk: string | Uint8Array
-    ): Promise<void> {
-      const metadataKey = `metadata/${name}`;
-      const metadataObj = await bucket.get(metadataKey);
-      let chunkIndex = 0;
-      if (metadataObj) {
-        const metadata = await metadataObj.json<{ chunkCount: number }>();
-        chunkIndex = metadata.chunkCount;
-      }
-      const data =
-        typeof chunk === 'string' ? new TextEncoder().encode(chunk) : chunk;
-      const chunkKey = `streams/${name}/${chunkIndex}`;
-      await bucket.put(chunkKey, data);
-      await bucket.put(
-        metadataKey,
-        JSON.stringify({ chunkCount: chunkIndex + 1 })
+    async writeToStream(name, chunk) {
+      const coordinator = getCoordinator(name);
+      const encoded = encodeChunk(chunk);
+      const response = await coordinator.fetch(
+        // Workers requires Durable Object fetches to use an absolute URL.
+        // Only the path/query are inspected by the coordinator, so we supply a
+        // fixed placeholder origin to satisfy that requirement.
+        new URL('/write', 'https://stream-coordinator.worker'),
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/octet-stream',
+            'X-Stream-Name': name,
+          },
+          body: toBodyInit(encoded),
+        }
       );
+      if (!response.ok) {
+        throw new Error(
+          `Failed to write stream chunk (${response.status}): ${await response.text()}`
+        );
+      }
     },
 
-    async closeStream(name: string): Promise<void> {
-      const metadataKey = `metadata/${name}`;
-      const metadataObj = await bucket.get(metadataKey);
-      let chunkCount = 0;
-      if (metadataObj) {
-        const metadata = await metadataObj.json<{ chunkCount: number }>();
-        chunkCount = metadata.chunkCount;
-      }
-      await bucket.put(
-        metadataKey,
-        JSON.stringify({ chunkCount, closed: true })
+    async closeStream(name) {
+      const coordinator = getCoordinator(name);
+      const response = await coordinator.fetch(
+        new URL('/close', 'https://stream-coordinator.worker'),
+        {
+          method: 'POST',
+          headers: {
+            'X-Stream-Name': name,
+          },
+        }
       );
+      if (!response.ok) {
+        throw new Error(
+          `Failed to close stream (${response.status}): ${await response.text()}`
+        );
+      }
     },
 
-    async readFromStream(
-      name: string,
-      startIndex = 0
-    ): Promise<ReadableStream<Uint8Array>> {
-      return new ReadableStream({
-        async start(controller) {
-          try {
-            let index = startIndex;
-            const metadataKey = `metadata/${name}`;
-            const metadataObj = await bucket.get(metadataKey);
-            if (!metadataObj) {
-              controller.close();
-              return;
-            }
-            const metadata = await metadataObj.json<{
-              chunkCount: number;
-              closed?: boolean;
-            }>();
-            while (index < metadata.chunkCount) {
-              const chunkKey = `streams/${name}/${index}`;
-              const chunkObj = await bucket.get(chunkKey);
-              if (!chunkObj) {
-                break;
-              }
-              const data = await chunkObj.arrayBuffer();
-              controller.enqueue(new Uint8Array(data));
-              index++;
-            }
-            controller.close();
-          } catch (error) {
-            controller.error(error);
-          }
+    async readFromStream(name, startIndex = 0) {
+      const coordinator = getCoordinator(name);
+      const url = new URL('/read', 'https://stream-coordinator.worker');
+      url.searchParams.set('startIndex', String(startIndex));
+      const response = await coordinator.fetch(url, {
+        headers: {
+          'X-Stream-Name': name,
         },
       });
+
+      if (!response.ok || !response.body) {
+        throw new Error(
+          `Failed to read stream (${response.status}): ${await response.text()}`
+        );
+      }
+
+      return response.body as ReadableStream<Uint8Array>;
     },
   };
 }

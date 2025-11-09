@@ -22,6 +22,17 @@ The Cloudflare world can be configured by setting the `WORKFLOW_TARGET_WORLD` en
 export WORKFLOW_TARGET_WORLD="@workflow/world-cloudflare"
 ```
 
+> This package is self-hosted. Setting the environment variable just tells the Workflow SDK to instantiate this world inside your Worker—you still deploy and operate the Worker, queues, D1, R2, and Durable Objects yourself.
+
+### Deployment Models
+
+You can run the world in two ways:
+
+1. **Co-located with your app** – Install `@workflow/world-cloudflare` in the same Worker that serves your SvelteKit/Next/Nitro routes. The generated `/.well-known/workflow` handlers, queue consumer, and world storage all share one deployment and one set of bindings.
+2. **Dedicated Worker** – Deploy a standalone Worker that only exposes the world (including the queue consumer and `StreamCoordinator`). Application Workers connect to it via a [service binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (`WORKFLOW_DISPATCH`) or, less preferably, an HTTPS origin (`WORKFLOW_DISPATCH_URL`). Multiple apps can share the same world Worker this way.
+
+In both scenarios, Cloudflare Queues deliver messages to your Worker, `handleQueueMessage` forwards them to the workflow/step HTTP handlers, and the Durable Object keeps streaming state consistent during deployments.
+
 ### Wrangler Configuration
 
 Configure your Cloudflare Worker with the required bindings in `wrangler.json`:
@@ -38,6 +49,20 @@ Configure your Cloudflare Worker with the required bindings in `wrangler.json`:
       "database_name": "workflow-db",
       "database_id": "YOUR_D1_DATABASE_ID",
       "migrations_dir": "src/drizzle/migrations"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "STREAM_COORDINATOR",
+        "class_name": "StreamCoordinator"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "stream-coordinator-v1",
+      "new_classes": ["StreamCoordinator"]
     }
   ],
   "queues": {
@@ -81,9 +106,11 @@ Configure your Cloudflare Worker with the required bindings in `wrangler.json`:
 Create a Cloudflare world in your Worker:
 
 ```typescript
-import { createWorld } from "@workflow/world-cloudflare";
-import type { CloudflareEnv } from "@workflow/world-cloudflare";
-import { handleQueueMessage } from '@workflow/world-cloudflare';
+import {
+  createWorld,
+  handleQueueMessage,
+  type CloudflareEnv,
+} from "@workflow/world-cloudflare";
 
 export default {
   async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
@@ -98,27 +125,51 @@ export default {
     
     return Response.json({ runId: run.runId });
   },
-  
+
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
-    
     for (const message of batch.messages) {
-      await handleQueueMessage(env, message);
+      try {
+        const result = await handleQueueMessage(env, message);
+        if (result?.retryAfterSeconds) {
+          message.retry({ delaySeconds: result.retryAfterSeconds });
+        } else {
+          message.ack();
+        }
+      } catch (error) {
+        console.error("Failed to forward queue message", error);
+        message.retry();
+      }
     }
-  }
+  },
 };
+```
+
+### Durable Object Registration
+
+Add the coordinator class to your Worker module so Wrangler can bind it:
+
+```typescript
+import { StreamCoordinator } from "@workflow/world-cloudflare";
+
+export { StreamCoordinator };
 ```
 
 ## Required Bindings
 
 The Cloudflare world requires the following environment bindings:
 
-| Binding           | Type                     | Description                                    |
-| ----------------- | ------------------------ | ---------------------------------------------- |
-| `DB`              | `D1Database`             | D1 database for workflow state storage         |
-| `WORKFLOW_QUEUE`  | `Queue`                  | Cloudflare Queue for workflow tasks            |
-| `STEP_QUEUE`      | `Queue`                  | Cloudflare Queue for step tasks                |
-| `STREAM_BUCKET`   | `R2Bucket`               | R2 bucket for stream chunk storage             |
-| `DEPLOYMENT_ID`   | `string` (optional)      | Deployment identifier (default: "cloudflare")  |
+| Binding             | Type                     | Description                                    |
+| ------------------- | ------------------------ | ---------------------------------------------- |
+| `DB`                | `D1Database`             | D1 database for workflow state storage         |
+| `WORKFLOW_QUEUE`    | `Queue`                  | Cloudflare Queue for workflow tasks            |
+| `STEP_QUEUE`        | `Queue`                  | Cloudflare Queue for step tasks                |
+| `STREAM_BUCKET`     | `R2Bucket`               | R2 bucket for stream chunk storage             |
+| `STREAM_COORDINATOR`| `DurableObjectNamespace` | Durable Object coordinating stream writers/readers |
+| `WORKFLOW_DISPATCH` | `Service binding` (optional) | Internal binding that can invoke your Worker routes without leaving Cloudflare's network |
+| `WORKFLOW_DISPATCH_URL` | `string` (optional)  | Public origin (for example `https://example.workers.dev`) used when no service binding is available |
+| `DEPLOYMENT_ID`     | `string` (optional)      | Deployment identifier (default: "cloudflare")  |
+
+> Configure either `WORKFLOW_DISPATCH` or `WORKFLOW_DISPATCH_URL` so queue consumers can reach your `.well-known/workflow` endpoints.
 
 ## Database Setup
 
@@ -139,10 +190,10 @@ wrangler d1 migrations apply workflow-db          # for production
 ## Features
 
 - **Durable Storage**: D1 (SQLite) stores workflow runs, events, steps, and hooks
-- **Queue Processing**: Native Cloudflare Queues for reliable job processing
-- **Streaming**: R2-based chunk storage for workflow streams
-- **Edge Deployment**: Runs on Cloudflare's global network
-- **Automatic Scaling**: Leverages Cloudflare Workers' auto-scaling
+- **Queue Processing**: Native Cloudflare Queues deliver workflow + step jobs with retry semantics compatible with other worlds
+- **Streaming**: Durable Object + R2 combo provides push-based `ReadableStream` delivery without polling
+- **Edge Deployment**: Runs entirely inside Cloudflare Workers (or a Worker + DO pair) with zero extra infrastructure
+- **Self-hosted Flexibility**: Bundle with your app or expose a shared world Worker via service bindings
 
 ## Development
 
@@ -178,14 +229,24 @@ import { handleQueueMessage } from '@workflow/world-cloudflare';
 
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
-    
     for (const message of batch.messages) {
-      await handleQueueMessage(message);
-      message.ack(); // Acknowledge successful processing
+      try {
+        const result = await handleQueueMessage(env, message);
+        if (result?.retryAfterSeconds) {
+          message.retry({ delaySeconds: result.retryAfterSeconds });
+        } else {
+          message.ack();
+        }
+      } catch (error) {
+        console.error('Failed to dispatch queue message', error);
+        message.retry();
+      }
     }
   }
 };
 ```
+
+If you run the world as a separate Worker, make sure this consumer lives in that Worker and expose it to application Workers through a service binding (`WORKFLOW_DISPATCH`). If the world is co-located with your app, the same Worker handles both HTTP and queue traffic.
 
 ## World Selection
 
@@ -203,3 +264,6 @@ Or in `wrangler.json`:
     "WORKFLOW_TARGET_WORLD": "@workflow/world-cloudflare"
   }
 }
+```
+
+This setting only points the Workflow SDK at this world implementation—you still need to deploy the Worker (co-located or dedicated) with the bindings described above so queue handlers, storage, and streaming are available.

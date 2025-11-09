@@ -23,7 +23,7 @@ export interface CloudflareEnv {
   STREAM_BUCKET: R2Bucket;
 
   /**
-   * Durable Object namespace for stream coordination
+   * Durable Object namespace that coordinates stream writers/readers
    */
   STREAM_COORDINATOR: DurableObjectNamespace;
 
@@ -31,6 +31,22 @@ export interface CloudflareEnv {
    * Optional deployment ID (defaults to 'cloudflare')
    */
   DEPLOYMENT_ID?: string;
+
+  /**
+   * Optional service binding that can invoke the Worker routes handling
+   * `/.well-known/workflow` requests without leaving Cloudflare's network.
+   *
+   * When present, queue consumers will use this binding to deliver workflow
+   * and step messages. If omitted, you must provide `WORKFLOW_DISPATCH_URL`.
+   */
+  WORKFLOW_DISPATCH?: Fetcher;
+
+  /**
+   * Absolute origin (for example: https://my-worker.workers.dev) that queue
+   * consumers can use to call your Worker's workflow/step endpoints when a
+   * service binding is not available.
+   */
+  WORKFLOW_DISPATCH_URL?: string;
 }
 
 export interface CloudflareWorldConfig {

@@ -1,12 +1,14 @@
+import type { Message } from '@cloudflare/workers-types';
+import { JsonTransport } from '@vercel/queue';
 import {
   MessageId,
   type Queue,
   QueuePayloadSchema,
   type QueuePrefix,
-  type ValidQueueName,
+  ValidQueueName,
 } from '@workflow/world';
-import { createEmbeddedWorld } from '@workflow/world-local';
 import { monotonicFactory } from 'ulid';
+import { z } from 'zod';
 import type { CloudflareEnv } from './config.js';
 
 /**
@@ -20,12 +22,7 @@ import type { CloudflareEnv } from './config.js';
  * hybrid architectures.
  */
 export function createQueue(env: CloudflareEnv): Queue {
-  const port = process.env.PORT ? Number(process.env.PORT) : undefined;
-  const embeddedWorld = createEmbeddedWorld({ dataDir: undefined, port });
-
   const generateMessageId = monotonicFactory();
-
-  const createQueueHandler = embeddedWorld.createQueueHandler;
 
   const getDeploymentId: Queue['getDeploymentId'] = async () => {
     return env.DEPLOYMENT_ID || 'cloudflare';
@@ -54,6 +51,50 @@ export function createQueue(env: CloudflareEnv): Queue {
     return { messageId };
   };
 
+  const createQueueHandler: Queue['createQueueHandler'] = (prefix, handler) => {
+    return async (req) => {
+      const headerEntries: [string, string][] = [];
+      req.headers.forEach((value, key) => {
+        headerEntries.push([key, value]);
+      });
+      const headers = HeaderParser.safeParse(Object.fromEntries(headerEntries));
+      if (!headers.success || !req.body) {
+        return Response.json(
+          {
+            error: !req.body
+              ? 'Missing request body'
+              : 'Missing required headers',
+          },
+          { status: 400 }
+        );
+      }
+
+      const queueName = headers.data['x-vqs-queue-name'];
+      const messageId = headers.data['x-vqs-message-id'];
+      const attempt = headers.data['x-vqs-message-attempt'];
+
+      if (!queueName.startsWith(prefix)) {
+        return Response.json({ error: 'Unhandled queue' }, { status: 400 });
+      }
+
+      const body = await new JsonTransport().deserialize(req.body);
+      try {
+        const result = await handler(body, { attempt, queueName, messageId });
+        if (result && typeof result.timeoutSeconds === 'number') {
+          return Response.json(
+            { timeoutSeconds: result.timeoutSeconds },
+            { status: 503 }
+          );
+        }
+
+        return Response.json({ ok: true });
+      } catch (error) {
+        console.error('Error handling queue request', error);
+        return Response.json(String(error), { status: 500 });
+      }
+    };
+  };
+
   return {
     createQueueHandler,
     getDeploymentId,
@@ -72,32 +113,112 @@ const parseQueueName = (name: ValidQueueName): [QueuePrefix, string] => {
 };
 
 /**
- * Queue consumer handler to be used in a Cloudflare Worker
- * This processes messages from Cloudflare Queues and forwards them to the embedded world
+ * Queue consumer handler to be used in a Cloudflare Worker.
+ * This processes messages from Cloudflare Queues and forwards them to the
+ * deployed workflow routes via either a service binding or an external URL.
  */
-export async function handleQueueMessage(batch: MessageBatch): Promise<void> {
-  const embeddedWorld = createEmbeddedWorld({ dataDir: undefined });
+export async function handleQueueMessage(
+  env: CloudflareEnv,
+  message: Message<unknown>
+): Promise<{ retryAfterSeconds?: number } | undefined> {
+  const dispatcher = createDispatcher(env);
+  const envelope = QueueEnvelope.parse(message.body);
 
-  for (const message of batch.messages) {
-    try {
-      const body = message.body as {
-        queueName: ValidQueueName;
-        queueId: string;
-        message: unknown;
-        messageId: string;
-        idempotencyKey?: string;
-        attempt: number;
-      };
+  const path = envelope.queueName.startsWith('__wkf_step_')
+    ? STEP_ENDPOINT
+    : FLOW_ENDPOINT;
 
-      const parsedMessage = QueuePayloadSchema.parse(body.message);
-      await embeddedWorld.queue(body.queueName, parsedMessage, {
-        idempotencyKey: body.idempotencyKey,
-      });
+  const request = new Request(new URL(path, dispatcher.baseUrl), {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'x-vqs-queue-name': envelope.queueName,
+      'x-vqs-message-id': envelope.messageId,
+      'x-vqs-message-attempt': String(message.attempts + 1),
+    },
+    body: JSON.stringify(envelope.message),
+  });
 
-      message.ack();
-    } catch (error) {
-      console.error('Error processing queue message:', error);
-      message.retry();
+  const response = await dispatcher.fetch(request);
+  if (response.ok) {
+    return;
+  }
+
+  if (response.status === 503) {
+    const retry = await parseRetry(response);
+    if (retry) {
+      return { retryAfterSeconds: retry };
     }
   }
+
+  const text = await response.text();
+  throw new Error(
+    `Queue dispatch failed with status ${response.status}: ${text || 'No body'}`
+  );
+}
+
+const STEP_ENDPOINT = '/.well-known/workflow/v1/step';
+const FLOW_ENDPOINT = '/.well-known/workflow/v1/flow';
+const INTERNAL_DISPATCH_BASE_URL = 'https://workflow.internal';
+
+const HeaderParser = z.object({
+  'x-vqs-queue-name': ValidQueueName,
+  'x-vqs-message-id': MessageId,
+  'x-vqs-message-attempt': z.coerce.number().int().min(1),
+});
+
+const QueueEnvelope = z.object({
+  queueName: ValidQueueName,
+  queueId: z.string(),
+  message: QueuePayloadSchema,
+  messageId: z.string(),
+  idempotencyKey: z.string().optional(),
+  attempt: z.number().int().min(1),
+});
+
+interface Dispatcher {
+  baseUrl: string;
+  fetch(request: Request): Promise<Response>;
+}
+
+function createDispatcher(env: CloudflareEnv): Dispatcher {
+  const { WORKFLOW_DISPATCH: serviceBinding, WORKFLOW_DISPATCH_URL: url } = env;
+
+  if (serviceBinding) {
+    return {
+      baseUrl: INTERNAL_DISPATCH_BASE_URL,
+      fetch(request) {
+        return serviceBinding.fetch(request);
+      },
+    };
+  }
+
+  if (url) {
+    return {
+      baseUrl: url,
+      fetch(request) {
+        return fetch(request);
+      },
+    };
+  }
+
+  throw new Error(
+    'WORKFLOW_DISPATCH service binding or WORKFLOW_DISPATCH_URL must be configured'
+  );
+}
+
+async function parseRetry(response: Response): Promise<number | undefined> {
+  try {
+    const body = (await response.json()) as { timeoutSeconds?: unknown };
+    if (
+      body &&
+      typeof body.timeoutSeconds === 'number' &&
+      Number.isFinite(body.timeoutSeconds)
+    ) {
+      return Math.max(0, body.timeoutSeconds);
+    }
+  } catch {
+    // ignore JSON parse errors, fall through
+  }
+  return undefined;
 }

@@ -42,6 +42,7 @@
     }
   ],
   "vars": {
-    "DEPLOYMENT_ID": "dev"
+    "DEPLOYMENT_ID": "dev",
+    "WORKFLOW_DISPATCH_URL": "https://world-cloudflare-example.workers.dev"
   }
 }

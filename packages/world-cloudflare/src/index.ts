@@ -22,6 +22,10 @@ function createStorage(drizzle: Drizzle): Storage {
 /**
  * Create a World instance backed by Cloudflare services
  *
+ * This function intentionally mirrors the `World` interface defined in
+ * `@workflow/world`, returning a single object that spreads queue, storage,
+ * and streamer capabilities. Framework integrations rely on this contract
+ * remaining stable across World implementations.
  * @param env - Cloudflare environment bindings containing:
  *   - DB: D1 database for workflow state
  *   - WORKFLOW_QUEUE: Queue for workflow tasks
@@ -57,3 +61,4 @@ export function createWorld(env: CloudflareEnv): World {
 // Re-export types and utilities
 export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
 export { handleQueueMessage } from './queue.js';
+export { StreamCoordinator } from './stream-coordinator.js';

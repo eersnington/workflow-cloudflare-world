@@ -19,25 +19,24 @@ The Cloudflare world leverages native Cloudflare primitives:
 
 ```mermaid
 graph LR
-    Client[Client Request] --> Worker[Cloudflare Worker]
-    Worker --> Queue[Cloudflare Queues]
+    Client[Client Request] --> App[App Worker /.well-known/workflow]
+    App --> Queue[Cloudflare Queues]
     Queue --> Consumer[Queue Consumer]
-    Consumer --> EW[Embedded World]
-    EW --> HTTP[HTTP fetch]
-    HTTP --> Worker
-    
+    Consumer --> Binding[Service Binding or Same Worker]
+    Binding --> Flow[Workflow/Step Handlers]
+    Flow --> D1[(D1)]
+
     Queue -.-> WQ[workflow-queue]
     Queue -.-> SQ[step-queue]
 ```
 
 ### Queue Flow
 
-1. **Client Request**: Workflow or step is queued via `world.queue()`
-2. **Cloudflare Queue**: Message sent to `WORKFLOW_QUEUE` or `STEP_QUEUE`
-3. **Queue Consumer**: Worker's `queue()` handler receives batch of messages
-4. **Embedded World**: Messages are forwarded to embedded world for processing
-5. **HTTP Fetch**: Embedded world makes HTTP requests back to Worker endpoints
-6. **Execution**: Worker executes workflow/step logic
+1. **Client Request**: Your app (or the world Worker) calls `world.queue()` which enqueues a workflow or step message.
+2. **Cloudflare Queue**: The payload is written to either `WORKFLOW_QUEUE` or `STEP_QUEUE`.
+3. **Queue Consumer**: The Worker's `queue()` handler receives batches from Cloudflare Queues.
+4. **Dispatch**: `handleQueueMessage` validates the message and calls your generated `/.well-known/workflow` route through either a service binding (`WORKFLOW_DISPATCH`) or a public origin (`WORKFLOW_DISPATCH_URL`). If the world is bundled with the app, this is just an in-process fetch.
+5. **Execution**: The workflow/step handler replays events, talks to D1/R2, executes user code, and may enqueue additional work.
 
 Messages include:
 - Automatic retry logic (Cloudflare Queues handle retries)
@@ -62,27 +61,27 @@ D1 provides:
 
 ## Streaming
 
-Workflow streaming uses **R2 object storage**:
+Workflow streaming uses **R2 object storage** coordinated by a **Durable Object** to provide push-based delivery:
 
 ### Stream Architecture
 
 ```mermaid
 graph TD
-    Writer[Stream Writer] -->|writeToStream| R2[R2 Bucket]
-    R2 --> Metadata[Metadata Object]
-    Metadata -->|chunkCount| Reader[Stream Reader]
-    Reader -->|readFromStream| Chunks[Stream Chunks]
-    R2 --> Chunks
+    Writer[Stream Writer] -->|writeToStream| DO[Stream Coordinator DO]
+    DO -->|persist| R2[R2 Bucket]
+    Reader1[Reader] -->|readFromStream| DO
+    Reader2[Reader] -->|WebSocket-like stream| DO
 ```
 
 ### How It Works
 
-1. **Write**: Stream chunks stored as R2 objects at `streams/{name}/{index}`
-2. **Metadata**: Chunk count tracked in `metadata/{name}` object
-3. **Read**: Reader fetches all chunks from start index to current chunk count
-4. **Close**: Metadata marked as closed (`{chunkCount, closed: true}`)
+1. **Write**: The worker sends chunk data to the `StreamCoordinator` durable object.
+2. **Persist**: The durable object writes the chunk to R2 and updates metadata (chunk count, closed flag).
+3. **Push**: Connected readers receive the chunk immediately over a live `ReadableStream` (backed by the durable object).
+4. **Replay**: When a reader connects, the durable object replays historical chunks from R2 starting at the requested index, then keeps the connection open for new chunks.
+5. **Close**: When a stream is closed, the durable object notifies all readers and persists the closed flag.
 
-Unlike PostgreSQL's LISTEN/NOTIFY, Cloudflare streaming uses R2's object storage with metadata for tracking stream state. This approach is designed for Cloudflare's edge architecture where long-lived connections are not available.
+Durable Objects provide version pinning and stateful coordination so every connection observes consistent behavior even during rolling deployments.
 
 ## Queue Consumer Handler
 
@@ -96,8 +95,12 @@ export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
     for (const message of batch.messages) {
       try {
-        await handleQueueMessage(env, message);
-        message.ack(); // Success
+        const result = await handleQueueMessage(env, message);
+        if (result?.retryAfterSeconds) {
+          message.retry({ delaySeconds: result.retryAfterSeconds });
+        } else {
+          message.ack(); // Success
+        }
       } catch (error) {
         message.retry(); // Retry on failure
       }
@@ -107,10 +110,11 @@ export default {
 ```
 
 The `handleQueueMessage` function:
-1. Deserializes the queue message
-2. Creates an embedded world instance
-3. Forwards the message to the embedded world's queue handler
-4. Embedded world makes HTTP requests to execute workflow/step logic
+1. Validates and deserializes the queue message payload.
+2. Sends the payload to the workflow or step handler via the configured service binding (preferred) or HTTPS origin so the same generated routes that served the initial request can continue execution.
+3. Returns `{ retryAfterSeconds }` when a handler responds with a `timeoutSeconds` hint so the consumer can request a delayed retry from Cloudflare Queues.
+
+This means queue retries, idempotency, and the `createQueueHandler` contract exactly match other worlds even though the infrastructure backing them is Cloudflare-native.
 
 ## Edge Runtime Considerations
 
@@ -167,6 +171,15 @@ Test queue consumers locally:
 pnpm wrangler queues producer send workflow-queue '{"test": "message"}'
 ```
 
+## Deployment Patterns
+
+You can deploy this world in two common ways:
+
+1. **Co-located** – Bundle the world with your framework app. The generated `/.well-known/workflow` routes, queue handler, and `createWorld(env)` call all live inside one Worker deployment.
+2. **Dedicated Worker** – Deploy the world as its own Worker (plus Durable Object) and reference it from application Workers using a service binding (`WORKFLOW_DISPATCH`). This lets multiple applications share a single world, but you still manage the queues, D1, and R2 instances yourself.
+
+In both cases you control versioning via normal Worker deployments, and the Durable Object keeps streaming state consistent across versions.
+
 ## Comparison with Other Worlds
 
 ### vs. world-postgres
@@ -175,7 +188,7 @@ pnpm wrangler queues producer send workflow-queue '{"test": "message"}'
 |---------|-----------|------------|
 | Database | D1 (SQLite) | PostgreSQL |
 | Queue | Cloudflare Queues | pg-boss |
-| Streaming | R2 polling | LISTEN/NOTIFY |
+| Streaming | R2 + Durable Object push | LISTEN/NOTIFY |
 | Runtime | CF Edge Workers | Node.js |
 | Scaling | Automatic | Manual |
 | Cold Starts | Yes | No |
@@ -187,4 +200,4 @@ pnpm wrangler queues producer send workflow-queue '{"test": "message"}'
 | Persistence | D1 + R2 | Filesystem |
 | Distributed | Yes | No |
 | Multi-tenant | Yes | No |
-| Development | Local + Edge | Local only |
+| Deployment | Worker + DO | Node process |

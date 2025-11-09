@@ -1,6 +1,8 @@
+import type { MessageBatch } from '@cloudflare/workers-types';
 import { QueuePayloadSchema, ValidQueueName } from '@workflow/world';
 import {
   type CloudflareEnv,
+  StreamCoordinator,
   createWorld,
   handleQueueMessage,
 } from './src/index.js';
@@ -168,14 +170,26 @@ export default {
     }
   },
 
-  async queue(batch: MessageBatch, _env: CloudflareEnv): Promise<void> {
+  async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
     console.log(`Processing ${batch.messages.length} queue messages`);
 
-    try {
-      await handleQueueMessage(batch);
-      console.log('Batch processed successfully');
-    } catch (error) {
-      console.error('Error processing batch:', error);
+    for (const message of batch.messages) {
+      try {
+        const result = await handleQueueMessage(env, message);
+        if (result?.retryAfterSeconds) {
+          console.log(
+            `Retrying message ${message.id} after ${result.retryAfterSeconds}s`
+          );
+          message.retry({ delaySeconds: result.retryAfterSeconds });
+        } else {
+          message.ack();
+        }
+      } catch (error) {
+        console.error('Error processing queue message:', error);
+        message.retry();
+      }
     }
   },
 };
+
+export { StreamCoordinator };
