@@ -228,9 +228,6 @@ async function main(): Promise<void> {
     console.log(
       `\u001b[32m✨ Wrote queue handler to ${queueFilePath}\u001b[0m`
     );
-    console.log(
-      '   (Ensure @cloudflare/workers-types is installed as a devDependency for MessageBatch types.)'
-    );
   }
 
   printOutput({
