@@ -2,6 +2,7 @@
   "name": "workflow-app",
   "main": "build/index.js",
   "compatibility_date": "2024-09-26",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
@@ -56,5 +57,9 @@
   "vars": {
     "DEPLOYMENT_ID": "cloudflare",
     "WORKFLOW_TARGET_WORLD": "workflow-cloudflare-world"
+  },
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".cloudflare/assets"
   }
 }
