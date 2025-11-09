@@ -7,6 +7,9 @@
   "files": [
     "dist"
   ],
+  "bin": {
+    "workflow-cloudflare-world": "dist/src/cli.js"
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -26,6 +29,7 @@
     "db:push": "pnpm exec drizzle-kit --version && drizzle-kit push"
   },
   "dependencies": {
+    "@inquirer/prompts": "^7.10.0",
     "@vercel/queue": "0.0.0-alpha.23",
     "@workflow/errors": "workspace:*",
     "@workflow/world": "workspace:*",
