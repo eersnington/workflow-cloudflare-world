@@ -1,3 +1,4 @@
+import './polyfills.js';
 import type { Storage, World } from '@workflow/world';
 import type { CloudflareEnv } from './config.js';
 import { createClient, type Drizzle } from './drizzle/index.js';
