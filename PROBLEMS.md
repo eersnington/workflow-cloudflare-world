@@ -19,13 +19,18 @@ This repository hit a number of Cloudflare-specific issues while wiring the Work
 
 ## 4. WeakRef / FinalizationRegistry Crashes on Import
 - **Symptom:** Simply importing `workflow-cloudflare-world` threw `ReferenceError: WeakRef is not defined` (and later `FinalizationRegistry`).
-- **Cause:** `@workflow/core` always bundles `@workflow/world-local`, which depends on `undici`. Undici instantiates `WeakRef`/`FinalizationRegistry` at module load, but Cloudflare’s runtime (and Miniflare) omit those globals.
-- **Resolution:** Added runtime polyfills in `packages/world-cloudflare/src/polyfills.ts` so the package safely polyfills both APIs before re-exporting anything. Consumers no longer need to patch their apps.
+- **Cause:** `@workflow/workflow` hard-depends on `@workflow/world-local`, which drags in Undici. Undici instantiates `WeakRef`/`FinalizationRegistry` during module evaluation, but Cloudflare Workers (and Miniflare) do not ship those globals.
+- **Resolution:** `packages/world-cloudflare/src/polyfills.ts` now polyfills both APIs before anything else runs, so the world package can coexist with the core bundle without requiring every consumer Worker to add its own shim. Long term the core package should avoid bundling the local world into Cloudflare builds, but the repo-level polyfill unblocks us for now.
 
 ## 5. Embedded Serializer Uses `eval`
-- **Symptom:** `POST /api/trigger` returned “Failed to serialize workflow arguments” with a nested `EvalError: Code generation from strings disallowed for this context`.
-- **Cause:** `dehydrateWorkflowArguments` in `@workflow/core` dynamically builds helper functions via `new Function` when serializing complex types. Cloudflare Workers forbid string-based code generation, so the serializer explodes even for otherwise valid inputs.
-- **Resolution:** **Open issue.** Until the core runtime provides an eval-free code path (or detects the environment), avoid passing types that trigger the advanced serializer (stick to JSON-safe primitives) when running on Cloudflare.
+- **Symptom:** `POST /api/trigger` returns “Failed to serialize workflow arguments” with a nested `EvalError: Code generation from strings disallowed for this context` even when passing primitive arguments like `2`.
+- **Cause:** `packages/core/src/serialization.ts` uses a `revive()` helper (`lines 192-199`) that does `(0, eval)(...)` on every `devalue.stringify()` result. `dehydrateWorkflowArguments()` (line ~751) calls that path for every workflow trigger. Cloudflare Workers forbid any string-based code generation, so the serializer explodes before the workflow even enqueues.
+- **Resolution:** **Still open.** There is no app-level workaround other than “only send JSON-safe primitives and hope they never hit the eval path”. The real fix has to land in the core package (replace the eval-based revive logic with a Worker-safe parser or gate the advanced serializer behind a feature flag).
+
+## 6. Queue Consumer Used Vercel’s JsonTransport
+- **Symptom:** Earlier iterations imported `JsonTransport` from `@vercel/queue` inside `packages/world-cloudflare/src/queue.ts`, which meant Workers were bundling Vercel-only runtime code just to read queue payloads.
+- **Cause:** The initial Cloudflare world piggybacked on the Vercel webhook transport to deserialize queue bodies, even though the actual queue producer already used native Cloudflare bindings.
+- **Resolution:** Replaced the consumer with Cloudflare-native logic: messages are now sent with `cfQueue.send(..., { contentType: 'json' })` and read via `Request.json()`. This drops the Vercel dependency, keeps the Worker bundle CF-only, and eliminates an extra deserialization hop. Wrangler queue bindings now work without any third-party helpers.
 
 ---
 
