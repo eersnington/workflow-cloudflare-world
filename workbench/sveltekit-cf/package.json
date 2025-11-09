@@ -30,11 +30,12 @@
     "@swc/core": "1.11.24",
     "@vercel/otel": "^1.13.0",
     "@workflow/ai": "workspace:*",
-    "workflow-cloudflare-world": "workspace:*",
     "ai": "catalog:",
     "exsolve": "^1.0.7",
     "lodash.chunk": "^4.2.0",
     "workflow": "workspace:*",
+    "workflow-cloudflare-world": "workspace:*",
+    "wrangler": "^4.46.0",
     "zod": "catalog:"
   }
 }
