@@ -46,6 +46,7 @@ export class LocalBuilder extends BaseBuilder {
   }
 
   override async build(): Promise<void> {
+    const tsConfig = await this.getTsConfigOptions();
     const inputFiles = await this.getInputFiles();
     await mkdir(this.#outDir, { recursive: true });
 
@@ -54,6 +55,8 @@ export class LocalBuilder extends BaseBuilder {
       bundleFinalOutput: false,
       format: 'esm',
       inputFiles,
+      tsBaseUrl: tsConfig.baseUrl,
+      tsPaths: tsConfig.paths,
     });
 
     await this.createStepsBundle({
@@ -61,6 +64,8 @@ export class LocalBuilder extends BaseBuilder {
       externalizeNonSteps: true,
       format: 'esm',
       inputFiles,
+      tsBaseUrl: tsConfig.baseUrl,
+      tsPaths: tsConfig.paths,
     });
 
     await this.createWebhookBundle({

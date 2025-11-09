@@ -1,5 +1,5 @@
 import { readFile } from 'node:fs/promises';
-import { relative } from 'node:path';
+import { isAbsolute, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import enhancedResolveOrig from 'enhanced-resolve';
 import type { Plugin } from 'esbuild';
@@ -50,6 +50,12 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
   return {
     name: 'swc-workflow-plugin',
     setup(build) {
+      const workingDir = build.initialOptions.absWorkingDir || process.cwd();
+      const resolveTsSpecifier =
+        options.tsPaths && options.tsBaseUrl
+          ? createTsPathResolver(options.tsPaths, options.tsBaseUrl)
+          : undefined;
+
       // everything is external unless explicitly configured
       // to be bundled
       const cjsResolver = promisify(
@@ -73,11 +79,14 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
         }
 
         try {
-          let resolvedPath: string | false | undefined = args.path;
+          const requestPath = resolveTsSpecifier?.(args.path) ?? args.path;
+          let resolvedPath: string | false | undefined = requestPath;
 
-          // handle local imports e.g. ./hello or ../another
-          if (args.path.startsWith('.')) {
-            resolvedPath = await enhancedResolve(args.resolveDir, args.path);
+          if (isAbsolute(requestPath) || requestPath.startsWith('.')) {
+            const context = isAbsolute(requestPath)
+              ? workingDir
+              : args.resolveDir;
+            resolvedPath = await enhancedResolve(context, requestPath);
           } else {
             resolvedPath = await enhancedResolve(
               // `args.resolveDir` is not used here to ensure we only
@@ -85,8 +94,8 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
               // project's working directory e.g. a nested dep can't
               // be externalized as we won't be able to resolve it once
               // it's parent has been bundled
-              build.initialOptions.absWorkingDir || process.cwd(),
-              args.path
+              workingDir,
+              requestPath
             );
           }
 
@@ -94,6 +103,8 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
 
           // Normalize to forward slashes for cross-platform comparison
           const normalizedResolvedPath = resolvedPath.replace(/\\/g, '/');
+          const isNodeModule =
+            normalizedResolvedPath.includes('/node_modules/');
 
           for (const entryToBundle of options.entriesToBundle) {
             const normalizedEntry = entryToBundle.replace(/\\/g, '/');
@@ -110,8 +121,13 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
             }
           }
 
+          if (!isNodeModule) {
+            // Bundle any project-local helper
+            return null;
+          }
+
           const isFilePath =
-            args.path.startsWith('.') || args.path.startsWith('/');
+            requestPath.startsWith('.') || requestPath.startsWith('/');
 
           return {
             external: true,
@@ -120,7 +136,7 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
                   /\\/g,
                   '/'
                 )
-              : args.path,
+              : requestPath,
           };
         } catch (_) {}
         return null;
@@ -244,5 +260,112 @@ export function createSwcPlugin(options: SwcPluginOptions): Plugin {
         }
       });
     },
+  };
+}
+
+type TsPathResolver = (specifier: string) => string | null;
+
+function createTsPathResolver(
+  tsPaths: Record<string, string[]>,
+  baseUrl: string
+): TsPathResolver {
+  const entries = Object.entries(tsPaths)
+    .map(([pattern, replacements]) => {
+      if (!replacements || replacements.length === 0) {
+        return null;
+      }
+
+      const wildcardIndex = pattern.indexOf('*');
+      const hasWildcard = wildcardIndex !== -1;
+      const prefix = hasWildcard ? pattern.slice(0, wildcardIndex) : pattern;
+      const suffix = hasWildcard ? pattern.slice(wildcardIndex + 1) : '';
+
+      const normalizedReplacements = replacements
+        .map((replacement) => {
+          if (!replacement) return null;
+          const replacementWildcardIndex = replacement.indexOf('*');
+          const replacementHasWildcard = replacementWildcardIndex !== -1;
+          const replacementPrefix = replacementHasWildcard
+            ? replacement.slice(0, replacementWildcardIndex)
+            : replacement;
+          const replacementSuffix = replacementHasWildcard
+            ? replacement.slice(replacementWildcardIndex + 1)
+            : '';
+          return {
+            replacementHasWildcard,
+            replacementPrefix,
+            replacementSuffix,
+          };
+        })
+        .filter(
+          (
+            replacement
+          ): replacement is {
+            replacementHasWildcard: boolean;
+            replacementPrefix: string;
+            replacementSuffix: string;
+          } => !!replacement && !!replacement.replacementPrefix
+        );
+
+      if (normalizedReplacements.length === 0) {
+        return null;
+      }
+
+      return {
+        hasWildcard,
+        prefix,
+        suffix,
+        replacements: normalizedReplacements,
+      };
+    })
+    .filter(
+      (
+        entry
+      ): entry is {
+        hasWildcard: boolean;
+        prefix: string;
+        suffix: string;
+        replacements: {
+          replacementHasWildcard: boolean;
+          replacementPrefix: string;
+          replacementSuffix: string;
+        }[];
+      } => !!entry
+    );
+
+  return (specifier) => {
+    for (const entry of entries) {
+      if (entry.hasWildcard) {
+        if (!specifier.startsWith(entry.prefix)) continue;
+        if (entry.suffix && !specifier.endsWith(entry.suffix)) continue;
+
+        const endIndex = entry.suffix
+          ? specifier.length - entry.suffix.length
+          : specifier.length;
+        const wildcardValue = specifier.slice(entry.prefix.length, endIndex);
+
+        for (const replacement of entry.replacements) {
+          const candidateRelative = replacement.replacementHasWildcard
+            ? `${replacement.replacementPrefix}${wildcardValue}${replacement.replacementSuffix}`
+            : replacement.replacementPrefix;
+          const absoluteCandidate = isAbsolute(candidateRelative)
+            ? candidateRelative
+            : resolve(baseUrl, candidateRelative);
+          return absoluteCandidate;
+        }
+      } else if (specifier === entry.prefix) {
+        for (const replacement of entry.replacements) {
+          const candidateRelative = replacement.replacementHasWildcard
+            ? `${replacement.replacementPrefix}${replacement.replacementSuffix}`
+            : replacement.replacementPrefix;
+          const absoluteCandidate = isAbsolute(candidateRelative)
+            ? candidateRelative
+            : resolve(baseUrl, candidateRelative);
+          return absoluteCandidate;
+        }
+      }
+    }
+
+    return null;
   };
 }
