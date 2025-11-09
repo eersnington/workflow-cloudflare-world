@@ -24,6 +24,16 @@ export WORKFLOW_TARGET_WORLD="workflow-cloudflare-world"
 
 > This package is self-hosted. Setting the environment variable just tells the Workflow SDK to instantiate this world inside your Worker—you still deploy and operate the Worker, queues, D1, R2, and Durable Objects yourself.
 
+### CLI Helper
+
+Run the included CLI to generate Wrangler snippets and deployment instructions tailored to your project:
+
+```bash
+npx workflow-cloudflare-world
+```
+
+It will ask a few questions (deployment mode, binding names) and then write a `wrangler.generated.json` (or a path you choose) with the full config plus exact code snippets for exporting `StreamCoordinator` and wiring the queue consumer. Review that file and merge it into your actual `wrangler.json`.
+
 ### Deployment Models
 
 You can run the world in two ways:
