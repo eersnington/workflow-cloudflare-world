@@ -180,6 +180,8 @@ You can deploy this world in two common ways:
 
 In both cases you control versioning via normal Worker deployments, and the Durable Object keeps streaming state consistent across versions.
 
+> Need a starting snippet? Run `npx workflow-cloudflare-world` to launch an interactive helper that prints the Wrangler config for either deployment mode along with queue-consumer reminders.
+
 ## Comparison with Other Worlds
 
 ### vs. world-postgres
