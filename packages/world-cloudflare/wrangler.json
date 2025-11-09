@@ -1,5 +1,5 @@
 {
-  "name": "world-cloudflare",
+  "name": "workflow-cloudflare-world",
   "main": "test-worker.ts",
   "compatibility_date": "2024-09-26",
   "compatibility_flags": ["nodejs_compat"],

@@ -1,7 +1,7 @@
 {
-  "name": "@workflow/world-cloudflare",
-  "version": "4.0.1-beta.3",
-  "description": "A reference World implementation based on Cloudflare",
+  "name": "workflow-cloudflare-world",
+  "version": "4.0.1-beta.12",
+  "description": "A World implementation based on Cloudflare",
   "type": "module",
   "main": "dist/index.js",
   "files": [

@@ -88,8 +88,8 @@ Durable Objects provide version pinning and stateful coordination so every conne
 Implement the `queue()` export in your Worker to process queue messages:
 
 ```typescript
-import { handleQueueMessage } from "@workflow/world-cloudflare";
-import type { CloudflareEnv } from "@workflow/world-cloudflare";
+import { handleQueueMessage } from "workflow-cloudflare-world";
+import type { CloudflareEnv } from "workflow-cloudflare-world";
 
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {

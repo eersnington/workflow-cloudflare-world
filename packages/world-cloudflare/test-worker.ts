@@ -43,7 +43,7 @@ function getRouteHandler(
 async function handleHealthCheck({ env }: RouteContext): Promise<Response> {
   return Response.json({
     status: 'ok',
-    service: 'world-cloudflare',
+    service: 'workflow-cloudflare-world',
     deploymentId: env.DEPLOYMENT_ID || 'unknown',
   });
 }

@@ -1,15 +1,15 @@
-# @workflow/world-cloudflare
+# workflow-cloudflare-world
 
 A workflow system backed by Cloudflare primitives (D1, Queues, R2) for edge-deployed workflows. This implementation leverages Cloudflare Workers' distributed infrastructure for durable workflow execution.
 
 ## Installation
 
 ```bash
-npm install @workflow/world-cloudflare
+npm install workflow-cloudflare-world
 # or
-pnpm add @workflow/world-cloudflare
+pnpm add workflow-cloudflare-world
 # or
-yarn add @workflow/world-cloudflare
+yarn add workflow-cloudflare-world
 ```
 
 ## Usage
@@ -19,7 +19,7 @@ yarn add @workflow/world-cloudflare
 The Cloudflare world can be configured by setting the `WORKFLOW_TARGET_WORLD` environment variable:
 
 ```bash
-export WORKFLOW_TARGET_WORLD="@workflow/world-cloudflare"
+export WORKFLOW_TARGET_WORLD="workflow-cloudflare-world"
 ```
 
 > This package is self-hosted. Setting the environment variable just tells the Workflow SDK to instantiate this world inside your Worker—you still deploy and operate the Worker, queues, D1, R2, and Durable Objects yourself.
@@ -28,7 +28,7 @@ export WORKFLOW_TARGET_WORLD="@workflow/world-cloudflare"
 
 You can run the world in two ways:
 
-1. **Co-located with your app** – Install `@workflow/world-cloudflare` in the same Worker that serves your SvelteKit/Next/Nitro routes. The generated `/.well-known/workflow` handlers, queue consumer, and world storage all share one deployment and one set of bindings.
+1. **Co-located with your app** – Install `workflow-cloudflare-world` in the same Worker that serves your SvelteKit/Next/Nitro routes. The generated `/.well-known/workflow` handlers, queue consumer, and world storage all share one deployment and one set of bindings.
 2. **Dedicated Worker** – Deploy a standalone Worker that only exposes the world (including the queue consumer and `StreamCoordinator`). Application Workers connect to it via a [service binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/service-bindings/) (`WORKFLOW_DISPATCH`) or, less preferably, an HTTPS origin (`WORKFLOW_DISPATCH_URL`). Multiple apps can share the same world Worker this way.
 
 In both scenarios, Cloudflare Queues deliver messages to your Worker, `handleQueueMessage` forwards them to the workflow/step HTTP handlers, and the Durable Object keeps streaming state consistent during deployments.
@@ -110,7 +110,7 @@ import {
   createWorld,
   handleQueueMessage,
   type CloudflareEnv,
-} from "@workflow/world-cloudflare";
+} from "workflow-cloudflare-world";
 
 export default {
   async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
@@ -149,7 +149,7 @@ export default {
 Add the coordinator class to your Worker module so Wrangler can bind it:
 
 ```typescript
-import { StreamCoordinator } from "@workflow/world-cloudflare";
+import { StreamCoordinator } from "workflow-cloudflare-world";
 
 export { StreamCoordinator };
 ```
@@ -225,7 +225,7 @@ wrangler d1 execute workflow-db --local --command "SELECT * FROM workflow_runs"
 Queue consumers are automatically configured in `wrangler.json`. Implement the `queue()` handler in your Worker:
 
 ```typescript
-import { handleQueueMessage } from '@workflow/world-cloudflare';
+import { handleQueueMessage } from 'workflow-cloudflare-world';
 
 export default {
   async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
@@ -253,7 +253,7 @@ If you run the world as a separate Worker, make sure this consumer lives in that
 To use the Cloudflare world, set the `WORKFLOW_TARGET_WORLD` environment variable:
 
 ```bash
-export WORKFLOW_TARGET_WORLD="@workflow/world-cloudflare"
+export WORKFLOW_TARGET_WORLD="workflow-cloudflare-world"
 ```
 
 Or in `wrangler.json`:
@@ -261,7 +261,7 @@ Or in `wrangler.json`:
 ```json
 {
   "vars": {
-    "WORKFLOW_TARGET_WORLD": "@workflow/world-cloudflare"
+    "WORKFLOW_TARGET_WORLD": "workflow-cloudflare-world"
   }
 }
 ```
