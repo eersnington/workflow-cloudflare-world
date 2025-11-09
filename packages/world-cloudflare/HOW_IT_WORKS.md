@@ -2,7 +2,7 @@
 
 This document explains the architecture and components of the Cloudflare world implementation for workflow management.
 
-This implementation uses [Drizzle Schema](./src/drizzle/schema.ts) that can be migrated into your D1 database and is backed by Cloudflare's D1 (SQLite).
+This implementation uses [Drizzle Schema](./src/drizzle/schema.ts) that can be migrated into your D1 database and is backed by Cloudflare's D1 (SQLite). The `npx workflow-cloudflare-world` CLI copies the baseline SQL migration into your project so `wrangler d1 migrations apply` works out of the box.
 
 If you want to use a different ORM or query builder, you can fork this implementation and replace the Drizzle parts with your own.
 
@@ -150,6 +150,8 @@ pnpm wrangler dev
 # Apply migrations to D1
 pnpm wrangler d1 migrations apply workflow-db 
 ```
+
+The CLI drops the initial migration file for you (default `migrations/0000_workflow_cloudflare.sql`). Add future SQL files to the same directory before re-running the apply command.
 
 ### Production Deployment
 
