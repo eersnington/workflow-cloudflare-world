@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { confirm, input, select } from '@inquirer/prompts';
-import { writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
 import process from 'node:process';
 
 interface QueueConfig {
@@ -12,6 +13,35 @@ interface DispatchConfig {
   mode: 'binding' | 'url';
   value: string;
 }
+
+const queueHandlerTemplate = `import {
+  StreamCoordinator,
+  handleQueueMessage,
+  type CloudflareEnv,
+  type MessageBatch,
+} from 'workflow-cloudflare-world';
+
+export { StreamCoordinator };
+
+export async function queue(
+  batch: MessageBatch,
+  env: CloudflareEnv
+): Promise<void> {
+  for (const message of batch.messages) {
+    try {
+      const result = await handleQueueMessage(env, message);
+      if (result?.retryAfterSeconds) {
+        message.retry({ delaySeconds: result.retryAfterSeconds });
+      } else {
+        message.ack();
+      }
+    } catch (error) {
+      console.error('Failed to dispatch queue message', error);
+      message.retry();
+    }
+  }
+}
+`;
 
 const banner =
   '\n╭──────────────────────────────────────────────╮\n│  Workflow Cloudflare World Configuration CLI │\n╰──────────────────────────────────────────────╯\n';
@@ -113,18 +143,42 @@ async function main(): Promise<void> {
     dispatchConfig,
   });
 
-  const outputFile = await input({
-    message: 'Write Wrangler config to file (leave blank to skip writing)?',
-    default: 'wrangler.generated.json',
+  const configPathInput = await input({
+    message: 'Path to write Wrangler config (leave blank to skip)?',
+    default: 'wrangler.json',
   });
+  const configPath =
+    configPathInput.trim().length > 0
+      ? resolve(process.cwd(), configPathInput.trim())
+      : null;
 
-  if (outputFile.trim().length > 0) {
+  if (configPath) {
+    await ensureDir(dirname(configPath));
     await writeFile(
-      outputFile,
+      configPath,
       JSON.stringify(wranglerSnippet, null, 2),
       'utf-8'
     );
-    console.log(`\n✨ Wrote config to ${outputFile}`);
+    console.log(`\n✨ Wrote config to ${configPath}`);
+  }
+
+  const queueFileInput = await input({
+    message:
+      'Path to create queue handler + StreamCoordinator export (leave blank to skip)?',
+    default: 'src/worker.ts',
+  });
+  const queueFilePath =
+    queueFileInput.trim().length > 0
+      ? resolve(process.cwd(), queueFileInput.trim())
+      : null;
+
+  if (queueFilePath) {
+    await ensureDir(dirname(queueFilePath));
+    await writeFile(queueFilePath, queueHandlerTemplate, 'utf-8');
+    console.log(`✨ Wrote queue handler to ${queueFilePath}`);
+    console.log(
+      '   (Ensure @cloudflare/workers-types is installed as a devDependency for MessageBatch types.)'
+    );
   }
 
   printOutput({
@@ -132,8 +186,13 @@ async function main(): Promise<void> {
     wranglerSnippet,
     dispatchConfig,
     d1DatabaseName,
-    outputFile: outputFile.trim().length > 0 ? outputFile : null,
+    outputFile: configPath,
+    queueFilePath,
   });
+}
+
+async function ensureDir(path: string): Promise<void> {
+  await mkdir(path, { recursive: true });
 }
 
 function createWranglerSnippet({
@@ -219,12 +278,14 @@ function printOutput({
   dispatchConfig,
   d1DatabaseName,
   outputFile,
+  queueFilePath,
 }: {
   workerName: string;
   wranglerSnippet: Record<string, unknown>;
   dispatchConfig: DispatchConfig;
   d1DatabaseName: string;
   outputFile: string | null;
+  queueFilePath: string | null;
 }): void {
   if (!outputFile) {
     console.log(
@@ -239,26 +300,12 @@ function printOutput({
 
   console.log('\nNext steps:');
   console.log(
-    [
-      '1. Export the StreamCoordinator so Wrangler can bind the Durable Object.',
-      '   import { StreamCoordinator } from "workflow-cloudflare-world";',
-      '   export { StreamCoordinator };',
-      '',
-      '2. Register the queue consumer in your Worker (handles Cloudflare Queue batches).',
-      '   import { handleQueueMessage } from "workflow-cloudflare-world";',
-      '   export default {',
-      '     async queue(batch, env) {',
-      '       for (const message of batch.messages) {',
-      '         const result = await handleQueueMessage(env, message);',
-      '         result?.retryAfterSeconds',
-      '           ? message.retry({ delaySeconds: result.retryAfterSeconds })',
-      '           : message.ack();',
-      '       }',
-      '     }',
-      '   };',
-      '',
-      `3. Merge the generated config, run “wrangler d1 migrations apply ${d1DatabaseName}”, then “wrangler deploy”.`,
-    ].join('\n')
+    queueFilePath
+      ? `• Queue handler scaffolded at ${queueFilePath}. Re-export it from your framework entry so Wrangler picks up both fetch routes and the queue handler.`
+      : '• Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
+  );
+  console.log(
+    `• Run:\n   wrangler d1 migrations apply ${d1DatabaseName}\n   wrangler deploy`
   );
 
   if (dispatchConfig.mode === 'binding') {
