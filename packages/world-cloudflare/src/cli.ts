@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 import { confirm, input, select } from '@inquirer/prompts';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 
 interface QueueConfig {
   workflow: string;
@@ -42,6 +43,8 @@ export async function queue(
   }
 }
 `;
+
+const MIGRATION_FILENAME = '0000_workflow_cloudflare.sql';
 
 const banner =
   '\n╭──────────────────────────────────────────────╮\n│  Workflow Cloudflare World Configuration CLI │\n╰──────────────────────────────────────────────╯\n';
@@ -133,7 +136,27 @@ async function main(): Promise<void> {
         }),
       };
 
-  const wranglerSnippet = createWranglerSnippet({
+  const entryPointInput = await input({
+    message:
+      'Built Worker entry file (value for wrangler "main", e.g. dist/index.js)',
+    default: 'build/index.js',
+  });
+  const entryPoint = entryPointInput.trim().length
+    ? entryPointInput.trim()
+    : 'build/index.js';
+
+  const migrationsDirInput = await input({
+    message:
+      'D1 migrations directory (wrangler reads *.sql here when applying migrations)',
+    default: 'migrations',
+  });
+  const migrationsDirRelative = migrationsDirInput.trim().length
+    ? migrationsDirInput.trim()
+    : 'migrations';
+  const migrationsDirAbsolute = resolve(process.cwd(), migrationsDirRelative);
+  const migrationFilePath = await ensureMigrationFile(migrationsDirAbsolute);
+
+  const wranglerSnippet = await createWranglerSnippet({
     workerName,
     d1Binding,
     d1DatabaseName,
@@ -141,6 +164,8 @@ async function main(): Promise<void> {
     r2Bucket,
     deploymentId,
     dispatchConfig,
+    entryPoint,
+    migrationsDir: migrationsDirRelative,
   });
 
   const configPathInput = await input({
@@ -190,6 +215,7 @@ async function main(): Promise<void> {
     d1DatabaseName,
     outputFile: configPath,
     queueFilePath,
+    migrationFilePath,
   });
 }
 
@@ -205,6 +231,8 @@ function createWranglerSnippet({
   r2Bucket,
   deploymentId,
   dispatchConfig,
+  entryPoint,
+  migrationsDir,
 }: {
   workerName: string;
   d1Binding: string;
@@ -213,15 +241,18 @@ function createWranglerSnippet({
   r2Bucket: string;
   deploymentId: string;
   dispatchConfig: DispatchConfig;
+  entryPoint: string;
+  migrationsDir: string;
 }): Record<string, unknown> {
   const baseConfig: Record<string, unknown> = {
     name: workerName,
-    main: 'dist/index.js',
+    main: entryPoint,
     compatibility_date: '2024-09-26',
     d1_databases: [
       {
         binding: d1Binding,
         database_name: d1DatabaseName,
+        migrations_dir: migrationsDir,
       },
     ],
     durable_objects: {
@@ -281,6 +312,7 @@ function printOutput({
   d1DatabaseName,
   outputFile,
   queueFilePath,
+  migrationFilePath,
 }: {
   workerName: string;
   wranglerSnippet: Record<string, unknown>;
@@ -288,6 +320,7 @@ function printOutput({
   d1DatabaseName: string;
   outputFile: string | null;
   queueFilePath: string | null;
+  migrationFilePath: string;
 }): void {
   if (!outputFile) {
     console.log(
@@ -315,6 +348,10 @@ function printOutput({
     `Run:\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`
   );
 
+  bullet(
+    `Baseline D1 migration saved at ${migrationFilePath}. Add future SQL files in the same directory.`
+  );
+
   if (dispatchConfig.mode === 'binding') {
     console.log(
       `\n\u001b[35mService binding "${dispatchConfig.value}" lets other Workers invoke ${workerName} internally.\u001b[0m\nAdd this to any consumer Worker that should call the world:\n\n"services": [\n  { "binding": "${dispatchConfig.value}", "service": "${workerName}" }\n]\n`
@@ -323,6 +360,65 @@ function printOutput({
     console.log(
       `\nRemember to keep ${dispatchConfig.value} private—queue consumers will call your workflow endpoints over HTTPS.`
     );
+  }
+}
+
+const moduleDir = dirname(fileURLToPath(import.meta.url));
+const migrationSourceCandidates = [
+  resolve(moduleDir, 'drizzle', 'migrations', MIGRATION_FILENAME),
+  resolve(
+    moduleDir,
+    '..',
+    '..',
+    'src',
+    'drizzle',
+    'migrations',
+    MIGRATION_FILENAME
+  ),
+];
+
+async function ensureMigrationFile(targetDir: string): Promise<string> {
+  await ensureDir(targetDir);
+  const targetPath = join(targetDir, MIGRATION_FILENAME);
+  const exists = await pathExists(targetPath);
+  if (exists) {
+    return targetPath;
+  }
+
+  const sql = await readMigrationTemplate();
+  await writeFile(targetPath, sql, 'utf-8');
+  console.log(`\u001b[32m✨ Wrote D1 migration to ${targetPath}\u001b[0m`);
+  return targetPath;
+}
+
+async function readMigrationTemplate(): Promise<string> {
+  for (const candidate of migrationSourceCandidates) {
+    try {
+      return await readFile(candidate, 'utf-8');
+    } catch {
+      // try next candidate
+    }
+  }
+
+  throw new Error(
+    'Unable to locate the bundled D1 migration template. Rebuild workflow-cloudflare-world before running the CLI.'
+  );
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as { code?: string }).code === 'ENOENT'
+    ) {
+      return false;
+    }
+    throw error;
   }
 }
 
