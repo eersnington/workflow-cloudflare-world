@@ -159,7 +159,7 @@ async function main(): Promise<void> {
       JSON.stringify(wranglerSnippet, null, 2),
       'utf-8'
     );
-    console.log(`\n✨ Wrote config to ${configPath}`);
+    console.log(`\n\u001b[32m✨ Wrote config to ${configPath}\u001b[0m`);
   }
 
   const queueFileInput = await input({
@@ -175,7 +175,9 @@ async function main(): Promise<void> {
   if (queueFilePath) {
     await ensureDir(dirname(queueFilePath));
     await writeFile(queueFilePath, queueHandlerTemplate, 'utf-8');
-    console.log(`✨ Wrote queue handler to ${queueFilePath}`);
+    console.log(
+      `\u001b[32m✨ Wrote queue handler to ${queueFilePath}\u001b[0m`
+    );
     console.log(
       '   (Ensure @cloudflare/workers-types is installed as a devDependency for MessageBatch types.)'
     );
@@ -299,18 +301,23 @@ function printOutput({
   }
 
   console.log('\nNext steps:');
-  console.log(
-    queueFilePath
-      ? `• Queue handler scaffolded at ${queueFilePath}. Re-export it from your framework entry so Wrangler picks up both fetch routes and the queue handler.`
-      : '• Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
-  );
-  console.log(
-    `• Run:\n   wrangler d1 migrations apply ${d1DatabaseName}\n   wrangler deploy`
+  const bullet = (msg: string) => console.log(`\u001b[36m•\u001b[0m ${msg}`);
+  if (queueFilePath) {
+    bullet(
+      `Queue handler scaffolded at ${queueFilePath}. Re-export it from your framework entry so Wrangler picks up both fetch routes and the queue handler.`
+    );
+  } else {
+    bullet(
+      'Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
+    );
+  }
+  bullet(
+    `Run:\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`
   );
 
   if (dispatchConfig.mode === 'binding') {
     console.log(
-      `\nService binding "${dispatchConfig.value}" lets other Workers invoke ${workerName} internally.\nAdd this to any consumer Worker that should call the world:\n\n"services": [\n  { "binding": "${dispatchConfig.value}", "service": "${workerName}" }\n]\n`
+      `\n\u001b[35mService binding "${dispatchConfig.value}" lets other Workers invoke ${workerName} internally.\u001b[0m\nAdd this to any consumer Worker that should call the world:\n\n"services": [\n  { "binding": "${dispatchConfig.value}", "service": "${workerName}" }\n]\n`
     );
   } else {
     console.log(
