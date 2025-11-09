@@ -12,7 +12,7 @@ import { z } from 'zod';
 import type { CloudflareEnv } from './config.js';
 
 /**
- * The Cloudflare queue works by creating two separate Cloudflare Queues:
+ * The Cloudflare World queue works by creating two separate Cloudflare Queues:
  * - WORKFLOW_QUEUE for workflow jobs
  * - STEP_QUEUE for step jobs
  *
