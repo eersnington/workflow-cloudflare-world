@@ -32,11 +32,13 @@ Run the included CLI to scaffold the Cloudflare bindings and queue handler direc
 npx workflow-cloudflare-world
 ```
 
-It asks how you want to deploy, which built bundle file Wrangler should use as `main`, and where your D1 migrations should live. The CLI then:
+It asks how you want to deploy, which built bundle file Wrangler should use as `main`, and where your D1 migrations/static assets should live. The CLI then:
 
 - Writes a `wrangler.json` stub (or prints JSON to merge)
 - Creates a queue/`StreamCoordinator` entry file (default `src/worker.ts`)
 - Drops the baseline D1 migration (`0000_workflow_cloudflare.sql`) into your chosen migrations directory
+- Adds an `assets` binding (default `.cloudflare/assets`) so adapter-cloudflare builds deploy without extra edits
+- Enables the `nodejs_compat` flag to satisfy Node built-ins required by the Workflow runtime
 
 Adjust the file paths or merge the output into your existing config if needed.
 
@@ -58,13 +60,18 @@ Configure your Cloudflare Worker with the required bindings in `wrangler.json`:
   "name": "my-workflow-worker",
   "main": "dist/index.js",
   "compatibility_date": "2024-09-26",
+  "compatibility_flags": ["nodejs_compat"],
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "workflow-db"
+      "database_name": "workflow-db",
+      "migrations_dir": "migrations"
     }
   ],
-  "migrations_dir": "migrations",
+  "assets": {
+    "binding": "ASSETS",
+    "directory": ".cloudflare/assets"
+  },
   "durable_objects": {
     "bindings": [
       {
