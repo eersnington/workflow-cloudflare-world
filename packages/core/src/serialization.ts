@@ -189,9 +189,7 @@ type Revivers = {
 };
 
 function revive(str: string) {
-  // biome-ignore lint/security/noGlobalEval: Eval is safe here - we are only passing value from `devalue.stringify()`
-  // biome-ignore lint/complexity/noCommaOperator: This is how you do global scope eval
-  return (0, eval)(`(${str})`);
+  return devalue.parse(str);
 }
 
 function getCommonReducers(global: Record<string, any> = globalThis) {
