@@ -181,7 +181,7 @@ You can deploy this world in two common ways:
 
 In both cases you control versioning via normal Worker deployments, and the Durable Object keeps streaming state consistent across versions.
 
-> Need a starting point? Run `npx workflow-cloudflare-world` inside your project and it will scaffold `wrangler.json` plus a queue handler (exporting `StreamCoordinator`) tailored to your answers.
+> Need a starting point? Run `npx workflow-cloudflare-world` inside your project and it will scaffold `wrangler.json` (bindings, assets directory, migrations, `nodejs_compat` flag) plus a queue handler exporting `StreamCoordinator`, tailored to your answers.
 
 ## Comparison with Other Worlds
 
