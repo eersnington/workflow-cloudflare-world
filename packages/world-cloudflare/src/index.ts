@@ -62,3 +62,4 @@ export function createWorld(env: CloudflareEnv): World {
 export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
 export { handleQueueMessage } from './queue.js';
 export { StreamCoordinator } from './stream-coordinator.js';
+export type { MessageBatch } from '@cloudflare/workers-types';
