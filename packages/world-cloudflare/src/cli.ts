@@ -15,6 +15,11 @@ interface DispatchConfig {
   value: string;
 }
 
+interface AssetsConfig {
+  directory: string;
+  binding: string;
+}
+
 const queueHandlerTemplate = `import {
   StreamCoordinator,
   handleQueueMessage,
@@ -145,6 +150,25 @@ async function main(): Promise<void> {
     ? entryPointInput.trim()
     : 'build/index.js';
 
+  const assetsDirectoryInput = await input({
+    message:
+      'Static assets directory for Wrangler assets binding (leave blank to skip)',
+    default: '.cloudflare/assets',
+  });
+  const assetsDirectory =
+    assetsDirectoryInput.trim().length > 0 ? assetsDirectoryInput.trim() : null;
+  let assetsConfig: AssetsConfig | null = null;
+  if (assetsDirectory) {
+    const assetsBinding = await input({
+      message: 'Assets binding name',
+      default: 'ASSETS',
+    });
+    assetsConfig = {
+      directory: assetsDirectory,
+      binding: assetsBinding.trim().length ? assetsBinding.trim() : 'ASSETS',
+    };
+  }
+
   const migrationsDirInput = await input({
     message:
       'D1 migrations directory (wrangler reads *.sql here when applying migrations)',
@@ -166,6 +190,7 @@ async function main(): Promise<void> {
     dispatchConfig,
     entryPoint,
     migrationsDir: migrationsDirRelative,
+    assets: assetsConfig,
   });
 
   const configPathInput = await input({
@@ -233,6 +258,7 @@ function createWranglerSnippet({
   dispatchConfig,
   entryPoint,
   migrationsDir,
+  assets,
 }: {
   workerName: string;
   d1Binding: string;
@@ -243,11 +269,13 @@ function createWranglerSnippet({
   dispatchConfig: DispatchConfig;
   entryPoint: string;
   migrationsDir: string;
+  assets: AssetsConfig | null;
 }): Record<string, unknown> {
   const baseConfig: Record<string, unknown> = {
     name: workerName,
     main: entryPoint,
     compatibility_date: '2024-09-26',
+    compatibility_flags: ['nodejs_compat'],
     d1_databases: [
       {
         binding: d1Binding,
@@ -301,6 +329,13 @@ function createWranglerSnippet({
         : {}),
     },
   };
+
+  if (assets) {
+    baseConfig.assets = {
+      binding: assets.binding,
+      directory: assets.directory,
+    };
+  }
 
   return baseConfig;
 }
