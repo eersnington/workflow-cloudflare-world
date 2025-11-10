@@ -68,6 +68,12 @@
       "bucket_name": "workflow-streams"
     }
   ],
+  "services": [
+    {
+      "binding": "WORKFLOW_DISPATCH",
+      "service": "workflow-app"
+    }
+  ],
   "vars": {
     "DEPLOYMENT_ID": "cloudflare",
     "WORKFLOW_TARGET_WORLD": "workflow-cloudflare-world"
