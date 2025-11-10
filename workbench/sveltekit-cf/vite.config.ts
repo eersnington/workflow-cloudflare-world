@@ -11,20 +11,4 @@ export default defineConfig({
     devtoolsJson(),
     sveltekit(),
   ],
-  ssr: {
-    external: [
-      'workflow-cloudflare-world',
-      '@workflow/world',
-      '@workflow/core',
-    ],
-  },
-  build: {
-    rollupOptions: {
-      external: [
-        'cloudflare:workers',
-        'workflow-cloudflare-world',
-        '@workflow/world',
-      ],
-    },
-  },
 });
