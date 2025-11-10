@@ -1,11 +1,12 @@
 import {
   StreamCoordinator,
+  WorkflowExecutorContainer,
   handleQueueMessage,
   type CloudflareEnv,
   type MessageBatch,
 } from 'workflow-cloudflare-world';
 
-export { StreamCoordinator };
+export { StreamCoordinator, WorkflowExecutorContainer };
 
 export async function queue(
   batch: MessageBatch,
