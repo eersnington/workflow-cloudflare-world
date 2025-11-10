@@ -1,7 +1,7 @@
 {
-  "name": "workflow-app",
+  "name": "workflow-world",
   "main": ".svelte-kit/cloudflare/_worker.js",
-  "compatibility_date": "2024-09-26",
+  "compatibility_date": "2025-11-10",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
     "logs": {
@@ -29,13 +29,17 @@
       {
         "name": "STREAM_COORDINATOR",
         "class_name": "StreamCoordinator"
+      },
+      {
+        "name": "WORKFLOW_EXECUTOR",
+        "class_name": "WorkflowExecutorContainer"
       }
     ]
   },
   "migrations": [
     {
-      "tag": "stream-coordinator-v1",
-      "new_classes": ["StreamCoordinator"]
+      "tag": "v1",
+      "new_sqlite_classes": ["StreamCoordinator", "WorkflowExecutorContainer"]
     }
   ],
   "queues": {
@@ -68,18 +72,28 @@
       "bucket_name": "workflow-streams"
     }
   ],
-  "services": [
-    {
-      "binding": "WORKFLOW_DISPATCH",
-      "service": "workflow-app"
-    }
-  ],
   "vars": {
-    "DEPLOYMENT_ID": "cloudflare",
+    "DEPLOYMENT_ID": "workflow-world",
     "WORKFLOW_TARGET_WORLD": "workflow-cloudflare-world"
   },
+  "containers": [
+    {
+      "max_instances": 10,
+      "class_name": "WorkflowExecutorContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "rollout_active_grace_period": 300,
+      "rollout_step_percentage": [10, 100]
+    }
+  ],
   "assets": {
     "binding": "ASSETS",
     "directory": ".cloudflare/assets"
-  }
+  },
+  "services": [
+    {
+      "binding": "WORKFLOW_DISPATCH",
+      "service": "workflow-world"
+    }
+  ]
 }
