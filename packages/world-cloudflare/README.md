@@ -221,11 +221,31 @@ Containers provide a deterministic Node.js VM context with:
 - **Deterministic Crypto**: Controlled `crypto.getRandomValues()` and `crypto.randomUUID()`
 - **Full Node.js APIs**: Access to all Node.js built-ins and modules
 
+### Container Execution Model
+
+**Important**: Each container instance executes **one workflow at a time** (sequentially), not multiple workflows concurrently.
+
+- **One Workflow Per Container**: Each container processes one workflow request to completion
+- **Sequential Processing**: Multiple workflow requests queue up within a single container
+- **Scaling Model**: More concurrent workflows = more container instances
+- **Isolation**: Each workflow gets its own VM context within the container
+
+Example with `max_instances: 10`:
+```
+Container 1: Workflow A → Workflow B → Workflow C (sequential)
+Container 2: Workflow D → Workflow E (sequential)
+Container 3: Workflow F (executing)
+...
+Container 10: (idle)
+
+Total concurrent workflows = 3 (one per active container)
+```
+
 ### Container Lifecycle
 
 - **Cold Start**: 2-3 seconds for first container start
 - **Warming Period**: 10 minutes after last request (configurable)
-- **Max Instances**: Configurable concurrent containers (default: 10)
+- **Max Instances**: Maximum concurrent containers (default: 10 = 10 concurrent workflows)
 - **Instance Types**: From `lite` (1/16 vCPU) to `standard-4` (4 vCPU)
 
 ## Development

@@ -141,11 +141,43 @@ crypto.randomUUID = deterministicUUID;
 4. **State Management**: Results persisted to D1 database
 5. **Response**: Execution result returned to Worker
 
+### Container Execution Model
+
+**Critical**: Each container instance executes **one workflow at a time** (sequentially), not multiple workflows concurrently.
+
+```mermaid
+graph LR
+    subgraph "Container Instance"
+        Request1[Workflow Request 1] --> Exec1[Executing Workflow 1]
+        Request2[Workflow Request 2] --> Queue[Waiting in Queue]
+        Request3[Workflow Request 3] --> Queue
+        Exec1 --> Complete[Complete]
+        Queue --> Exec2[Executing Workflow 2]
+    end
+```
+
+**Key Characteristics:**
+- **One-at-a-Time**: Container processes one workflow to completion before starting the next
+- **Sequential Queue**: Multiple workflow requests queue within the same container
+- **VM Context Isolation**: Each workflow gets its own fresh VM context
+- **Scaling Strategy**: More concurrent workflows = more container instances
+
+**Example with 3 containers, max_instances=10:**
+```
+Container 1: [Workflow A] → Workflow B → Workflow C (sequential)
+Container 2: [Workflow D] → Workflow E (sequential)
+Container 3: [Workflow F] (executing)
+Containers 4-10: (idle/warming)
+
+Concurrent workflows = 3 (one per active container)
+```
+
 ### Container Lifecycle
 - **Cold Start**: 2-3 seconds for initial container initialization
 - **Warm Execution**: ~0ms for subsequent requests
 - **Sleep**: Container sleeps after 10 minutes of inactivity
 - **Scaling**: Manual scaling based on max_instances configuration
+- **Concurrency**: max_instances = maximum concurrent workflows
 
 ## Storage Architecture
 
@@ -230,8 +262,15 @@ graph TB
 ### Scaling
 - **Workers**: Auto-scale based on request volume
 - **Containers**: Manual scaling via max_instances configuration
+  - `max_instances: 10` = 10 workflows can run simultaneously
+  - Each container handles one workflow at a time (sequentially)
 - **D1**: Automatic read replication, regional writes
 - **Queues**: Automatic message distribution and retry
+
+**Container Scaling Strategy:**
+- More concurrent workflow demand → Increase max_instances
+- Each additional container = +1 concurrent workflow capacity
+- Containers automatically handle queued workflows sequentially
 
 ### Limits and Considerations
 - **Container Limits**: Account-wide memory, CPU, and disk quotas
