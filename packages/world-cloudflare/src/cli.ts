@@ -102,6 +102,74 @@ CMD ["node", "dist/index.js"]
 # The container should only contain the compiled/bundled application code
 `;
 
+const dockerignoreTemplate = `# Dependencies (huge, not needed in container)
+node_modules
+.pnpm-store
+
+# Development files (not needed in container)
+src
+.vite
+.swc
+.wrangler
+.wrangler-logs
+
+# Config files (not needed in container)
+tsconfig.json
+svelte.config.js
+vite.config.ts
+*.config.*
+
+# Build outputs we don't need (keep SvelteKit output for containers)
+build
+dist
+
+# Cache and temp
+.cache
+.tmp
+
+# Git
+.git
+.gitignore
+
+# Environment
+.env
+.env.*
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Lock files (not needed in container)
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+
+# Testing
+coverage
+.nyc_output
+
+# Keep SvelteKit build outputs needed for container
+# .svelte-kit/cloudflare/_worker.js
+# .svelte-kit/output/server/
+
+# Note: Uncomment below lines if you use other build systems:
+# For Next.js:
+# .next
+# For Remix:
+# build
+# For other frameworks, adjust accordingly
+`;
+
 const banner =
   '\n╭──────────────────────────────────────────────╮\n│  Workflow Cloudflare World Configuration CLI │\n╰──────────────────────────────────────────────╯\n';
 
@@ -328,6 +396,20 @@ async function main(): Promise<void> {
     );
   }
 
+  // Create .dockerignore for optimized container builds
+  const dockerignorePath = resolve(process.cwd(), '.dockerignore');
+  const dockerignoreExists = await pathExists(dockerignorePath);
+  if (!dockerignoreExists) {
+    await writeFile(dockerignorePath, dockerignoreTemplate, 'utf-8');
+    console.log(
+      `\u001b[32m✨ Wrote .dockerignore to ${dockerignorePath}\u001b[0m`
+    );
+  } else {
+    console.log(
+      `\u001b[33m⚠️  .dockerignore already exists at ${dockerignorePath}\u001b[0m`
+    );
+  }
+
   printOutput({
     workerName,
     wranglerSnippet,
@@ -523,6 +605,10 @@ function printOutput({
       'Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
     );
   }
+
+  bullet(
+    'Generated configuration files: wrangler.json, Dockerfile, .dockerignore, and D1 migration.'
+  );
   const deployCommands = `Run:\n   \u001b[33mwrangler d1 create ${d1DatabaseName}\u001b[0m (first time only)\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m (containers take 2-3 minutes to provision)\n   \u001b[33mwrangler containers list\u001b[0m (check container status)`;
 
   bullet(deployCommands);
@@ -533,6 +619,10 @@ function printOutput({
 
   bullet(
     `Dockerfile created for container execution. Adjust the build path if your build output directory differs from 'dist/'.`
+  );
+
+  bullet(
+    `.dockerignore created to optimize container build size and speed. Excludes node_modules and development files.`
   );
 
   if (dispatchConfig.mode === 'binding') {
