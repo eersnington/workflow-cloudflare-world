@@ -5,4 +5,9 @@ import { workflowPlugin } from 'workflow/sveltekit';
 
 export default defineConfig({
   plugins: [workflowPlugin(), devtoolsJson(), sveltekit()],
+  build: {
+    rollupOptions: {
+      external: ['cloudflare:workers'],
+    },
+  },
 });
