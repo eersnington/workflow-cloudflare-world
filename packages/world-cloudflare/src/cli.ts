@@ -334,6 +334,16 @@ function createWranglerSnippet({
     };
   }
 
+  // Add services section if using service binding
+  if (dispatchConfig.mode === 'binding') {
+    baseConfig.services = [
+      {
+        binding: dispatchConfig.value,
+        service: workerName,
+      },
+    ];
+  }
+
   return baseConfig;
 }
 
