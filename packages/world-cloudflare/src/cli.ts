@@ -65,6 +65,72 @@ export async function queue(
 
 const MIGRATION_FILENAME = '0000_workflow_cloudflare.sql';
 
+const dockerfileTemplate = `# Use Node.js 18 Alpine as base image
+FROM node:18-alpine AS base
+
+# Install dependencies only when needed
+FROM base AS deps
+# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
+RUN apk add --no-cache libc6-compat
+WORKDIR /app
+
+# Install dependencies based on the preferred package manager
+COPY package.json package-lock.json* pnpm-lock.yaml* yarn.lock* ./
+RUN \\
+  if [ -f "pnpm-lock.yaml" ]; then \\
+    corepack enable pnpm && pnpm install --frozen-lockfile; \\
+  elif [ -f "yarn.lock" ]; then \\
+    yarn install --frozen-lockfile; \\
+  elif [ -f "package-lock.json" ]; then \\
+    npm ci; \\
+  else \\
+    echo "Lockfile not found." && exit 1; \\
+  fi
+
+# Rebuild the source code only when needed
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+
+# Build the application
+RUN \\
+  if [ -f "pnpm-lock.yaml" ]; then \\
+    corepack enable pnpm && pnpm run build; \\
+  elif [ -f "yarn.lock" ]; then \\
+    yarn run build; \\
+  else \\
+    npm run build; \\
+  fi
+
+# Production image, copy all the files and run the app
+FROM node:18-alpine AS runner
+WORKDIR /app
+
+ENV NODE_ENV production
+
+# Create a non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+# Copy built application (adjust paths based on your build output)
+COPY --from=builder /app/dist ./dist
+COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=builder --chown=nodejs:nodejs /app/package.json ./package.json
+
+# Set the correct permissions
+RUN mkdir -p /app/dist && chown -R nodejs:nodejs /app
+
+# Expose the port the app runs on
+EXPOSE 8080
+
+# Set user to nodejs
+USER nodejs
+
+# Start the container
+CMD ["node", "dist/index.js"]
+`;
+
 const banner =
   '\n╭──────────────────────────────────────────────╮\n│  Workflow Cloudflare World Configuration CLI │\n╰──────────────────────────────────────────────╯\n';
 
@@ -279,6 +345,18 @@ async function main(): Promise<void> {
     );
   }
 
+  // Create Dockerfile for container execution
+  const dockerfilePath = resolve(process.cwd(), 'Dockerfile');
+  const dockerfileExists = await pathExists(dockerfilePath);
+  if (!dockerfileExists) {
+    await writeFile(dockerfilePath, dockerfileTemplate, 'utf-8');
+    console.log(`\u001b[32m✨ Wrote Dockerfile to ${dockerfilePath}\u001b[0m`);
+  } else {
+    console.log(
+      `\u001b[33m⚠️  Dockerfile already exists at ${dockerfilePath}\u001b[0m`
+    );
+  }
+
   printOutput({
     workerName,
     wranglerSnippet,
@@ -401,17 +479,15 @@ function createWranglerSnippet({
     'WorkflowExecutorContainer'
   );
 
-  // Update queue consumers to use script_name for all deployments
+  // Update queue consumers (no script_name needed for single-worker deployment)
   (baseConfig.queues as any).consumers = [
     {
       queue: queueConfig.workflow,
-      script_name: workerName,
       max_batch_size: 10,
       max_batch_timeout: 5,
     },
     {
       queue: queueConfig.step,
-      script_name: workerName,
       max_batch_size: 10,
       max_batch_timeout: 5,
     },
@@ -482,6 +558,10 @@ function printOutput({
 
   bullet(
     `Baseline D1 migration saved at ${migrationFilePath}. Add future SQL files in the same directory.`
+  );
+
+  bullet(
+    `Dockerfile created for container execution. Adjust the build path if your build output directory differs from 'dist/'.`
   );
 
   if (dispatchConfig.mode === 'binding') {
