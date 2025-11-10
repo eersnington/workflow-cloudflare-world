@@ -68,7 +68,23 @@ export type {
   WorkflowExecutionRequest,
   WorkflowExecutionResponse,
 } from './container.js';
-export { WorkflowExecutorContainer } from './container.js';
+
+// NOTE:
+// `WorkflowExecutorContainer` is server-only and depends on the
+// `@cloudflare/containers` package. Importing it at module-evaluation time
+// causes build-time consumers (like Vite configs) to attempt to resolve
+// server-only dependencies and can break builds. To keep the package root
+// safe for build-time imports, we do NOT export the container class directly.
+//
+// Consumers that actually need the container class (server/runtime code)
+// should dynamically import it via the helper provided below, or import the
+// dedicated subpath `workflow-cloudflare-world/container` after the package
+// is built (see package.json `exports`).
+export async function loadWorkflowExecutorContainer() {
+  const mod = await import('./container.js');
+  return mod.WorkflowExecutorContainer;
+}
+
 export { ContainerClient, defaultContainerClient } from './container-client.js';
 export { handleQueueMessage } from './queue.js';
 export { StreamCoordinator } from './stream-coordinator.js';
