@@ -14,7 +14,7 @@ const root = process.cwd();
 const workerPath = resolve(root, '.svelte-kit/cloudflare/_worker.js');
 
 const wrapper = `import worker from "../../build/index.js";
-import { StreamCoordinator as WorkflowStreamCoordinator, queue as workflowQueue } from "../../src/worker";
+import { StreamCoordinator as WorkflowStreamCoordinator, WorkflowExecutorContainer, queue as workflowQueue } from "../../src/worker";
 
 const workflowWorker = {
   ...worker,
@@ -24,6 +24,7 @@ const workflowWorker = {
 export default workflowWorker;
 export const queue = workflowQueue;
 export const StreamCoordinator = WorkflowStreamCoordinator;
+export { WorkflowExecutorContainer };
 `;
 
 try {
