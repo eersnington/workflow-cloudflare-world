@@ -1,10 +1,10 @@
 import {
   StreamCoordinator,
-  WorkflowExecutorContainer,
   handleQueueMessage,
   type CloudflareEnv,
   type MessageBatch,
 } from 'workflow-cloudflare-world';
+import { WorkflowExecutorContainer } from 'workflow-cloudflare-world/container';
 
 export { StreamCoordinator, WorkflowExecutorContainer };
 
