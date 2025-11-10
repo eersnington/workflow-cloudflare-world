@@ -20,14 +20,28 @@ interface AssetsConfig {
   binding: string;
 }
 
+interface ContainerConfig {
+  enabled: boolean;
+  instanceType:
+    | 'lite'
+    | 'basic'
+    | 'standard-1'
+    | 'standard-2'
+    | 'standard-3'
+    | 'standard-4';
+  maxInstances: number;
+  sleepAfter: string;
+}
+
 const queueHandlerTemplate = `import {
   StreamCoordinator,
+  WorkflowExecutorContainer,
   handleQueueMessage,
   type CloudflareEnv,
   type MessageBatch,
 } from 'workflow-cloudflare-world';
 
-export { StreamCoordinator };
+export { StreamCoordinator, WorkflowExecutorContainer };
 
 export async function queue(
   batch: MessageBatch,
@@ -75,12 +89,21 @@ async function main(): Promise<void> {
         name: 'Dedicated Worker (apps call via service binding)',
         value: 'dedicated',
       },
+      {
+        name: 'Container-based execution (for vm.runInContext support)',
+        value: 'containers',
+      },
     ] as const,
   });
 
   const workerName = await input({
     message: 'Worker name',
-    default: deploymentMode === 'dedicated' ? 'workflow-world' : 'workflow-app',
+    default:
+      deploymentMode === 'dedicated'
+        ? 'workflow-world'
+        : deploymentMode === 'containers'
+          ? 'workflow-world'
+          : 'workflow-app',
   });
 
   const d1Binding = await input({
@@ -178,6 +201,84 @@ async function main(): Promise<void> {
     ? migrationsDirInput.trim()
     : 'migrations';
   const migrationsDirAbsolute = resolve(process.cwd(), migrationsDirRelative);
+  // Container configuration for container-based deployments
+  const containerConfig: ContainerConfig = {
+    enabled: false,
+    instanceType: 'basic',
+    maxInstances: 10,
+    sleepAfter: '10m',
+  };
+
+  if (deploymentMode === 'containers') {
+    const enableContainers = await confirm({
+      message:
+        'Enable Cloudflare Containers for workflow execution (provides vm.runInContext support)?',
+      default: true,
+    });
+
+    if (enableContainers) {
+      containerConfig.enabled = true;
+
+      containerConfig.instanceType = await select({
+        message:
+          'Container instance type (choose based on workflow complexity)',
+        choices: [
+          {
+            name: 'lite (1/16 vCPU, 256 MiB, 2 GB) - Simple workflows',
+            value: 'lite',
+          },
+          {
+            name: 'basic (1/4 vCPU, 1 GiB, 4 GB) - Most workflows',
+            value: 'basic',
+          },
+          {
+            name: 'standard-1 (1/2 vCPU, 4 GiB, 8 GB) - Complex workflows',
+            value: 'standard-1',
+          },
+          {
+            name: 'standard-2 (1 vCPU, 6 GiB, 12 GB) - Heavy workflows',
+            value: 'standard-2',
+          },
+          {
+            name: 'standard-3 (2 vCPU, 8 GiB, 16 GB) - Very heavy workflows',
+            value: 'standard-3',
+          },
+          {
+            name: 'standard-4 (4 vCPU, 12 GiB, 20 GB) - Maximum workflows',
+            value: 'standard-4',
+          },
+        ] as const,
+        default: 'basic',
+      });
+
+      containerConfig.maxInstances = parseInt(
+        await input({
+          message: 'Maximum concurrent container instances',
+          default: '10',
+          validate: (input) => {
+            const num = parseInt(input);
+            if (isNaN(num) || num < 1 || num > 100) {
+              return 'Please enter a number between 1 and 100';
+            }
+            return true;
+          },
+        }),
+        10
+      );
+
+      containerConfig.sleepAfter = await select({
+        message: 'Container warming period (how long to keep containers warm)',
+        choices: [
+          { name: '5 minutes (faster warm-up, higher cost)', value: '5m' },
+          { name: '10 minutes (balanced)', value: '10m' },
+          { name: '30 minutes (slower warm-up, lower cost)', value: '30m' },
+          { name: '1 hour (maximum savings)', value: '1h' },
+        ] as const,
+        default: '10m',
+      });
+    }
+  }
+
   const migrationFilePath = await ensureMigrationFile(migrationsDirAbsolute);
 
   const wranglerSnippet = await createWranglerSnippet({
@@ -191,6 +292,8 @@ async function main(): Promise<void> {
     entryPoint,
     migrationsDir: migrationsDirRelative,
     assets: assetsConfig,
+    containerConfig,
+    deploymentMode,
   });
 
   const configPathInput = await input({
@@ -238,6 +341,7 @@ async function main(): Promise<void> {
     outputFile: configPath,
     queueFilePath,
     migrationFilePath,
+    deploymentMode,
   });
 }
 
@@ -256,6 +360,8 @@ function createWranglerSnippet({
   entryPoint,
   migrationsDir,
   assets,
+  containerConfig,
+  deploymentMode,
 }: {
   workerName: string;
   d1Binding: string;
@@ -267,11 +373,13 @@ function createWranglerSnippet({
   entryPoint: string;
   migrationsDir: string;
   assets: AssetsConfig | null;
+  containerConfig: ContainerConfig;
+  deploymentMode: string;
 }): Record<string, unknown> {
   const baseConfig: Record<string, unknown> = {
     name: workerName,
     main: entryPoint,
-    compatibility_date: '2024-09-26',
+    compatibility_date: '2025-11-10',
     compatibility_flags: ['nodejs_compat'],
     d1_databases: [
       {
@@ -290,8 +398,8 @@ function createWranglerSnippet({
     },
     migrations: [
       {
-        tag: 'stream-coordinator-v1',
-        new_classes: ['StreamCoordinator'],
+        tag: 'v1',
+        new_sqlite_classes: ['StreamCoordinator'],
       },
     ],
     queues: {
@@ -327,6 +435,49 @@ function createWranglerSnippet({
     },
   };
 
+  // Add container configuration for container-based deployments
+  if (containerConfig.enabled) {
+    (baseConfig as any).containers = [
+      {
+        max_instances: containerConfig.maxInstances,
+        class_name: 'WorkflowExecutorContainer',
+        image: './Dockerfile',
+        instance_type: containerConfig.instanceType,
+        rollout_active_grace_period: 300,
+        rollout_step_percentage: [10, 100],
+      },
+    ];
+
+    // Add container DO binding
+    (baseConfig.durable_objects as any).bindings.push({
+      name: 'WORKFLOW_EXECUTOR',
+      class_name: 'WorkflowExecutorContainer',
+    });
+
+    // Update migrations to include container
+    (baseConfig.migrations as any)[0].new_sqlite_classes.push(
+      'WorkflowExecutorContainer'
+    );
+
+    // Update queue consumers to use script_name for container deployments
+    if (deploymentMode === 'containers') {
+      (baseConfig.queues as any).consumers = [
+        {
+          queue: queueConfig.workflow,
+          script_name: workerName,
+          max_batch_size: 10,
+          max_batch_timeout: 5,
+        },
+        {
+          queue: queueConfig.step,
+          script_name: workerName,
+          max_batch_size: 10,
+          max_batch_timeout: 5,
+        },
+      ];
+    }
+  }
+
   if (assets) {
     baseConfig.assets = {
       binding: assets.binding,
@@ -355,6 +506,7 @@ function printOutput({
   outputFile,
   queueFilePath,
   migrationFilePath,
+  deploymentMode,
 }: {
   workerName: string;
   wranglerSnippet: Record<string, unknown>;
@@ -363,6 +515,7 @@ function printOutput({
   outputFile: string | null;
   queueFilePath: string | null;
   migrationFilePath: string;
+  deploymentMode: string;
 }): void {
   if (!outputFile) {
     console.log(
@@ -386,9 +539,12 @@ function printOutput({
       'Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
     );
   }
-  bullet(
-    `Run:\n   \u001b[33mwrangler d1 create ${d1DatabaseName}\u001b[0m (first time only)\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`
-  );
+  const deployCommands =
+    deploymentMode === 'containers'
+      ? `Run:\n   \u001b[33mwrangler d1 create ${d1DatabaseName}\u001b[0m (first time only)\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m (containers take 2-3 minutes to provision)\n   \u001b[33mwrangler containers list\u001b[0m (check container status)`
+      : `Run:\n   \u001b[33mwrangler d1 create ${d1DatabaseName}\u001b[0m (first time only)\n   \u001b[33mwrangler d1 migrations apply ${d1DatabaseName}\u001b[0m\n   \u001b[33mwrangler deploy\u001b[0m`;
+
+  bullet(deployCommands);
 
   bullet(
     `Baseline D1 migration saved at ${migrationFilePath}. Add future SQL files in the same directory.`
