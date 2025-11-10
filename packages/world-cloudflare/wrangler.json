@@ -1,8 +1,37 @@
 {
+  "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "workflow-cloudflare-world",
-  "main": "test-worker.ts",
-  "compatibility_date": "2024-09-26",
+  "main": "dist/index.js",
+  "compatibility_date": "2025-11-10",
   "compatibility_flags": ["nodejs_compat"],
+
+  "containers": [
+    {
+      "max_instances": 10,
+      "class_name": "WorkflowExecutorContainer",
+      "image": "./Dockerfile",
+      "instance_type": "basic",
+      "rollout_active_grace_period": 300,
+      "rollout_step_percentage": [10, 100]
+    }
+  ],
+
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "WORKFLOW_EXECUTOR",
+        "class_name": "WorkflowExecutorContainer"
+      }
+    ]
+  },
+
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["WorkflowExecutorContainer", "StreamCoordinator"]
+    }
+  ],
+
   "d1_databases": [
     {
       "binding": "DB",
@@ -11,6 +40,7 @@
       "migrations_dir": "src/drizzle/migrations"
     }
   ],
+
   "queues": {
     "producers": [
       {
@@ -25,22 +55,26 @@
     "consumers": [
       {
         "queue": "workflow-queue",
+        "script_name": "workflow-cloudflare-world",
         "max_batch_size": 10,
         "max_batch_timeout": 5
       },
       {
         "queue": "step-queue",
+        "script_name": "workflow-cloudflare-world",
         "max_batch_size": 10,
         "max_batch_timeout": 5
       }
     ]
   },
+
   "r2_buckets": [
     {
       "binding": "STREAM_BUCKET",
       "bucket_name": "workflow-streams"
     }
   ],
+
   "vars": {
     "DEPLOYMENT_ID": "dev",
     "WORKFLOW_DISPATCH_URL": "https://world-cloudflare-example.workers.dev"

@@ -30,10 +30,12 @@
     "db:push": "pnpm exec drizzle-kit --version && drizzle-kit push"
   },
   "dependencies": {
+    "@cloudflare/containers": "^0.1.0",
     "@inquirer/prompts": "^7.10.0",
     "@workflow/errors": "workspace:*",
     "@workflow/world": "workspace:*",
     "drizzle-orm": "^0.31.2",
+    "seedrandom": "^3.0.5",
     "ulid": "^3.0.1",
     "zod": "catalog:"
   },

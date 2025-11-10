@@ -10,6 +10,7 @@ import {
   createStepsStorage,
 } from './storage.js';
 import { createStreamer } from './streamer.js';
+import { WorkflowExecutorContainer } from './container.js';
 
 function createStorage(drizzle: Drizzle): Storage {
   return {
@@ -32,6 +33,7 @@ function createStorage(drizzle: Drizzle): Storage {
  *   - WORKFLOW_QUEUE: Queue for workflow tasks
  *   - STEP_QUEUE: Queue for step tasks
  *   - STREAM_BUCKET: R2 bucket for stream storage
+ *   - WORKFLOW_EXECUTOR: Container namespace for workflow execution
  *
  * @returns World instance with storage, queue, and streaming capabilities
  *
@@ -63,4 +65,10 @@ export function createWorld(env: CloudflareEnv): World {
 export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
 export { handleQueueMessage } from './queue.js';
 export { StreamCoordinator } from './stream-coordinator.js';
+export { WorkflowExecutorContainer } from './container.js';
+export type {
+  WorkflowExecutionRequest,
+  WorkflowExecutionResponse,
+  WorkflowExecutionContext,
+} from './container.js';
 export type { MessageBatch } from '@cloudflare/workers-types';

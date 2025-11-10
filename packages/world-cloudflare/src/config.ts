@@ -28,6 +28,11 @@ export interface CloudflareEnv {
   STREAM_COORDINATOR: DurableObjectNamespace;
 
   /**
+   * Durable Object namespace for workflow execution containers
+   */
+  WORKFLOW_EXECUTOR: DurableObjectNamespace;
+
+  /**
    * Optional deployment ID (defaults to 'cloudflare')
    */
   DEPLOYMENT_ID?: string;

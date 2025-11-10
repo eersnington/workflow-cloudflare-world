@@ -9,6 +9,7 @@ import {
 import { monotonicFactory } from 'ulid';
 import { z } from 'zod';
 import type { CloudflareEnv } from './config.js';
+import type { WorkflowExecutionRequest } from './container.js';
 
 /**
  * The Cloudflare World queue works by creating two separate Cloudflare Queues:
@@ -125,25 +126,112 @@ const parseQueueName = (name: ValidQueueName): [QueuePrefix, string] => {
  * Queue consumer handler to be used in a Cloudflare Worker.
  * This processes messages from Cloudflare Queues and forwards them to the
  * deployed workflow routes via either a service binding or an external URL.
+ *
+ * UPDATED: Routes workflow execution to containers, step execution remains in Workers
  */
 export async function handleQueueMessage(
   env: CloudflareEnv,
   message: Message<unknown>
 ): Promise<{ retryAfterSeconds?: number } | undefined> {
-  const dispatcher = createDispatcher(env);
   const envelope = QueueEnvelope.parse(message.body);
 
-  const path = envelope.queueName.startsWith('__wkf_step_')
-    ? STEP_ENDPOINT
-    : FLOW_ENDPOINT;
+  // Route workflow jobs to containers, step jobs stay in Workers
+  if (envelope.queueName.startsWith('__wkf_workflow_')) {
+    return handleWorkflowJob(env, envelope);
+  } else if (envelope.queueName.startsWith('__wkf_step_')) {
+    const dispatcher = createDispatcher(env);
+    return handleStepJob(env, envelope, dispatcher);
+  } else {
+    throw new Error(`Unknown queue type: ${envelope.queueName}`);
+  }
+}
 
+/**
+ * Handle workflow job execution in containers
+ */
+async function handleWorkflowJob(
+  env: CloudflareEnv,
+  envelope: z.infer<typeof QueueEnvelope>
+): Promise<{ retryAfterSeconds?: number } | undefined> {
+  const { message, messageId, queueName } = envelope;
+
+  // Extract workflow execution details from the message
+  const workflowRequest: WorkflowExecutionRequest = {
+    workflowCode: message.workflowCode,
+    context: {
+      seed: message.context?.seed || 'default-seed',
+      fixedTimestamp: message.context?.fixedTimestamp || Date.now(),
+      workflowRunId: message.workflowRunId,
+      deploymentId: env.DEPLOYMENT_ID,
+    },
+    inputs: message.inputs,
+    workflowRun: {
+      workflowName: message.workflowName,
+      runId: message.workflowRunId,
+    },
+  };
+
+  try {
+    // Get or create container instance for this workflow run
+    const container = env.WORKFLOW_EXECUTOR.get(message.workflowRunId);
+
+    // Prepare request to container
+    const containerRequest = new Request('http://container/execute', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(workflowRequest),
+    });
+
+    // Execute workflow in container
+    const response = await container.fetch(containerRequest);
+    const result = (await response.json()) as {
+      success: boolean;
+      error?: string;
+      retryAfterSeconds?: number;
+    };
+
+    if (result.success) {
+      // Workflow executed successfully
+      return;
+    } else {
+      // Workflow failed
+      if (result.retryAfterSeconds) {
+        return { retryAfterSeconds: result.retryAfterSeconds };
+      }
+      throw new Error(`Workflow execution failed: ${result.error}`);
+    }
+  } catch (error) {
+    console.error('Failed to execute workflow in container:', error);
+
+    // Check if container is not ready and needs retry
+    if (
+      error.message.includes('container') ||
+      error.message.includes('connection')
+    ) {
+      return { retryAfterSeconds: 30 }; // Retry after 30 seconds
+    }
+
+    // Re-throw non-retryable errors
+    throw error;
+  }
+}
+
+/**
+ * Handle step job execution in Workers (unchanged logic)
+ */
+async function handleStepJob(
+  env: CloudflareEnv,
+  envelope: z.infer<typeof QueueEnvelope>,
+  dispatcher: Dispatcher
+): Promise<{ retryAfterSeconds?: number } | undefined> {
+  const path = STEP_ENDPOINT;
   const request = new Request(new URL(path, dispatcher.baseUrl), {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
       'x-vqs-queue-name': envelope.queueName,
       'x-vqs-message-id': envelope.messageId,
-      'x-vqs-message-attempt': String(message.attempts + 1),
+      'x-vqs-message-attempt': String(envelope.attempt + 1),
     },
     body: JSON.stringify(envelope.message),
   });
