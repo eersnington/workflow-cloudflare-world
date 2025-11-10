@@ -1,28 +1,27 @@
-# Dependencies
+# Dependencies (huge, not needed in container)
 node_modules
 .pnpm-store
 
-# Build outputs (we copy these manually)
-.svelte-kit
-build
-
-# Development files
+# Development files (not needed in container)
 src
 .vite
 .swc
 .wrangler
 .wrangler-logs
 
-# Config files
+# Config files (not needed in container)
 tsconfig.json
 svelte.config.js
 vite.config.ts
 *.config.*
 
+# Build outputs we don't need (keep SvelteKit output)
+build
+dist
+
 # Cache and temp
 .cache
 .tmp
-dist
 
 # Git
 .git
@@ -54,3 +53,7 @@ yarn.lock
 # Testing
 coverage
 .nyc_output
+
+# Keep SvelteKit build outputs needed for container
+# .svelte-kit/cloudflare/_worker.js
+# .svelte-kit/output/server/
