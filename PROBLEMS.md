@@ -22,12 +22,17 @@ This repository hit a number of Cloudflare-specific issues while wiring the Work
 - **Cause:** `@workflow/workflow` hard-depends on `@workflow/world-local`, which drags in Undici. Undici instantiates `WeakRef`/`FinalizationRegistry` during module evaluation, but Cloudflare Workers (and Miniflare) do not ship those globals.
 - **Resolution:** `packages/world-cloudflare/src/polyfills.ts` now polyfills both APIs before anything else runs, so the world package can coexist with the core bundle without requiring every consumer Worker to add its own shim. Long term the core package should avoid bundling the local world into Cloudflare builds, but the repo-level polyfill unblocks us for now.
 
-## 5. Embedded Serializer Uses `eval`
-- **Symptom:** `POST /api/trigger` returns “Failed to serialize workflow arguments” with a nested `EvalError: Code generation from strings disallowed for this context` even when passing primitive arguments like `2`.
-- **Cause:** `packages/core/src/serialization.ts` uses a `revive()` helper (`lines 192-199`) that does `(0, eval)(...)` on every `devalue.stringify()` result. `dehydrateWorkflowArguments()` (line ~751) calls that path for every workflow trigger. Cloudflare Workers forbid any string-based code generation, so the serializer explodes before the workflow even enqueues.
-- **Resolution:** **Still open.** There is no app-level workaround other than “only send JSON-safe primitives and hope they never hit the eval path”. The real fix has to land in the core package (replace the eval-based revive logic with a Worker-safe parser or gate the advanced serializer behind a feature flag).
+## 5. Core Runtime Requires Node.js VM APIs
+- **Symptom:** Workflow execution fails with `[unenv] vm.runInContext is not implemented yet!` when queue consumers try to run workflow code.
+- **Cause:** `packages/core/src/vm/index.ts` fundamentally depends on Node.js `vm.runInContext` to create isolated sandboxes for workflow execution. This is required for the deterministic replay system that makes Workflow work. Cloudflare Workers do not provide any VM isolation APIs, making this a core incompatibility.
+- **Resolution:** **Fundamental blocker.** The current Workflow runtime architecture cannot run on Cloudflare Workers. A complete redesign would be needed to either: (1) use Worker-specific isolation if available, (2) move workflow execution to a different environment that supports Node.js VM, or (3) implement a Worker-compatible sandboxing approach that provides the same deterministic guarantees.
 
-## 6. Queue Consumer Used Vercel’s JsonTransport
+## 6. Embedded Serializer Uses `eval`
+- **Symptom:** `POST /api/trigger` returns "Failed to serialize workflow arguments" with a nested `EvalError: Code generation from strings disallowed for this context" even when passing primitive arguments like `2`.
+- **Cause:** `packages/core/src/serialization.ts` uses a `revive()` helper (`lines 192-199`) that does `(0, eval)(...)` on every `devalue.stringify()` result. `dehydrateWorkflowArguments()` (line ~751) calls that path for every workflow trigger. Cloudflare Workers forbid any string-based code generation, so the serializer explodes before the workflow even enqueues.
+- **Resolution:** **Still open.** There is no app-level workaround other than "only send JSON-safe primitives and hope they never hit the eval path". The real fix has to land in the core package (replace the eval-based revive logic with a Worker-safe parser or gate the advanced serializer behind a feature flag).
+
+## 7. Queue Consumer Used Vercel's JsonTransport
 - **Symptom:** Earlier iterations imported `JsonTransport` from `@vercel/queue` inside `packages/world-cloudflare/src/queue.ts`, which meant Workers were bundling Vercel-only runtime code just to read queue payloads.
 - **Cause:** The initial Cloudflare world piggybacked on the Vercel webhook transport to deserialize queue bodies, even though the actual queue producer already used native Cloudflare bindings.
 - **Resolution:** Replaced the consumer with Cloudflare-native logic: messages are now sent with `cfQueue.send(..., { contentType: 'json' })` and read via `Request.json()`. This drops the Vercel dependency, keeps the Worker bundle CF-only, and eliminates an extra deserialization hop. Wrangler queue bindings now work without any third-party helpers.
