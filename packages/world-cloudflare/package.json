@@ -30,7 +30,7 @@
     "db:push": "pnpm exec drizzle-kit --version && drizzle-kit push"
   },
   "dependencies": {
-    "@cloudflare/containers": "^0.1.0",
+    "@cloudflare/containers": "^0.0.30",
     "@inquirer/prompts": "^7.10.0",
     "@workflow/errors": "workspace:*",
     "@workflow/world": "workspace:*",
@@ -42,6 +42,7 @@
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20251014.0",
     "@types/node": "catalog:",
+    "@types/seedrandom": "^3.0.8",
     "@workflow/errors": "workspace:*",
     "@workflow/tsconfig": "workspace:*",
     "@workflow/world-testing": "workspace:*",
