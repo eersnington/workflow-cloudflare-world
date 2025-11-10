@@ -19,6 +19,18 @@
     ".": {
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
+    },
+    "./vite-plugin": {
+      "types": "./dist/src/vite-plugin.d.ts",
+      "default": "./dist/src/vite-plugin.js"
+    },
+    "./container-client": {
+      "types": "./dist/src/container-client.d.ts",
+      "default": "./dist/src/container-client.js"
+    },
+    "./container": {
+      "types": "./dist/src/container.d.ts",
+      "default": "./dist/src/container.js"
     }
   },
   "scripts": {
