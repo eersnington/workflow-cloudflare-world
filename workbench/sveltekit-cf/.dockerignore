@@ -15,7 +15,7 @@ svelte.config.js
 vite.config.ts
 *.config.*
 
-# Build outputs we don't need (keep SvelteKit output)
+# Build outputs we don't need (keep SvelteKit output for containers)
 build
 dist
 
@@ -57,3 +57,10 @@ coverage
 # Keep SvelteKit build outputs needed for container
 # .svelte-kit/cloudflare/_worker.js
 # .svelte-kit/output/server/
+
+# Note: Uncomment below lines if you use other build systems:
+# For Next.js:
+# .next
+# For Remix:
+# build
+# For other frameworks, adjust accordingly
