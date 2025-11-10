@@ -1,6 +1,6 @@
 import { Container } from '@cloudflare/containers';
 import { runInContext, createContext } from 'node:vm';
-import { seedrandom } from 'seedrandom';
+import seedrandom from 'seedrandom';
 
 export interface WorkflowExecutionContext {
   seed: string;
@@ -90,7 +90,10 @@ export class WorkflowExecutorContainer extends Container {
         console.error('Workflow execution error:', workflowError);
 
         // Check if this is a retryable error
-        if (workflowError.message.includes('RetryableError')) {
+        if (
+          workflowError instanceof Error &&
+          workflowError.message.includes('RetryableError')
+        ) {
           return Response.json(
             {
               success: false,
@@ -102,20 +105,26 @@ export class WorkflowExecutorContainer extends Container {
         }
 
         // Non-retryable error
+        const errorMessage =
+          workflowError instanceof Error
+            ? workflowError.message
+            : 'Unknown error';
         return Response.json(
           {
             success: false,
-            error: workflowError.message,
+            error: errorMessage,
           } satisfies WorkflowExecutionResponse,
           { status: 500 }
         );
       }
     } catch (error) {
       console.error('Container error:', error);
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
       return Response.json(
         {
           success: false,
-          error: error.message,
+          error: errorMessage,
         } satisfies WorkflowExecutionResponse,
         { status: 500 }
       );
@@ -123,7 +132,7 @@ export class WorkflowExecutorContainer extends Container {
   }
 
   private createVMContext(options: WorkflowExecutionContext) {
-    const { fixedTimestamp, seed } = options;
+    let { fixedTimestamp, seed } = options;
     const rng = seedrandom(seed);
     const context = createContext();
 
@@ -133,19 +142,19 @@ export class WorkflowExecutorContainer extends Container {
     g.Math.random = rng;
 
     // Deterministic Date constructor
-    const Date_ = g.Date;
-    (g as any).Date = function Date(...args: any[]) {
+    const originalDate = g.Date;
+    (g as any).Date = (...args: any[]) => {
       if (args.length === 0) {
-        return new Date_(fixedTimestamp);
+        return new originalDate(fixedTimestamp);
       }
-      return new Date_(...args);
+      return new originalDate(...args);
     };
-    (g as any).Date.prototype = Date_.prototype;
-    Object.setPrototypeOf(g.Date, Date_);
+    (g as any).Date.prototype = originalDate.prototype;
+    Object.setPrototypeOf(g.Date, originalDate);
     g.Date.now = () => fixedTimestamp;
 
     // Deterministic crypto using Proxy
-    const originalCrypto = globalThis.crypto;
+    const originalCrypto = (globalThis as any).crypto;
     const originalSubtle = originalCrypto.subtle;
 
     function getRandomValues(array: Uint8Array) {
@@ -207,13 +216,13 @@ export class WorkflowExecutorContainer extends Container {
     };
 
     // Add required Web APIs
-    g.Headers = globalThis.Headers;
-    g.TextEncoder = globalThis.TextEncoder;
-    g.TextDecoder = globalThis.TextDecoder;
-    g.console = globalThis.console;
-    g.URL = globalThis.URL;
-    g.URLSearchParams = globalThis.URLSearchParams;
-    g.structuredClone = globalThis.structuredClone;
+    g.Headers = (globalThis as any).Headers;
+    g.TextEncoder = (globalThis as any).TextEncoder;
+    g.TextDecoder = (globalThis as any).TextDecoder;
+    g.console = (globalThis as any).console;
+    g.URL = (globalThis as any).URL;
+    g.URLSearchParams = (globalThis as any).URLSearchParams;
+    g.structuredClone = (globalThis as any).structuredClone;
 
     // HACK: Shim exports for bundle compatibility
     g.exports = {};
