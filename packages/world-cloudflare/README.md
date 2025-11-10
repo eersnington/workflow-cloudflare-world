@@ -273,6 +273,7 @@ The `WORKFLOW_TARGET_WORLD` environment variable tells the Workflow SDK to use t
 
 ## Support
 
-- **Documentation**: See [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) for detailed architecture
+- **Architecture**: See [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) for detailed architecture
+- **Container Development**: See [CONTAINER_DEVELOPMENT.md](./CONTAINER_DEVELOPMENT.md) for comprehensive development guide
 - **Issues**: Report bugs in the GitHub repository
 - **Community**: Join discussions in the Workflow DevKit community
