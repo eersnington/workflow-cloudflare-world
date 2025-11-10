@@ -284,3 +284,6 @@ export const POST = async function(request, env) {
     },
   };
 }
+
+// Export a default to make subpath `vite-plugin` provide a default entrypoint
+export default cloudflareWorkflowTransformer;
