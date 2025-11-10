@@ -1,5 +1,5 @@
+import { createContext, runInContext } from 'node:vm';
 import { Container } from '@cloudflare/containers';
-import { runInContext, createContext } from 'node:vm';
 import seedrandom from 'seedrandom';
 
 export interface WorkflowExecutionContext {

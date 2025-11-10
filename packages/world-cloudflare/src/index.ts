@@ -1,5 +1,6 @@
 import type { Storage, World } from '@workflow/world';
 import type { CloudflareEnv } from './config.js';
+import { defaultContainerClient } from './container-client.js';
 import { createClient, type Drizzle } from './drizzle/index.js';
 import { createQueue } from './queue.js';
 import {
@@ -59,14 +60,31 @@ export function createWorld(env: CloudflareEnv): World {
   };
 }
 
+export type { MessageBatch } from '@cloudflare/workers-types';
 // Re-export types and utilities
 export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
-export { handleQueueMessage } from './queue.js';
-export { StreamCoordinator } from './stream-coordinator.js';
-export { WorkflowExecutorContainer } from './container.js';
 export type {
+  WorkflowExecutionContext,
   WorkflowExecutionRequest,
   WorkflowExecutionResponse,
-  WorkflowExecutionContext,
 } from './container.js';
-export type { MessageBatch } from '@cloudflare/workers-types';
+export { WorkflowExecutorContainer } from './container.js';
+export { ContainerClient, defaultContainerClient } from './container-client.js';
+export { handleQueueMessage } from './queue.js';
+export { StreamCoordinator } from './stream-coordinator.js';
+// Cloudflare-specific tooling exports
+export { cloudflareWorkflowTransformer } from './vite-plugin.js';
+
+// Expose a global factory so injected handlers can obtain a Cloudflare World instance.
+// Integrations may optionally override this global before handlers run.
+if (typeof (globalThis as any).__wf__create_world === 'undefined') {
+  (globalThis as any).__wf__create_world = function (env: CloudflareEnv) {
+    return createWorld(env);
+  };
+}
+
+// Provide a default container client on the global if not already provided by runtime.
+// This allows the injected POST handler to call `globalThis.__wf__container_client.execute(...)`.
+if (typeof (globalThis as any).__wf__container_client === 'undefined') {
+  (globalThis as any).__wf__container_client = defaultContainerClient;
+}

@@ -1,9 +1,9 @@
 #!/usr/bin/env node
-import { input, select } from '@inquirer/prompts';
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
+import { input, select } from '@inquirer/prompts';
 
 interface QueueConfig {
   workflow: string;
@@ -65,42 +65,82 @@ export async function queue(
 
 const MIGRATION_FILENAME = '0000_workflow_cloudflare.sql';
 
-const dockerfileTemplate = `# Use Node.js 18 Alpine as base image for Cloudflare Containers
+function getDockerfileTemplate(framework: string, entryPoint: string): string {
+  // Framework-aware Dockerfile templates. The CLI will write the selected
+  // template into the repository unless a Dockerfile already exists.
+  if (framework === 'sveltekit') {
+    return `# SvelteKit Cloudflare/Node-compatible Dockerfile (framework-aware)
 FROM node:18-alpine AS runner
 
 WORKDIR /app
-
 ENV NODE_ENV production
 
 # Create a non-root user
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 
-# Copy ONLY the runtime bundle - no node_modules needed!
-# Cloudflare containers should only contain the built worker code
-# Build your application locally first, then copy the built output
-COPY dist ./dist
+# Copy SvelteKit Cloudflare worker output (adapter may produce _worker.js)
+# Adjust paths if your adapter/runtime differs.
+COPY .svelte-kit/cloudflare/_worker.js ./_worker.js
 
-# Set permissions
+# Set permissions and switch to non-root user
 RUN chown -R nodejs:nodejs /app
-
-# Expose the port the app runs on
-EXPOSE 8080
-
-# Set user to nodejs
 USER nodejs
 
-# Start the container
-CMD ["node", "dist/index.js"]
+# Expose the port the container listens on (if applicable)
+EXPOSE 8080
 
-# For SvelteKit apps, use these paths instead:
-# COPY .svelte-kit/output/server ./server
-# COPY .svelte-kit/cloudflare/_worker.js ./
-# CMD ["node", "_worker.js"]
-
-# NOTE: Do NOT copy node_modules - they're bundled into your build output
-# The container should only contain the compiled/bundled application code
+# Run the worker entry - adapt if your adapter uses a different file
+CMD ["node", "_worker.js"]
 `;
+  }
+
+  if (framework === 'nuxt') {
+    return `# Nuxt 3 server Dockerfile (framework-aware)
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV production
+
+RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nodejs
+
+# Copy Nuxt server output
+COPY .output/server ./.output/server
+COPY package.json ./package.json
+
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+EXPOSE 3000
+
+CMD ["node", ".output/server/index.mjs"]
+`;
+  }
+
+  // Fallback / Next.js / generic Node apps - run the provided entryPoint (usually in dist/)
+  // Use the supplied entryPoint when generating the CMD so it matches wrangler main.
+  const sanitized = entryPoint.replace(/\\/g, '/');
+  return `# Generic Node Dockerfile (framework-agnostic)
+FROM node:18-alpine AS runner
+
+WORKDIR /app
+ENV NODE_ENV production
+
+# Create a non-root user
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nodejs
+
+# Copy compiled bundle - adjust if your build uses a different directory
+COPY ${sanitized.split('/').slice(0, -1).join('/') || 'dist'} ./${sanitized.split('/').slice(0, -1).join('/') || 'dist'}
+
+RUN chown -R nodejs:nodejs /app
+USER nodejs
+
+EXPOSE 8080
+
+CMD ["node", "${sanitized}"]
+`;
+}
 
 const dockerignoreTemplate = `# Dependencies (huge, not needed in container)
 node_modules
@@ -228,14 +268,42 @@ async function main(): Promise<void> {
     }),
   };
 
+  // Detect common frameworks to pick sensible defaults for entrypoint and queue handler.
+  // This improves UX so users don't need to know the exact build output for their framework.
+  const isSvelteKit =
+    (await pathExists(resolve(process.cwd(), 'svelte.config.js'))) ||
+    (await pathExists(resolve(process.cwd(), 'svelte.config.cjs')));
+  const isNext =
+    (await pathExists(resolve(process.cwd(), 'next.config.js'))) ||
+    (await pathExists(resolve(process.cwd(), 'next.config.mjs')));
+  const isNuxt =
+    (await pathExists(resolve(process.cwd(), 'nuxt.config.js'))) ||
+    (await pathExists(resolve(process.cwd(), 'nuxt.config.ts')));
+
+  // Choose default entrypoint per framework; fall back to `dist/index.js`.
+  const entryDefault = isSvelteKit
+    ? '.svelte-kit/cloudflare/_worker.js'
+    : isNext
+      ? 'dist/index.js'
+      : isNuxt
+        ? '.output/server/index.mjs'
+        : 'dist/index.js';
+
+  // Suggest a queue handler default path tuned to the detected framework.
+  // SvelteKit: route-based handler so it is automatically exported by the framework.
+  // Others: a generic worker entry file.
+  const suggestedQueuePath = isSvelteKit
+    ? 'src/routes/.well-known/workflow/v1/queue/+server.ts'
+    : 'src/worker.ts';
+
   const entryPointInput = await input({
     message:
       'Built Worker entry file (value for wrangler "main", e.g. dist/index.js)',
-    default: 'build/index.js',
+    default: entryDefault,
   });
   const entryPoint = entryPointInput.trim().length
     ? entryPointInput.trim()
-    : 'build/index.js';
+    : entryDefault;
 
   const assetsDirectoryInput = await input({
     message:
@@ -333,6 +401,9 @@ async function main(): Promise<void> {
 
   const migrationFilePath = await ensureMigrationFile(migrationsDirAbsolute);
 
+  // Compatibility date for Wrangler - use today's date (ISO YYYY-MM-DD)
+  const compatibilityDate = new Date().toISOString().slice(0, 10);
+
   const wranglerSnippet = await createWranglerSnippet({
     workerName,
     d1Binding,
@@ -345,6 +416,7 @@ async function main(): Promise<void> {
     migrationsDir: migrationsDirRelative,
     assets: assetsConfig,
     containerConfig,
+    compatibilityDate,
   });
 
   const configPathInput = await input({
@@ -369,7 +441,8 @@ async function main(): Promise<void> {
   const queueFileInput = await input({
     message:
       'Path to create queue handler + StreamCoordinator export (leave blank to skip)?',
-    default: 'src/worker.ts',
+    // Use the framework-aware suggested path determined earlier
+    default: suggestedQueuePath,
   });
   const queueFilePath =
     queueFileInput.trim().length > 0
@@ -384,11 +457,17 @@ async function main(): Promise<void> {
     );
   }
 
-  // Create Dockerfile for container execution
+  // Create Dockerfile for container execution (framework-aware)
   const dockerfilePath = resolve(process.cwd(), 'Dockerfile');
   const dockerfileExists = await pathExists(dockerfilePath);
   if (!dockerfileExists) {
-    await writeFile(dockerfilePath, dockerfileTemplate, 'utf-8');
+    // Use the detected framework and the entryPoint to produce a suitable Dockerfile
+    // entryPoint was collected from user input earlier.
+    const dockerfileContent = getDockerfileTemplate(
+      isSvelteKit ? 'sveltekit' : isNuxt ? 'nuxt' : isNext ? 'next' : 'generic',
+      entryPoint
+    );
+    await writeFile(dockerfilePath, dockerfileContent, 'utf-8');
     console.log(`\u001b[32m✨ Wrote Dockerfile to ${dockerfilePath}\u001b[0m`);
   } else {
     console.log(
@@ -437,6 +516,7 @@ function createWranglerSnippet({
   migrationsDir,
   assets,
   containerConfig,
+  compatibilityDate,
 }: {
   workerName: string;
   d1Binding: string;
@@ -449,11 +529,12 @@ function createWranglerSnippet({
   migrationsDir: string;
   assets: AssetsConfig | null;
   containerConfig: ContainerConfig;
+  compatibilityDate: string;
 }): Record<string, unknown> {
   const baseConfig: Record<string, unknown> = {
     name: workerName,
     main: entryPoint,
-    compatibility_date: '2025-11-10',
+    compatibility_date: compatibilityDate,
     compatibility_flags: ['nodejs_compat'],
     d1_databases: [
       {
