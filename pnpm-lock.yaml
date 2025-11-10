@@ -876,6 +876,9 @@ importers:
 
   packages/world-cloudflare:
     dependencies:
+      '@cloudflare/containers':
+        specifier: ^0.0.30
+        version: 0.0.30
       '@inquirer/prompts':
         specifier: ^7.10.0
         version: 7.10.0(@types/node@22.19.0)
@@ -888,6 +891,9 @@ importers:
       drizzle-orm:
         specifier: ^0.31.2
         version: 0.31.4(@cloudflare/workers-types@4.20251109.0)(@opentelemetry/api@1.9.0)(@types/react@19.1.13)(better-sqlite3@11.10.0)(pg@8.16.3)(postgres@3.4.7)(react@19.2.0)
+      seedrandom:
+        specifier: ^3.0.5
+        version: 3.0.5
       ulid:
         specifier: ^3.0.1
         version: 3.0.1
@@ -901,6 +907,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.0
+      '@types/seedrandom':
+        specifier: ^3.0.8
+        version: 3.0.8
       '@workflow/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
@@ -1670,6 +1679,9 @@ packages:
 
   '@chevrotain/utils@11.0.3':
     resolution: {integrity: sha512-YslZMgtJUyuMbZ+aKvfF3x1f5liK4mWNxghFRv7jqRR9C3R3fAOGTTKvxXDa2Y1s9zSbcpuO0cAxDYsc9SrXoQ==}
+
+  '@cloudflare/containers@0.0.30':
+    resolution: {integrity: sha512-i148xBgmyn/pje82ZIyuTr/Ae0BT/YWwa1/GTJcw6DxEjUHAzZLaBCiX446U9OeuJ2rBh/L/9FIzxX5iYNt1AQ==}
 
   '@cloudflare/kv-asset-handler@0.4.0':
     resolution: {integrity: sha512-+tv3z+SPp+gqTIcImN9o0hqE9xyfQjI1XD9pL6NuKjua9B1y7mNYv0S9cP+QEbA4ppVgGZEmKOvHX5G5Ei1CVA==}
@@ -11342,6 +11354,8 @@ snapshots:
   '@chevrotain/types@11.0.3': {}
 
   '@chevrotain/utils@11.0.3': {}
+
+  '@cloudflare/containers@0.0.30': {}
 
   '@cloudflare/kv-asset-handler@0.4.0':
     dependencies:

@@ -1,69 +1,164 @@
 # How Cloudflare World Works
 
-This document explains the architecture and components of the Cloudflare world implementation for workflow management.
+This document explains the architecture and implementation details of the Cloudflare world for workflow management.
 
-This implementation uses [Drizzle Schema](./src/drizzle/schema.ts) that can be migrated into your D1 database and is backed by Cloudflare's D1 (SQLite). The `npx workflow-cloudflare-world` CLI copies the baseline SQL migration into your project so `wrangler d1 migrations apply` works out of the box.
+## Executive Summary
 
-If you want to use a different ORM or query builder, you can fork this implementation and replace the Drizzle parts with your own.
+The Cloudflare workflow world uses a **hybrid architecture** that combines:
+- **Cloudflare Workers** for HTTP handling, queue processing, and orchestration
+- **Cloudflare Containers** for full Node.js workflow execution with `vm.runInContext()`
+
+This hybrid approach provides the edge distribution benefits of Workers with the complete Node.js runtime required for deterministic workflow execution.
+
+## Why Containers Are Required
+
+Cloudflare Workers have a limited V8 isolates environment that does **not** support:
+- `vm.runInContext()` - essential for deterministic workflow execution
+- Full Node.js runtime APIs
+- Complex module systems
+
+Cloudflare Containers provide:
+- Full Node.js runtime environment
+- `vm.runInContext()` support for sandboxed workflow execution
+- Complete access to Node.js built-ins and modules
+- Deterministic execution with seeded randomness and fixed timestamps
 
 ## Architecture Overview
 
-The Cloudflare world leverages native Cloudflare primitives:
-
-- **D1 Database** (SQLite): Stores workflow state, events, steps, and hooks
-- **Cloudflare Queues**: Handles asynchronous job processing for workflows and steps
-- **R2 Bucket**: Stores stream chunks for workflow streaming
-- **Workers Runtime**: Executes workflow logic at the edge
-
-## Job Queue System
-
 ```mermaid
-graph LR
-    Client[Client Request] --> App[App Worker /.well-known/workflow]
-    App --> Queue[Cloudflare Queues]
-    Queue --> Consumer[Queue Consumer]
-    Consumer --> Binding[Service Binding or Same Worker]
-    Binding --> Flow[Workflow/Step Handlers]
-    Flow --> D1[(D1)]
+graph TB
+    subgraph "Cloudflare Edge"
+        HTTP[HTTP Requests] --> Worker[Worker Runtime]
+        Queue[Cloudflare Queues] --> Worker
+        Worker --> StepHandler[Step Handler<br/>in Worker]
+        Worker -->|workflow jobs| Container[Container with Node.js VM]
+        Container --> D1[(D1 Database)]
+        StepHandler --> D1
+        Worker --> R2[(R2 Storage)]
+        Worker --> DO[Stream Coordinator DO]
+    end
 
-    Queue -.-> WQ[workflow-queue]
-    Queue -.-> SQ[step-queue]
+    subgraph "Container Environment"
+        Container --> VM[Node.js VM Context]
+        VM --> Workflow[User Workflow Code]
+    end
 ```
 
-### Queue Flow
+## Component Breakdown
 
-1. **Client Request**: Your app (or the world Worker) calls `world.queue()` which enqueues a workflow or step message.
-2. **Cloudflare Queue**: The payload is written to either `WORKFLOW_QUEUE` or `STEP_QUEUE`.
-3. **Queue Consumer**: The Worker's `queue()` handler receives batches from Cloudflare Queues.
-4. **Dispatch**: `handleQueueMessage` validates the message and calls your generated `/.well-known/workflow` route through either a service binding (`WORKFLOW_DISPATCH`) or a public origin (`WORKFLOW_DISPATCH_URL`). If the world is bundled with the app, this is just an in-process fetch.
-5. **Execution**: The workflow/step handler replays events, talks to D1/R2, executes user code, and may enqueue additional work.
+### Workers Runtime
+- **HTTP Handling**: Processes incoming workflow API requests
+- **Queue Processing**: Consumes messages from Cloudflare Queues
+- **Orchestration**: Routes workflow jobs to containers, handles step jobs directly
+- **Service Binding**: Provides internal communication between services
 
-Messages include:
-- Automatic retry logic (Cloudflare Queues handle retries)
-- Idempotency keys for exactly-once semantics
-- Configurable batch sizes (`max_batch_size: 10`)
-- Timeout controls (`max_batch_timeout: 5`)
+### Cloudflare Containers
+- **Workflow Execution**: Runs user workflow code in Node.js VM contexts
+- **Deterministic Context**: Provides controlled environment for reproducible execution
+- **Stateless**: Each workflow run gets an isolated container instance
+- **Managed Scaling**: Containers scale based on workflow execution demand
 
-## Storage
+### Storage Layer
+- **D1 Database**: SQLite database storing workflow state, events, steps, and hooks
+- **R2 Storage**: Object storage for workflow stream chunks
+- **Durable Objects**: Stateful objects for stream coordination and container management
 
-All persistent data is stored in D1 (Cloudflare's SQLite database):
+## Job Processing Flow
 
-- **workflow_runs**: Workflow execution state
+```mermaid
+sequenceDiagram
+    participant Client as Client Request
+    participant Worker as Worker Runtime
+    participant Queue as Cloudflare Queues
+    participant Container as Container
+    participant D1 as D1 Database
+
+    Client->>Worker: HTTP Request
+    Worker->>Queue: Enqueue workflow/step job
+    Queue->>Worker: Queue consumer receives message
+    Worker->>Worker: Parse job type
+
+    alt Workflow Job
+        Worker->>Container: Dispatch to container
+        Container->>Container: Create VM context
+        Container->>Container: Execute workflow code
+        Container->>D1: Read/write state
+        Container->>Worker: Return result
+    else Step Job
+        Worker->>Worker: Execute step handler
+        Worker->>D1: Read/write state
+    end
+
+    Worker->>Client: Response
+```
+
+## Queue System
+
+### Queue Types
+- **Workflow Queue**: Handles workflow execution jobs
+- **Step Queue**: Handles individual step execution jobs
+
+### Message Processing
+1. **Enqueue**: `world.queue()` adds jobs to appropriate queue
+2. **Consume**: Worker's `queue()` handler processes batch messages
+3. **Route**: Jobs routed to containers (workflows) or workers (steps)
+4. **Execute**: Jobs processed with retry logic and error handling
+
+### Message Format
+```typescript
+{
+  queueName: string,        // "__wkf_workflow_*" or "__wkf_step_*"
+  queueId: string,          // Queue instance identifier
+  message: any,             // Workflow/step payload
+  messageId: string,        // Unique message identifier
+  attempt: number,          // Current attempt count
+  idempotencyKey?: string   // Optional deduplication key
+}
+```
+
+## Container Execution Environment
+
+### VM Context Creation
+Each container creates a deterministic Node.js VM context:
+
+```javascript
+// Deterministic Math.random()
+Math.random = seededRandomGenerator(seed);
+
+// Fixed timestamps
+Date.now = () => fixedTimestamp;
+new Date() => new Date(fixedTimestamp);
+
+// Deterministic crypto
+crypto.getRandomValues = deterministicRandom;
+crypto.randomUUID = deterministicUUID;
+```
+
+### Execution Process
+1. **Container Request**: Worker sends workflow code and execution context
+2. **VM Creation**: Container creates deterministic VM context
+3. **Code Execution**: Workflow code runs in sandboxed environment
+4. **State Management**: Results persisted to D1 database
+5. **Response**: Execution result returned to Worker
+
+### Container Lifecycle
+- **Cold Start**: 2-3 seconds for initial container initialization
+- **Warm Execution**: ~0ms for subsequent requests
+- **Sleep**: Container sleeps after 10 minutes of inactivity
+- **Scaling**: Manual scaling based on max_instances configuration
+
+## Storage Architecture
+
+### D1 Database Schema
+- **workflow_runs**: Workflow execution state and metadata
 - **workflow_events**: Event log for deterministic replay
-- **workflow_steps**: Step execution records
-- **workflow_hooks**: Webhook registrations
+- **workflow_steps**: Step execution records and results
+- **workflow_hooks**: Webhook registrations and triggers
 
-D1 provides:
-- ACID transactions
-- SQLite compatibility
-- Edge-replicated reads
-- Regional writes with global replication
-
-## Streaming
-
-Workflow streaming uses **R2 object storage** coordinated by a **Durable Object** to provide push-based delivery:
-
-### Stream Architecture
+### Stream Storage
+- **R2 Bucket**: Stores stream chunks as objects
+- **Durable Object**: Coordinates stream readers and writers
+- **Real-time Delivery**: Push-based stream delivery to connected clients
 
 ```mermaid
 graph TD
@@ -73,134 +168,113 @@ graph TD
     Reader2[Reader] -->|WebSocket-like stream| DO
 ```
 
-### How It Works
+## Deployment Architecture
 
-1. **Write**: The worker sends chunk data to the `StreamCoordinator` durable object.
-2. **Persist**: The durable object writes the chunk to R2 and updates metadata (chunk count, closed flag).
-3. **Push**: Connected readers receive the chunk immediately over a live `ReadableStream` (backed by the durable object).
-4. **Replay**: When a reader connects, the durable object replays historical chunks from R2 starting at the requested index, then keeps the connection open for new chunks.
-5. **Close**: When a stream is closed, the durable object notifies all readers and persists the closed flag.
+### Single Worker Deployment
+The standard deployment pattern uses one Worker that handles:
+- HTTP API endpoints (`/.well-known/workflow/*`)
+- Queue consumption for both workflow and step jobs
+- Stream coordination via Durable Objects
+- Container orchestration
 
-Durable Objects provide version pinning and stateful coordination so every connection observes consistent behavior even during rolling deployments.
-
-## Queue Consumer Handler
-
-Implement the `queue()` export in your Worker to process queue messages:
-
+### Service Binding Communication
+Application Workers connect to the workflow world via service bindings:
 ```typescript
-import { handleQueueMessage, type MessageBatch, type CloudflareEnv } from "workflow-cloudflare-world";
-
-export default {
-  async queue(batch: MessageBatch, env: CloudflareEnv): Promise<void> {
-    for (const message of batch.messages) {
-      try {
-        const result = await handleQueueMessage(env, message);
-        if (result?.retryAfterSeconds) {
-          message.retry({ delaySeconds: result.retryAfterSeconds });
-        } else {
-          message.ack(); // Success
-        }
-      } catch (error) {
-        message.retry(); // Retry on failure
-      }
-    }
-  }
-};
+// In application Worker
+"services": [
+  { "binding": "WORKFLOW_DISPATCH", "service": "workflow-world-worker" }
+]
 ```
 
-The `handleQueueMessage` function:
-1. Validates and deserializes the queue message payload.
-2. Sends the payload to the workflow or step handler via the configured service binding (preferred) or HTTPS origin so the same generated routes that served the initial request can continue execution.
-3. Returns `{ retryAfterSeconds }` when a handler responds with a `timeoutSeconds` hint so the consumer can request a delayed retry from Cloudflare Queues.
+### Container Deployment Strategy
+```mermaid
+graph TB
+    subgraph "Build & Deploy"
+        Code[Source Code] --> Build[Build Process]
+        Build --> Docker[Docker Build]
+        Docker --> Registry[Cloudflare Registry]
+        Registry --> Deploy[wrangler deploy]
+    end
 
-This means queue retries, idempotency, and the `createQueueHandler` contract exactly match other worlds even though the infrastructure backing them is Cloudflare-native.
+    subgraph "Runtime"
+        Deploy --> Worker[Worker + Container DO]
+        Worker --> Container[Container Instance]
+        Container --> VM[Node.js VM]
+        VM --> Workflow[User Workflow]
+    end
 
-## Edge Runtime Considerations
+    Deploy -.-> Rollout[Gradual Rollout<br/>10% → 90%]
+```
 
-### Stateless Execution
-
-Cloudflare Workers are stateless and may experience cold starts:
-- Each request may run on a different Worker instance
-- No shared in-memory state between requests
-- All state must be persisted to D1/R2
-- Queue consumers handle job processing asynchronously
-
-### Regional Writes
-
-D1 databases have regional write primaries:
-- Writes go to the primary region
-- Reads can be served from any region (eventually consistent)
-- Use transactions for consistency when needed
-
-### Request Limits
-
-Be aware of Cloudflare Workers limits:
-- CPU time limits (10ms for free tier, 50ms+ for paid)
-- Memory limits (128MB)
-- Subrequest limits (50 for free tier, 1000+ for paid)
-
-## Development Workflow
+## Development vs Production
 
 ### Local Development
-
-```bash
-# Start local dev server with D1
-pnpm wrangler dev 
-
-# Apply migrations to D1
-pnpm wrangler d1 migrations apply workflow-db 
-```
-
-The CLI drops the initial migration file for you (default `migrations/0000_workflow_cloudflare.sql`). Add future SQL files to the same directory before re-running the apply command.
+- **wrangler dev**: Local development with hot reloading
+- **Local Docker**: Container execution in local Docker environment
+- **Local D1**: Local SQLite database for development
 
 ### Production Deployment
+- **Global Distribution**: Workers deployed to Cloudflare's edge network
+- **Cloudflare Containers**: Container execution in Cloudflare's infrastructure
+- **Managed Services**: D1, R2, and Queues as managed Cloudflare services
+- **Gradual Rollouts**: Container updates with gradual deployment strategy
 
+## Performance Characteristics
+
+### Latency
+- **HTTP Requests**: Edge-optimized latency (milliseconds)
+- **Workflow Jobs**: Cold start 2-3s, warm execution ~0ms
+- **Step Jobs**: Immediate execution in Workers
+- **Queue Processing**: Batch processing with configurable timeouts
+
+### Scaling
+- **Workers**: Auto-scale based on request volume
+- **Containers**: Manual scaling via max_instances configuration
+- **D1**: Automatic read replication, regional writes
+- **Queues**: Automatic message distribution and retry
+
+### Limits and Considerations
+- **Container Limits**: Account-wide memory, CPU, and disk quotas
+- **D1 Limits**: Regional write primaries, eventual consistency
+- **Queue Limits**: Message size, retention, and throughput limits
+- **Worker Limits**: CPU time, memory, and subrequest quotas
+
+## Monitoring and Debugging
+
+### Container Health
 ```bash
-# Apply migrations to production
-pnpm wrangler d1 migrations apply workflow-db
+# Check container status
+wrangler containers list
 
-# Deploy Worker
-pnpm wrangler deploy
+# View container logs
+wrangler tail
+
+# Monitor queue processing
+wrangler queues list
 ```
 
-### Queue Testing
+### Common Issues
+- **Container Cold Starts**: First execution may have 2-3 second delay
+- **Regional D1 Writes**: Write latency varies by region
+- **Queue Retries**: Failed messages automatically retry with backoff
+- **Stream Connections**: Durable Objects manage connection lifecycle
 
-Test queue consumers locally:
+## Best Practices
 
-```bash
-# Send test message to queue
-pnpm wrangler queues producer send workflow-queue '{"test": "message"}'
-```
+### Performance
+- Use appropriate container instance types for workflow complexity
+- Configure warming periods based on usage patterns
+- Monitor container instance utilization
+- Optimize D1 query patterns for regional writes
 
-## Deployment Patterns
+### Reliability
+- Implement proper error handling in workflow code
+- Use idempotency keys for critical operations
+- Monitor queue depths and processing rates
+- Set appropriate retry policies for different failure types
 
-You can deploy this world in two common ways:
-
-1. **Co-located** – Bundle the world with your framework app. The generated `/.well-known/workflow` routes, queue handler, and `createWorld(env)` call all live inside one Worker deployment.
-2. **Dedicated Worker** – Deploy the world as its own Worker (plus Durable Object) and reference it from application Workers using a service binding (`WORKFLOW_DISPATCH`). This lets multiple applications share a single world, but you still manage the queues, D1, and R2 instances yourself.
-
-In both cases you control versioning via normal Worker deployments, and the Durable Object keeps streaming state consistent across versions.
-
-> Need a starting point? Run `npx workflow-cloudflare-world` inside your project and it will scaffold `wrangler.json` (bindings, assets directory, migrations, `nodejs_compat` flag) plus a queue handler exporting `StreamCoordinator`, tailored to your answers.
-
-## Comparison with Other Worlds
-
-### vs. world-postgres
-
-| Feature | Cloudflare | PostgreSQL |
-|---------|-----------|------------|
-| Database | D1 (SQLite) | PostgreSQL |
-| Queue | Cloudflare Queues | pg-boss |
-| Streaming | R2 + Durable Object push | LISTEN/NOTIFY |
-| Runtime | CF Edge Workers | Node.js |
-| Scaling | Automatic | Manual |
-| Cold Starts | Yes | No |
-
-### vs. world-local
-
-| Feature | Cloudflare | Local (Embedded) |
-|---------|-----------|------------------|
-| Persistence | D1 + R2 | Filesystem |
-| Distributed | Yes | No |
-| Multi-tenant | Yes | No |
-| Deployment | Worker + DO | Node process |
+### Security
+- Use service bindings for internal communication
+- Validate all input data in workflow handlers
+- Implement proper authentication for external API calls
+- Regularly update dependencies and container base images
