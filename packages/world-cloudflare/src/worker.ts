@@ -67,9 +67,8 @@ export default {
   },
 
   /**
-   * The `fetch` handler serves as a secondary entrypoint. It can be used for
-   * simple health checks or to implement custom administrative APIs for the runtime.
-   * The primary interaction with the workflow system should happen via queues.
+   * The `fetch` handler serves as a secondary entrypoint. It provides structured
+   * JSON responses for health checks and basic service information.
    */
   async fetch(
     request: Request,
@@ -77,18 +76,34 @@ export default {
     _ctx: ExecutionContext
   ): Promise<Response> {
     const url = new URL(request.url);
+    const { pathname } = url;
 
-    // Provide a basic health check endpoint.
-    if (url.pathname === '/_health') {
-      // In a real-world scenario, you might add checks here to ensure
-      // connectivity to D1, R2, etc.
-      return new Response('ok', { status: 200 });
+    // A simple router for health checks and service info.
+    switch (pathname) {
+      case '/':
+        return new Response(
+          JSON.stringify({
+            status: 'running',
+            message: 'Workflow Cloudflare World is active.',
+          }),
+          {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }
+        );
+
+      case '/_health':
+        // This endpoint can be expanded to check connectivity to D1, R2, etc.
+        return new Response(JSON.stringify({ status: 'ok' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        });
+
+      default:
+        return new Response(JSON.stringify({ error: 'Not Found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
     }
-
-    // For any other request, return a simple status message.
-    return new Response('Workflow Cloudflare World is running.', {
-      status: 200,
-      headers: { 'Content-Type': 'text/plain' },
-    });
   },
 };
