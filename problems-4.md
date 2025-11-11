@@ -1,9 +1,9 @@
 # PROBLEM: `wrangler dev` fails with bundling and runtime errors
-Repo area: `workbench/sveltekit-cf`, `packages/world-cloudflare`
+Repo area: `workbench/sveltekit`, `packages/world-cloudflare`
 
 ## Summary
 
-`wrangler dev` and `wrangler build` consistently fail for the SvelteKit Cloudflare example app (`workbench/sveltekit-cf`). The failures manifest in several ways, but they all stem from a core architectural conflict: the build process for an app hosted in a Worker (like the SvelteKit app) is attempting to process and bundle modules that are only intended for a different, incompatible runtime (the Cloudflare Containers runtime or a local Node.js dev environment).
+`wrangler dev` and `wrangler build` consistently fail for the SvelteKit Cloudflare example app (`workbench/sveltekit`). The failures manifest in several ways, but they all stem from a core architectural conflict: the build process for an app hosted in a Worker (like the SvelteKit app) is attempting to process and bundle modules that are only intended for a different, incompatible runtime (the Cloudflare Containers runtime or a local Node.js dev environment).
 
 The key issues are:
 
