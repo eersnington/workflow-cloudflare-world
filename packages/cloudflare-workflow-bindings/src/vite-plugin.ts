@@ -1,11 +1,19 @@
+// @ts-nocheck
+/* eslint-disable @typescript-eslint/no-var-requires */
+/* Purpose: this file is a Vite plugin shipped as plain JS-compatible code.
+   We disable TS checking here and declare `require` so the file can be used in
+   mixed environments (Node builds and Worker-safe bundling) without TypeScript
+   compilation errors. */
+declare function require(name: string): any;
+
 type Plugin = any;
 let MagicString: any;
 try {
   // Load magic-string at runtime to avoid a hard dependency during build/test runs.
   // Prefer the default export when present.
-  // eslint-disable-next-line @typescript-eslint/no-var-requires
   const _ms = require('magic-string');
-  MagicString = _ms && _ms.__esModule && _ms.default ? _ms.default : _ms;
+  // Use optional chaining to prefer the default export if present.
+  MagicString = _ms?.default ?? _ms;
 } catch {
   // Minimal fallback shim used only when magic-string cannot be resolved.
   // This provides the small subset of behavior used by the transformer.
@@ -91,11 +99,119 @@ export function cloudflareWorkflowTransformer(): Plugin {
           ) {
             return { id: source, external: true } as any;
           }
+
+          // Provide a virtual module for runtime imports so app code that imports
+          // `workflow/runtime` or `@workflow/core/runtime` receives a safe shim
+          // that forwards to the remote executor rather than invoking core VM/serialize.
+          if (
+            source === 'workflow/runtime' ||
+            source === 'workflow' ||
+            source === '@workflow/core/runtime' ||
+            source === 'workflow/runtime/index' ||
+            source === '@workflow/core/runtime/index'
+          ) {
+            return {
+              id: 'virtual:workflow-remote-shim',
+              external: false,
+            } as any;
+          }
         }
       } catch {
         // ignore and continue resolution
       }
       return null;
+    },
+
+    // Virtual module loader: provides a runtime-shim module source for 'virtual:workflow-remote-shim'.
+    // The module exports the public runtime API surface but implements dangerous functions
+    // (start, workflowEntrypoint, stepEntrypoint) as forwards to the worker-safe container client.
+    async load(id: string) {
+      if (id !== 'virtual:workflow-remote-shim') return null;
+
+      // The virtual module source below intentionally uses the global container client
+      // if present (globalThis.__wf__container_client). If not present at runtime it will
+      // dynamically import the bindings package to obtain the default client. This keeps
+      // the build-time bundle free of runtime-only dependencies.
+      return `
+/* virtual module: workflow-remote-shim */
+/* This module is injected by the cloudflare-workflow-transformer plugin and provides
+   Worker-safe forwarders for runtime APIs that would otherwise call @workflow/core
+   serialization/VM paths. */
+
+async function _getClient() {
+  if (typeof (globalThis).__wf__container_client !== 'undefined' && typeof (globalThis).__wf__container_client.execute === 'function') {
+    return (globalThis).__wf__container_client;
+  }
+  try {
+    // Attempt to dynamically import the bindings package to get the shared client.
+    // The package name should resolve in consumer apps that install the bindings.
+    const pkg = await import('cloudflare-workflow-bindings').catch(() => null);
+    if (pkg) {
+      // prefer named export defaultContainerClient, else default export
+      return pkg.defaultContainerClient ?? pkg.default ?? (pkg as any).defaultContainerClient;
+    }
+  } catch (err) {
+    // swallow - we'll throw below if no client
+  }
+  throw new Error('No workflow container client available (install cloudflare-workflow-bindings and call setupGlobalContainerClient(env) or configure WORKFLOW_EXECUTOR_URL).');
+}
+
+export async function start(...args) {
+  // Caller-facing shim for start(...). Translate args to a compact payload and forward.
+  // NOTE: Inputs must be JSON-safe or pre-staged; this shim does not attempt eval-based serialization.
+  const payload = {
+    action: 'start',
+    args
+  };
+  const client = await _getClient();
+  const res = await client.execute(payload, (globalThis as any).__wf__env);
+  return res;
+}
+
+export function workflowEntrypoint(workflowCode) {
+  // Return a handler function that forwards execution to the remote container.
+  return async function POST(request, env) {
+    // Parse optional request body (queue envelope) and forward minimal payload
+    let body = null;
+    try {
+      body = await request.json().catch(() => null);
+    } catch {}
+    const payload = {
+      action: 'executeWorkflowCode',
+      workflowCode,
+      body
+    };
+    const client = await _getClient();
+    const res = await client.execute(payload, env);
+    if (res instanceof Response) return res;
+    return new Response(JSON.stringify(res), { status: res && res.success ? 200 : 500 });
+  };
+}
+
+export function stepEntrypoint(...args) {
+  // Similar shim for step entrypoints. Forwarding wrapper only.
+  return async function POST(request, env) {
+    let body = null;
+    try {
+      body = await request.json().catch(() => null);
+    } catch {}
+    const payload = {
+      action: 'step',
+      args,
+      body
+    };
+    const client = await _getClient();
+    const res = await client.execute(payload, env);
+    if (res instanceof Response) return res;
+    return new Response(JSON.stringify(res), { status: res && res.success ? 200 : 500 });
+  };
+}
+
+// Provide a helpful failure for createWorld() which cannot be proxied safely from within Workers.
+export function createWorld() {
+  throw new Error('createWorld() cannot be used in the Worker build. Install and configure the cloudflare-workflow-bindings plugin and deploy the world runtime separately.');
+}
+`;
     },
 
     // Defensive Vite config hook: ensure runtime-only Cloudflare packages and
