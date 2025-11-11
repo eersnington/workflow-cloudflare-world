@@ -145,7 +145,7 @@ async function _getClient() {
   try {
     // Attempt to dynamically import the bindings package to get the shared client.
     // The package name should resolve in consumer apps that install the bindings.
-    const pkg = await import('cloudflare-workflow-bindings').catch(() => null);
+    const pkg = await import('workflow-cloudflare-bindings').catch(() => null);
     if (pkg) {
       // prefer named export defaultContainerClient, else default export
       return pkg.defaultContainerClient ?? pkg.default ?? (pkg as any).defaultContainerClient;
@@ -153,7 +153,7 @@ async function _getClient() {
   } catch (err) {
     // swallow - we'll throw below if no client
   }
-  throw new Error('No workflow container client available (install cloudflare-workflow-bindings and call setupGlobalContainerClient(env) or configure WORKFLOW_EXECUTOR_URL).');
+  throw new Error('No workflow container client available (install workflow-cloudflare-bindings and call setupGlobalContainerClient(env) or configure WORKFLOW_EXECUTOR_URL).');
 }
 
 export async function start(...args) {
@@ -209,7 +209,7 @@ export function stepEntrypoint(...args) {
 
 // Provide a helpful failure for createWorld() which cannot be proxied safely from within Workers.
 export function createWorld() {
-  throw new Error('createWorld() cannot be used in the Worker build. Install and configure the cloudflare-workflow-bindings plugin and deploy the world runtime separately.');
+  throw new Error('createWorld() cannot be used in the Worker build. Install and configure the workflow-cloudflare-bindings plugin and deploy the world runtime separately.');
 }
 `;
     },

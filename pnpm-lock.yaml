@@ -409,12 +409,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/cloudflare-workflow-bindings:
-    dependencies:
-      workflow:
-        specifier: '*'
-        version: 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
-
   packages/core:
     dependencies:
       '@aws-sdk/credential-provider-web-identity':
@@ -867,6 +861,12 @@ importers:
       '@workflow/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+
+  packages/workflow-cloudflare-bindings:
+    dependencies:
+      workflow:
+        specifier: '*'
+        version: 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(magicast@0.3.5)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
 
   packages/world:
     devDependencies:
@@ -15758,7 +15758,7 @@ snapshots:
       - '@swc/helpers'
       - supports-color
 
-  '@workflow/nuxt@4.0.1-beta.1(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)':
+  '@workflow/nuxt@4.0.1-beta.1(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(magicast@0.3.5)':
     dependencies:
       '@nuxt/kit': 4.2.0(magicast@0.3.5)
       '@workflow/nitro': 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)
@@ -21772,14 +21772,14 @@ snapshots:
       '@cloudflare/workerd-linux-arm64': 1.20251105.0
       '@cloudflare/workerd-windows-64': 1.20251105.0
 
-  workflow@4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3):
+  workflow@4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(magicast@0.3.5)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3):
     dependencies:
       '@workflow/cli': 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
       '@workflow/core': 4.0.1-beta.10(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)
       '@workflow/errors': 4.0.1-beta.4
       '@workflow/next': 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))
       '@workflow/nitro': 4.0.1-beta.12(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)
-      '@workflow/nuxt': 4.0.1-beta.1(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)
+      '@workflow/nuxt': 4.0.1-beta.1(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(magicast@0.3.5)
       '@workflow/sveltekit': 4.0.0-beta.6(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)
       '@workflow/typescript-plugin': 4.0.1-beta.4(typescript@5.9.3)
       ms: 2.1.3

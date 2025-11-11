@@ -4,7 +4,7 @@
 
 ### Major Changes
 
-- **Architectural Overhaul**: This package is now a standalone, deployable runtime application. The consumer-facing components (Vite plugin, container client) have been moved to a new `cloudflare-workflow-bindings` package. **BREAKING CHANGE:** Consumer applications should no longer install or import `workflow-cloudflare-world`. Instead, install `cloudflare-workflow-bindings` for Worker integration.
+- **Architectural Overhaul**: This package is now a standalone, deployable runtime application. The consumer-facing components (Vite plugin, container client) have been moved to a new `workflow-cloudflare-bindings` package. **BREAKING CHANGE:** Consumer applications should no longer install or import `workflow-cloudflare-world`. Instead, install `workflow-cloudflare-bindings` for Worker integration.
 
 ### Features
 

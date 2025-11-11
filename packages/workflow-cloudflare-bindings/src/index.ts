@@ -159,7 +159,7 @@ export default defaultContainerClient;
  * handlers (from the transformer) will look for.
  *
  * Usage:
- *   import { setupGlobalContainerClient } from '@workflow/cloudflare-workflow-bindings';
+ *   import { setupGlobalContainerClient } from 'workflow-cloudflare-bindings';
  *   setupGlobalContainerClient(env);
  *
  * This function will only set the global if it is not already defined, allowing
@@ -223,7 +223,7 @@ export async function loadCloudflareWorkflowTransformer(): Promise<any | null> {
  *
  * NOTE: Vite plugins are normally provided in `vite.config.ts` at build-time. The recommended
  * pattern is to statically export the plugin from this package (move the plugin source here)
- * so you can `import { cloudflareWorkflowTransformer } from '@workflow/cloudflare-workflow-bindings'`
+ * so you can `import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings'`
  * directly. This function exists as a best-effort helper and will return `undefined` in most build-time
  * contexts unless you explicitly attach the plugin to the global (not recommended).
  */

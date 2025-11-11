@@ -2,7 +2,7 @@
 
 A workflow system backed by Cloudflare primitives (D1, Queues, R2, Containers) for edge-deployed workflows. This implementation uses Cloudflare Containers to provide full Node.js workflow execution with `vm.runInContext()` support.
 
-RUNTIME-ONLY: This package contains the runtime/container implementation and Node.js-specific code required for deterministic workflow execution (for example, `node:vm` usage and the container entrypoints). It is intended to be deployed as the user-hosted runtime (Cloudflare Containers or any Node-capable host). Do NOT install or import this package directly into Worker application bundles. For Worker-side integration (Vite plugin, Worker-safe container client, and virtual runtime shim) use the separate bindings package `cloudflare-workflow-bindings`. The bindings package provides the Vite transformer and a Worker-safe `defaultContainerClient` so Worker bundles never invoke core VM/`eval`-based serialization locally.
+RUNTIME-ONLY: This package contains the runtime/container implementation and Node.js-specific code required for deterministic workflow execution (for example, `node:vm` usage and the container entrypoints). It is intended to be deployed as the user-hosted runtime (Cloudflare Containers or any Node-capable host). Do NOT install or import this package directly into Worker application bundles. For Worker-side integration (Vite plugin, Worker-safe container client, and virtual runtime shim) use the separate bindings package `workflow-cloudflare-bindings`. The bindings package provides the Vite transformer and a Worker-safe `defaultContainerClient` so Worker bundles never invoke core VM/`eval`-based serialization locally.
 
 ## Quick Start
 
