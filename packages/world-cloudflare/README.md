@@ -2,27 +2,41 @@
 
 A workflow system backed by Cloudflare primitives (D1, Queues, R2, Containers) for edge-deployed workflows. This implementation uses Cloudflare Containers to provide full Node.js workflow execution with `vm.runInContext()` support.
 
+RUNTIME-ONLY: This package contains the runtime/container implementation and Node.js-specific code required for deterministic workflow execution (for example, `node:vm` usage and the container entrypoints). It is intended to be deployed as the user-hosted runtime (Cloudflare Containers or any Node-capable host). Do NOT install or import this package directly into Worker application bundles. For Worker-side integration (Vite plugin, Worker-safe container client, and virtual runtime shim) use the separate bindings package `cloudflare-workflow-bindings`. The bindings package provides the Vite transformer and a Worker-safe `defaultContainerClient` so Worker bundles never invoke core VM/`eval`-based serialization locally.
+
 ## Quick Start
 
-```bash
-npm install workflow-cloudflare-world @cloudflare/containers
-# or
-pnpm add workflow-cloudflare-world @cloudflare/containers
-# or
-yarn add workflow-cloudflare-world @cloudflare/containers
-```
+This package includes a CLI wizard to help you configure and deploy your Cloudflare World.
 
-Set the environment variable:
+1.  **Run the Setup Wizard**:
+    From an empty directory, run the following command. The wizard will create the necessary configuration files (`wrangler.toml`, `package.json`, etc.).
 
-```bash
-export WORKFLOW_TARGET_WORLD="workflow-cloudflare-world"
-```
+    ```bash
+    npx workflow-cloudflare-world@latest init my-cloudflare-world
+    cd my-cloudflare-world
+    ```
 
-Run the CLI to configure your project:
+2.  **Install Dependencies**:
 
-```bash
-npx workflow-cloudflare-world
-```
+    ```bash
+    pnpm install
+    ```
+
+3.  **Deploy**:
+    Follow the instructions printed by the CLI to create your D1 database and deploy the worker.
+
+    ```bash
+    # Create D1 database (first time only)
+    wrangler d1 create <your-db-name>
+
+    # Apply database migrations
+    wrangler d1 migrations apply <your-db-name>
+
+    # Deploy the worker and container
+    wrangler deploy
+    ```
+
+That's it. Your Cloudflare World is now deployed. The worker will automatically process jobs from the configured Cloudflare Queues.
 
 ## Architecture Overview
 
@@ -151,64 +165,23 @@ The CLI will generate a `wrangler.json` configuration with container support:
 }
 ```
 
-### Deployment Steps
 
-```bash
-# Create D1 database (first time only)
-wrangler d1 create workflow-db
 
-# Apply migrations
-wrangler d1 migrations apply workflow-db
+## How It Works: Pre-built Worker Entrypoint
 
-# Deploy (containers take 2-3 minutes to provision)
-wrangler deploy
+This package provides a pre-built, canonical worker entrypoint that wires up the queue handlers, Durable Objects, and a basic health check endpoint.
 
-# Check container status
-wrangler containers list
+The CLI wizard automatically configures your `wrangler.toml` to use this entrypoint:
+
+```toml
+# wrangler.toml
+main = "./node_modules/workflow-cloudflare-world/dist/src/worker.js"
 ```
 
-## Worker Setup
-
-Create a worker file that exports the queue handler and StreamCoordinator:
-
-```typescript
-import {
-  StreamCoordinator,
-  WorkflowExecutorContainer,
-  handleQueueMessage,
-  type CloudflareEnv,
-  type MessageBatch,
-} from 'workflow-cloudflare-world';
-
-export { StreamCoordinator, WorkflowExecutorContainer };
-
-export async function queue(
-  batch: MessageBatch,
-  env: CloudflareEnv
-): Promise<void> {
-  for (const message of batch.messages) {
-    try {
-      const result = await handleQueueMessage(env, message);
-      if (result?.retryAfterSeconds) {
-        message.retry({ delaySeconds: result.retryAfterSeconds });
-      } else {
-        message.ack();
-      }
-    } catch (error) {
-      console.error('Failed to dispatch queue message', error);
-      message.retry();
-    }
-  }
-}
-
-export default {
-  async fetch(request: Request, env: CloudflareEnv): Promise<Response> {
-    const world = createWorld(env);
-    // Use world to create/manage workflow runs
-    return new Response('OK');
-  }
-};
-```
+This eliminates the need for you to write a custom worker script. The exported worker handles:
+- **Queue Processing**: Automatically consumes from `WORKFLOW_QUEUE` and `STEP_QUEUE`.
+- **Durable Object Exports**: Exports `StreamCoordinator` and `WorkflowExecutorContainer` so they can be bound in `wrangler.toml`.
+- **Health Check**: Responds to `GET /_health` requests with a `200 OK`.
 
 ## Container Execution
 
