@@ -27,6 +27,11 @@
 
     // Libs & paths
     "lib": ["ESNext", "DOM"],
-    "baseUrl": "."
+    "baseUrl": ".",
+    "plugins": [
+      {
+        "name": "workflow"
+      }
+    ]
   }
 }
