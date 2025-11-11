@@ -20,13 +20,9 @@
       "types": "./dist/src/index.d.ts",
       "default": "./dist/src/index.js"
     },
-    "./vite-plugin": {
-      "types": "./dist/src/vite-plugin.d.ts",
-      "default": "./dist/src/vite-plugin.js"
-    },
-    "./container-client": {
-      "types": "./dist/src/container-client.d.ts",
-      "default": "./dist/src/container-client.js"
+    "./worker": {
+      "types": "./dist/src/worker.d.ts",
+      "default": "./dist/src/worker.js"
     },
     "./container": {
       "types": "./dist/src/container-proxy.d.ts",
