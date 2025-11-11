@@ -1,0 +1,10 @@
+name = "workflow-svelte-cf-app"
+compatibility_date = "2023-11-21"
+main = "./.svelte-kit/cloudflare/index.js"
+
+[build]
+command = "pnpm build"
+
+[[services]]
+binding = "WORKFLOW_EXECUTOR"
+service = "my-workflow-runtime" # IMPORTANT: Change this to the name of your deployed Cloudflare World runtime
