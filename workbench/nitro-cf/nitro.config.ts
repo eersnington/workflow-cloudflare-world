@@ -1,5 +1,6 @@
-import { defineNitroConfig } from 'nitro/config';
+import { defineNitroConfig } from 'nitropack/config';
 
+// https://nitro.build/config
 export default defineNitroConfig({
   compatibilityDate: '2024-09-19',
   preset: 'cloudflare_module',
@@ -7,5 +8,6 @@ export default defineNitroConfig({
     deployConfig: true,
     nodeCompat: true,
   },
-  modules: ['workflow/nitro'],
+  srcDir: 'server',
+  imports: false,
 });

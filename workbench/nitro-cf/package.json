@@ -1,0 +1,14 @@
+{
+  "name": "cf-workflow-nitro",
+  "private": false,
+  "license": "Apache-2.0",
+  "scripts": {
+    "build": "nitro build",
+    "dev": "nitro dev",
+    "preview": "node .output/server/index.mjs"
+  },
+  "devDependencies": {
+    "h3": "^1.15.4",
+    "nitropack": "^2.12.4"
+  }
+}
