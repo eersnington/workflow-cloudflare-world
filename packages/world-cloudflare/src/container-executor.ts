@@ -33,7 +33,7 @@ try {
       return undefined;
     }
   })();
-} catch (err) {
+} catch {
   // If top-level await is not usable in this environment, ensure we still set
   // a safe fallback. Consumers that need the real implementation should call
   // the loader directly via the package's `loadWorkflowExecutorContainer` helper.
