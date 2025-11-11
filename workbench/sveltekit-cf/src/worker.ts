@@ -4,7 +4,7 @@ import {
   type CloudflareEnv,
   type MessageBatch,
 } from 'workflow-cloudflare-world';
-import { WorkflowExecutorContainer } from 'workflow-cloudflare-world/container';
+import { WorkflowExecutorContainer } from 'workflow-cloudflare-world';
 
 // SvelteKit endpoint modules (+server) must only export valid HTTP handler names.
 // Exposing library symbols like `StreamCoordinator` as top-level exports causes
