@@ -64,7 +64,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
      - Dockerfile, wrangler container configuration, DO classes exported synchronously for the runtime worker that registers them.
    - Deployed by the user to Cloudflare Containers (or other Node host). Exposes an HTTP `/execute` endpoint (and any management/admin endpoints) to run workflows in Node VM contexts.
 
-2. `cloudflare-workflow-bindings` (Worker-safe)
+2. `workflow-cloudflare-bindings` (Worker-safe)
    - Purpose: Lightweight package installed by app authors (the Worker/SvelteKit app). It contains only Worker-friendly code.
    - Contains:
      - `vite-plugin.ts` (transformation that injects forwarding `POST` handler into the Worker bundle).
@@ -81,7 +81,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
 ## Concrete technical changes
 
 1. Package split and renames
-   - Create `workflow/packages/cloudflare-workflow-bindings` and move/copy only the Worker-safe files from current `world-cloudflare`:
+   - Create `workflow/packages/workflow-cloudflare-bindings` and move/copy only the Worker-safe files from current `world-cloudflare`:
      - `vite-plugin.ts` (or a copy adapted to new package)
      - `container-client.ts`
      - `index.ts` that exports plugin and setup helper
@@ -96,7 +96,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
    - Keep DO classes (e.g., `StreamCoordinator`, `WorkflowExecutorContainer` if used as DO) inside `world-cloudflare-app` and export them synchronously from that runtime worker. Consumer Worker(s) should *not* re-export DO classes.
 
 4. Worker bindings plugin deployment
-   - Make the Vite transformer available from `cloudflare-workflow-bindings`.
+   - Make the Vite transformer available from `workflow-cloudflare-bindings`.
    - The transformer must continue to:
      - externalize `@cloudflare/containers` + `cloudflare:` scheme during build,
      - replace generated `export const POST = workflowEntrypoint(...)` with forwarding handler that calls `globalThis.__wf__container_client.execute` or falls back to DO/service/URL.
@@ -109,18 +109,18 @@ Split concerns into three package roles and ensure each has a clear boundary:
 
 6. Global defaults and proxies
    - Remove any "magic" that sets `globalThis.__wf__container_client` to a Node/runtime client from the package root of a package that may be imported by Workers. Instead:
-     - Worker runtime packages should set the global in their own worker entry or rely on `cloudflare-workflow-bindings.setupGlobalContainerClient(env)` at runtime.
+     - Worker runtime packages should set the global in their own worker entry or rely on `workflow-cloudflare-bindings.setupGlobalContainerClient(env)` at runtime.
 
 7. CLI & scaffolding updates
    - Update CLI (`world-cloudflare-app/src/cli.ts`) to generate:
      - `wrangler` config + DO definitions for the **runtime** world project,
-     - guidance and small snippet for consumer Worker showing how to use `cloudflare-workflow-bindings` plugin and how to either bind the runtime service or set `WORKFLOW_EXECUTOR_URL`.
+     - guidance and small snippet for consumer Worker showing how to use `workflow-cloudflare-bindings` plugin and how to either bind the runtime service or set `WORKFLOW_EXECUTOR_URL`.
 
 ---
 
 ## Migration plan & developer steps (recommended order)
 
-1. Create `cloudflare-workflow-bindings` package (Worker-safe)
+1. Create `workflow-cloudflare-bindings` package (Worker-safe)
    - Copy/adapt `vite-plugin.ts` and `container-client.ts`.
    - Export `cloudflareWorkflowTransformer()` and `setupGlobalContainerClient(env)`.
    - Update docs and examples to use this package in the app's `vite.config`.
@@ -130,7 +130,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
    - Ensure `world-cloudflare-app` package.json lists runtime-only deps (e.g., `@cloudflare/containers`) and documents deployment.
 
 3. Update `workflow` package docs
-   - Document that app authors should install `workflow` (public) + `cloudflare-workflow-bindings` (for Cloudflare) and must not import `world-cloudflare-app` in app code.
+   - Document that app authors should install `workflow` (public) + `workflow-cloudflare-bindings` (for Cloudflare) and must not import `world-cloudflare-app` in app code.
 
 4. Update examples:
    - `workbench/sveltekit` and other example apps should use the new bindings package and not import runtime world.
@@ -160,7 +160,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
 
 ## Next actions (short checklist)
 
-- [ ] Add `workflow/packages/cloudflare-workflow-bindings` package with `vite-plugin.ts` and `container-client.ts`.
+- [ ] Add `workflow/packages/workflow-cloudflare-bindings` package with `vite-plugin.ts` and `container-client.ts`.
 - [ ] Rename and repurpose `workflow/packages/world-cloudflare` → `workflow/packages/world-cloudflare-app` and move Node/runtime-only files there.
 - [ ] Update CLI and README to produce separate artifacts: runtime world deployment and consumer Worker snippets.
 - [ ] Add example for service binding and URL-based invocation.
@@ -192,7 +192,7 @@ Split concerns into three package roles and ensure each has a clear boundary:
 
 ## Plugin shim guidance & implementation notes
 
-The following guidance describes a practical plugin-based strategy to guarantee Worker bundles never execute `dehydrate*`, `start()`, `workflowEntrypoint()` or other core/runtime functions that rely on `eval`/`node:vm`. This text should be appended to the re-architecture plan above so implementers know how to proceed when building the `cloudflare-workflow-bindings` package.
+The following guidance describes a practical plugin-based strategy to guarantee Worker bundles never execute `dehydrate*`, `start()`, `workflowEntrypoint()` or other core/runtime functions that rely on `eval`/`node:vm`. This text should be appended to the re-architecture plan above so implementers know how to proceed when building the `workflow-cloudflare-bindings` package.
 
 1) Goal
 - Ensure every code path in the Worker that would otherwise invoke core serialization or VM-based runtime is replaced at build-time with a Worker-safe forwarder that calls the user-hosted world runtime. This should be enforced by the Vite plugin via two techniques:
@@ -252,8 +252,49 @@ The following guidance describes a practical plugin-based strategy to guarantee 
 
 ---
 
-Goal: Implement this plugin shim inside `workflow/packages/cloudflare-workflow-bindings` next:
+If you'd like, I can implement this plugin shim inside `workflow/packages/workflow-cloudflare-bindings` next:
 - create the bindings package skeleton,
 - implement the virtual module shim,
 - include the `cloudflareWorkflowTransformer()` and `defaultContainerClient`,
 - add a small CI check script to detect disallowed tokens in the built Worker bundle.
+
+Which of those sub-steps would you like me to perform first?
+
+---
+
+## D) Completed: world-cloudflare package runtime cleanup (summary of changes)
+
+I proceeded to implement the requested D) work: I updated the `world-cloudflare` package to make it safe as a runtime-only package and completed the following items. These changes have been applied to the repository and are documented below.
+
+What I changed in `world-cloudflare` (completed)
+- Removed runtime globals from the package root:
+  - No longer sets `globalThis.__wf__create_world` or `globalThis.__wf__container_client` at module evaluation time. Global wiring now belongs to the Worker bindings (`workflow-cloudflare-bindings`) or to runtime app entrypoints.
+- Removed build-time / Worker-safe exports from the package root:
+  - Removed direct `vite-plugin` and `container-client` root exports from the package's published `exports` map so importing `workflow-cloudflare-world` in a Worker does not pull runtime-only files.
+  - Kept the `container-proxy` export (for runtime use) and ensured the package root only exports artifacts intended for runtime apps (containers).
+- Fixed a blocking TypeScript build error:
+  - Removed an unused import that caused `tsc` to fail during workspace build.
+- Added clear runtime-only documentation:
+  - Updated `packages/world-cloudflare/README.md` with a clear "RUNTIME-ONLY" note instructing consumers not to install or import this package into Worker app bundles and to use `workflow-cloudflare-bindings` instead.
+  - Added `packages/world-cloudflare/REARCHITECTURE.md` describing the re-architecture work, what was moved to bindings, and operational guidance for runtime deployment.
+- Verified workspace build:
+  - After the above changes, ran the workspace build. The previous blocking error (unused import / global side-effect) was resolved and the repository build completed successfully.
+
+Why this fixes the core problem
+- By ensuring `world-cloudflare` does not expose or set runtime globals or export Worker-safe utilities at the package root, we prevent accidental bundling of Node/VM/container code into Worker bundles during Vite/`wrangler` builds.
+- Consumer Worker apps will now use the `workflow-cloudflare-bindings` package (Vite plugin + client) to forward execution to the runtime container, so `dehydrate*()` and `runInContext()` are executed only in the Node container runtime.
+
+Files changed (high level)
+- Modified:
+  - `packages/world-cloudflare/src/index.ts` — removed global assignments and removed unused import.
+  - `packages/world-cloudflare/package.json` — removed `./vite-plugin` and `./container-client` from top-level `exports` to avoid accidental import by consumer bundles.
+  - `packages/world-cloudflare/README.md` — added an explicit RUNTIME-ONLY note and guidance pointing consumers to the bindings package.
+- Added:
+  - `packages/world-cloudflare/REARCHITECTURE.md` — summary of the re-architecture and migration notes.
+
+Next recommended actions (you asked these to be done later)
+- Keep the `workflow-cloudflare-bindings` plugin `// @ts-nocheck` for now; plan a typed refactor later to remove the pragma and bring plugin code to full TS lint/typing standards.
+- When ready, add the `workflow/scripts/check-bundles-forbidden.sh` into CI as a post-build check to prevent regressions.
+- I will wait for your confirmation before updating example apps (workbench) to use the new bindings package.
+
+If you want, I can produce a concise PR-style changelog that lists the exact file diffs (line-level) applied in this D) work. Would you like that now?
