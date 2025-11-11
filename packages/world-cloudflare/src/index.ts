@@ -77,24 +77,24 @@ export type {
 // safe for build-time imports, we do NOT export the container class directly.
 //
 // Consumers that actually need the container class (server/runtime code)
-// should dynamically import it via the helper provided below, or import the
-// dedicated subpath `workflow-cloudflare-world/container` after the package
-// is built (see package.json `exports`).
-export async function loadWorkflowExecutorContainer() {
-  const mod = await import('./container.js');
-  return mod.WorkflowExecutorContainer;
-}
+// should use the runtime-safe proxy loader exported from the package root.
+// Re-export the proxy's loader/accessors so consumers importing from the
+// package root (or subpath) get the runtime-safe dynamic loader rather than
+// a module that may import `@cloudflare/containers` at evaluation time.
+export {
+  loadWorkflowExecutorContainer,
+  getWorkflowExecutorContainer,
+  isWorkflowExecutorContainerAvailable,
+  WorkflowExecutorContainer,
+  WorkflowExecutorContainer as ProxyWorkflowExecutorContainer,
+  loadWorkflowExecutorContainer as loadWorkflowExecutorContainerProxy,
+} from './container-proxy.js';
 
 // Additionally expose the runtime-safe container-proxy helpers from the package root.
 // The proxy module intentionally avoids importing Cloudflare runtime-only packages
 // at module evaluation time; it provides a lazy loader and a live binding that
 // consumers can use when running inside a Cloudflare-compatible runtime.
-export {
-  WorkflowExecutorContainer as ProxyWorkflowExecutorContainer,
-  loadWorkflowExecutorContainer as loadWorkflowExecutorContainerProxy,
-  getWorkflowExecutorContainer,
-  isWorkflowExecutorContainerAvailable,
-} from './container-proxy.js';
+// container-proxy exports consolidated above; this placeholder removes the duplicate export block.
 
 export { ContainerClient, defaultContainerClient } from './container-client.js';
 export { handleQueueMessage } from './queue.js';
