@@ -167,6 +167,117 @@ The CLI will generate a `wrangler.json` configuration with container support:
 
 
 
+## End-to-End Setup Guide: Deploying and Connecting Your App
+
+This guide walks you through the complete process of deploying the Cloudflare World as a standalone runtime and connecting a separate Worker-based application to it.
+
+### Part A: Deploying the Cloudflare World Runtime
+
+First, you'll create and deploy a dedicated project for your workflow runtime. This application will run independently in your Cloudflare account.
+
+**1. Create a New Runtime Project**
+
+From your terminal, run the `init` command. This will create a new directory with all the necessary configuration.
+
+```bash
+# This creates a new project in `my-workflow-runtime`
+npx workflow-cloudflare-world@latest init my-workflow-runtime
+cd my-workflow-runtime
+```
+
+**2. Install Dependencies**
+
+```bash
+pnpm install
+```
+
+**3. Configure Cloudflare Resources**
+
+The wizard generated a `wrangler.toml` file. You may need to create the underlying Cloudflare resources for the first time. Follow the instructions from the CLI, which will look something like this:
+
+```bash
+# Create the D1 database (only needs to be done once)
+wrangler d1 create <your-db-name>
+
+# Apply the initial database schema
+wrangler d1 migrations apply <your-db-name>
+```
+
+**4. Deploy the Runtime**
+
+Deploy the application to your Cloudflare account.
+
+```bash
+wrangler deploy
+```
+
+**Outcome:** You now have a service named `my-workflow-runtime` (or whatever you named it in `wrangler.toml`) running on Cloudflare. It is ready to accept and process workflow jobs.
+
+---
+
+### Part B: Connecting Your Application to the Runtime
+
+Now, in your separate front-end or Worker application (e.g., a SvelteKit or Next.js project), you'll install and configure the bindings to communicate with the runtime you just deployed.
+
+**1. Install the Bindings Package**
+
+In your application's project directory, add the `workflow-cloudflare-bindings` package.
+
+```bash
+# In your SvelteKit, Next.js, or other Worker-based project
+pnpm add workflow-cloudflare-bindings
+```
+
+**2. Configure the Vite Plugin**
+
+If your project uses Vite (common for SvelteKit and others), add the `cloudflareWorkflowTransformer` to your `vite.config.js`. This plugin is essential for rewriting workflow calls.
+
+```javascript
+// vite.config.js
+import { defineConfig } from 'vite';
+import { sveltekit } from '@sveltejs/kit/vite';
+import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings/vite-plugin';
+
+export default defineConfig({
+  plugins: [
+    cloudflareWorkflowTransformer(), // Add the plugin here
+    sveltekit(),
+  ],
+});
+```
+
+**3. Add the Service Binding**
+
+In your application's `wrangler.toml`, add a **service binding**. This tells your app how to securely communicate with the deployed runtime.
+
+```toml
+# In your application's wrangler.toml
+[[services]]
+binding = "WORKFLOW_EXECUTOR"      # Creates `env.WORKFLOW_EXECUTOR`
+service = "my-workflow-runtime"  # Must match the name of your deployed runtime
+```
+
+**4. Initialize the Client in Your Worker**
+
+In your application's server-side entrypoint (e.g., `src/hooks.server.ts` for SvelteKit, or your main worker file), call `setupGlobalContainerClient` to make the connection available to your workflows.
+
+```typescript
+// Example for a simple Cloudflare Worker
+import { setupGlobalContainerClient } from 'workflow-cloudflare-bindings';
+
+export default {
+  async fetch(request, env, ctx) {
+    // This makes the service binding available to the workflow system
+    setupGlobalContainerClient(env);
+
+    // ... your application logic continues here
+    return new Response("Hello from my app!");
+  }
+}
+```
+
+**Outcome:** Your application is now fully connected. When you call `start()` to trigger a workflow, the bindings plugin will automatically intercept the call and forward it to your `my-workflow-runtime` for execution.
+
 ## How It Works: Pre-built Worker Entrypoint
 
 This package provides a pre-built, canonical worker entrypoint that wires up the queue handlers, Durable Objects, and a basic health check endpoint.
