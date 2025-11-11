@@ -29,8 +29,12 @@
       "default": "./dist/src/container-client.js"
     },
     "./container": {
-      "types": "./dist/src/container.d.ts",
-      "default": "./dist/src/container.js"
+      "types": "./dist/src/container-proxy.d.ts",
+      "default": "./dist/src/container-proxy.js"
+    },
+    "./container-proxy": {
+      "types": "./dist/src/container-proxy.d.ts",
+      "default": "./dist/src/container-proxy.js"
     }
   },
   "scripts": {

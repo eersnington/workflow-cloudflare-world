@@ -85,6 +85,17 @@ export async function loadWorkflowExecutorContainer() {
   return mod.WorkflowExecutorContainer;
 }
 
+// Additionally expose the runtime-safe container-proxy helpers from the package root.
+// The proxy module intentionally avoids importing Cloudflare runtime-only packages
+// at module evaluation time; it provides a lazy loader and a live binding that
+// consumers can use when running inside a Cloudflare-compatible runtime.
+export {
+  WorkflowExecutorContainer as ProxyWorkflowExecutorContainer,
+  loadWorkflowExecutorContainer as loadWorkflowExecutorContainerProxy,
+  getWorkflowExecutorContainer,
+  isWorkflowExecutorContainerAvailable,
+} from './container-proxy.js';
+
 export { ContainerClient, defaultContainerClient } from './container-client.js';
 export { handleQueueMessage } from './queue.js';
 export { StreamCoordinator } from './stream-coordinator.js';

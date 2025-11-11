@@ -36,12 +36,46 @@ interface ContainerConfig {
 const queueHandlerTemplate = `import {
   StreamCoordinator,
   handleQueueMessage,
+  loadWorkflowExecutorContainer,
   type CloudflareEnv,
   type MessageBatch,
 } from 'workflow-cloudflare-world';
-import { WorkflowExecutorContainer } from 'workflow-cloudflare-world/container';
 
-export { StreamCoordinator, WorkflowExecutorContainer };
+// Export StreamCoordinator for Worker registration. The container class is
+// runtime-only and MUST NOT be statically imported by generated code.
+// Consumers that need the container should use the runtime loader below.
+export { StreamCoordinator };
+
+// Provide a runtime-loaded binding for WorkflowExecutorContainer.
+// This is a live binding populated asynchronously at runtime so bundlers
+// never attempt to resolve the container subpath during build.
+export let WorkflowExecutorContainer: any;
+(async () => {
+  try {
+    // Prefer the package-root helper if available (safe to call at runtime).
+    // The helper itself performs a dynamic import of the real container module.
+    const pkg = await import('workflow-cloudflare-world');
+    if (pkg && typeof pkg.loadWorkflowExecutorContainer === 'function') {
+      try {
+        const mod = await pkg.loadWorkflowExecutorContainer();
+        if (mod) {
+          WorkflowExecutorContainer = mod;
+          return;
+        }
+      } catch {
+        // Fallthrough to direct subpath import
+      }
+    }
+
+    // Runtime fallback: dynamically import the explicit container subpath.
+    // This code only runs at runtime inside the worker/container environment.
+    const direct = await import('workflow-cloudflare-world/container');
+    WorkflowExecutorContainer = direct.WorkflowExecutorContainer;
+  } catch (err) {
+    // Best-effort: leave undefined in environments where container runtime is unavailable.
+    (globalThis.console ?? console).warn?.('WorkflowExecutorContainer not available at runtime:', err);
+  }
+})();
 
 export async function queue(
   batch: MessageBatch,
@@ -57,7 +91,12 @@ export async function queue(
       }
     } catch (error) {
       console.error('Failed to dispatch queue message', error);
-      message.retry();
+      // best-effort to avoid throwing from the message handler
+      try {
+        message.retry();
+      } catch {
+        // swallow if message API isn't fully available in this environment
+      }
     }
   }
 }

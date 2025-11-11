@@ -58,7 +58,192 @@ try {
 export function cloudflareWorkflowTransformer(): Plugin {
   return {
     name: 'workflow:cloudflare-transformer',
-    enforce: 'post',
+    enforce: 'pre',
+
+    // Resolve id hook: treat cloudflare: scheme, @cloudflare/containers and the
+    // workflow-cloudflare-world/container subpath as external to prevent the
+    // bundler from attempting to resolve them during SSR/build-time. Returning
+    // an object with external:true ensures Rollup/Vite does not try to load the
+    // module (and thus avoids encountering the unsupported cloudflare: scheme).
+    resolveId(source: string) {
+      try {
+        if (typeof source === 'string') {
+          // Explicitly externalize the exact cloudflare:workers specifier
+          // to ensure Rollup/Vite never attempts to resolve it during build.
+          if (source === 'cloudflare:workers') {
+            return { id: source, external: true } as any;
+          }
+          // Any cloudflare: scheme import should be external
+          if (source.startsWith('cloudflare:')) {
+            return { id: source, external: true } as any;
+          }
+          // Mark the runtime-only containers package and its subpaths external
+          if (
+            source === '@cloudflare/containers' ||
+            source.startsWith('@cloudflare/containers/')
+          ) {
+            return { id: source, external: true } as any;
+          }
+          // Also mark the workflow package container subpath external
+          if (
+            source === 'workflow-cloudflare-world/container' ||
+            source.startsWith('workflow-cloudflare-world/container')
+          ) {
+            return { id: source, external: true } as any;
+          }
+        }
+      } catch {
+        // ignore and continue resolution
+      }
+      return null;
+    },
+
+    // Defensive Vite config hook: ensure runtime-only Cloudflare packages and
+    // special import schemes are treated as external during build so Rollup/Vite
+    // do not attempt to resolve `@cloudflare/containers` or the custom
+    // `cloudflare:` scheme during SSR/SSR-bundling.
+    //
+    // This keeps the plugin self-contained: consumers keep their minimal Vite
+    // config while the transformer ensures the container package and related
+    // subpaths aren't parsed at build-time.
+    config(config: any) {
+      // --- optimizeDeps.exclude: add @cloudflare/containers and workflow packages defensively ---
+      config.optimizeDeps = config.optimizeDeps || {};
+      const existingOptimizeExclude = Array.isArray(config.optimizeDeps.exclude)
+        ? config.optimizeDeps.exclude
+        : [];
+      // include Cloudflare runtime-only package
+      const optExcludes = existingOptimizeExclude.slice();
+      if (!optExcludes.includes('@cloudflare/containers'))
+        optExcludes.push('@cloudflare/containers');
+      // also defensively exclude the workspace workflow package and common subpath(s)
+      if (!optExcludes.includes('workflow')) optExcludes.push('workflow');
+      if (!optExcludes.includes('workflow/runtime'))
+        optExcludes.push('workflow/runtime');
+      config.optimizeDeps.exclude = optExcludes;
+
+      // --- ssr.external: include direct package & container subpath and workflow runtime ---
+      config.ssr = config.ssr || {};
+      const existingSsrExternal = Array.isArray(config.ssr.external)
+        ? config.ssr.external.slice()
+        : [];
+      if (!existingSsrExternal.includes('@cloudflare/containers')) {
+        existingSsrExternal.push('@cloudflare/containers');
+      }
+      if (
+        !existingSsrExternal.includes('workflow-cloudflare-world/container')
+      ) {
+        existingSsrExternal.push('workflow-cloudflare-world/container');
+      }
+      // Add workflow runtime/package to SSR external list to avoid server-side resolution
+      if (!existingSsrExternal.includes('workflow')) {
+        existingSsrExternal.push('workflow');
+      }
+      if (!existingSsrExternal.includes('workflow/runtime')) {
+        existingSsrExternal.push('workflow/runtime');
+      }
+      config.ssr.external = existingSsrExternal;
+
+      // --- build.rollupOptions.external: normalize to include our external rules ---
+      config.build = config.build || {};
+      config.build.rollupOptions = config.build.rollupOptions || {};
+      const currentExternal = config.build.rollupOptions.external;
+
+      // Helper: mark known cloudflare-ish ids (and workspace workflow ids) as external
+      const isCloudflareId = (id: unknown) => {
+        try {
+          if (!id || typeof id !== 'string') return false;
+          // direct packages and subpaths
+          if (
+            id === '@cloudflare/containers' ||
+            id.startsWith('@cloudflare/containers/')
+          )
+            return true;
+          if (
+            id === 'workflow-cloudflare-world/container' ||
+            id.startsWith('workflow-cloudflare-world/container')
+          )
+            return true;
+          // workspace workflow package and common runtime subpath
+          if (id === 'workflow' || id.startsWith('workflow/')) return true;
+          // any import using the cloudflare: scheme should be treated external
+          if (id.startsWith('cloudflare:')) return true;
+          return false;
+        } catch {
+          return false;
+        }
+      };
+
+      if (!currentExternal) {
+        // No external set: use function form to capture schemes/subpaths
+        config.build.rollupOptions.external = (
+          id: unknown,
+          ..._rest: unknown[]
+        ) => {
+          return isCloudflareId(id);
+        };
+      } else if (Array.isArray(currentExternal)) {
+        // preserve existing list but append our function rule
+        // rollup accepts mix of strings/regex/functions
+        const arr = currentExternal.slice();
+        // avoid duplicates of common literal entries
+        if (!arr.includes('@cloudflare/containers'))
+          arr.push('@cloudflare/containers');
+        if (!arr.includes('workflow-cloudflare-world/container'))
+          arr.push('workflow-cloudflare-world/container');
+        if (!arr.includes('workflow')) arr.push('workflow');
+        if (!arr.includes('workflow/runtime')) arr.push('workflow/runtime');
+        // Append function rule to cover cloudflare: scheme and subpath prefixes
+        arr.push((id: unknown) => isCloudflareId(id));
+        config.build.rollupOptions.external = arr;
+      } else if (typeof currentExternal === 'function') {
+        // Compose functions: keep existing + our check
+        const prev = currentExternal;
+        config.build.rollupOptions.external = (
+          id: unknown,
+          ...rest: unknown[]
+        ) => {
+          return prev(id, ...rest) || isCloudflareId(id);
+        };
+      } else if (currentExternal instanceof RegExp) {
+        // convert to array that includes the regex and our function
+        config.build.rollupOptions.external = [
+          currentExternal,
+          (id: unknown) => isCloudflareId(id),
+        ];
+      } else {
+        // Unknown shape: fall back to wrapper that defers to existing behavior and our rule
+        const prev = currentExternal as any;
+        config.build.rollupOptions.external = (
+          id: unknown,
+          ...rest: unknown[]
+        ) => {
+          try {
+            // try previous behavior first if callable
+            if (typeof prev === 'function') {
+              if (prev(id, ...rest)) return true;
+            }
+            // otherwise try matching against known literals/regexes in prev if array-like
+            if (Array.isArray(prev)) {
+              for (const item of prev) {
+                if (typeof item === 'string' && item === id) return true;
+                if (
+                  item instanceof RegExp &&
+                  typeof id === 'string' &&
+                  item.test(id)
+                )
+                  return true;
+              }
+            }
+          } catch {
+            // ignore and fallback to our rule
+          }
+          return isCloudflareId(id);
+        };
+      }
+
+      return config;
+    },
     async transform(code: string, id: string) {
       // Only transform relevant JS/TS files
       if (!/\.(js|ts|mjs|cjs|jsx|tsx)$/.test(id)) return null;
@@ -271,7 +456,70 @@ export const POST = async function(request, env) {
       // Replace the original export with our handler
       s.overwrite(postExprIndex, postExprEnd, injectedHandler);
 
-      // Add a minimal shim to avoid runtime ReferenceError when global client is missing.
+      // Conservative handling: avoid destructive global text rewrites on the
+      // generated bundle. Aggressive regex replacements are brittle and have
+      // previously introduced TypeScript/compile-time issues. Instead:
+      //
+      // 1) Rely on the plugin's config() and resolveId() hooks to externalize
+      //    runtime-only modules (`@cloudflare/containers`, `cloudflare:*`),
+      //    which prevents the bundler from attempting to resolve them.
+      // 2) If the generated bundle still references the container subpath, do
+      //    NOT attempt to remove import lines here. Instead, append a small
+      //    runtime loader shim (below) that provides a live exported binding
+      //    `WorkflowExecutorContainer` without modifying the original bundle
+      //    text. This approach is non-destructive and avoids brittle string/regex
+      //    work.
+      //
+      // If necessary, log the presence of a remaining reference so callers can
+      // decide to update generator templates rather than rely on brittle rewrites.
+      if (
+        code.includes('workflow-cloudflare-world/container') ||
+        code.includes('@cloudflare/containers')
+      ) {
+        // Detected a reference to the runtime subpath in the generated bundle.
+        // We will append a runtime loader shim below (no in-place removals).
+        // Optionally, one could surface a debug log here for diagnostics.
+      }
+
+      // Append a runtime loader shim that provides a live exported binding
+      // named WorkflowExecutorContainer. This preserves the consumer API but
+      // ensures the container class is only resolved at runtime.
+      const loaderShim = `
+// Runtime loader for WorkflowExecutorContainer.
+// Replaces any static import of the container subpath so bundlers don't parse runtime-only packages.
+export let WorkflowExecutorContainer;
+(async function() {
+  try {
+    // Prefer package-root helper if present (safe to import at runtime).
+    // Use a dynamic import of the package root so this only runs in the deployed worker.
+    const pkg = await import('workflow-cloudflare-world');
+    if (pkg && typeof pkg.loadWorkflowExecutorContainer === 'function') {
+      try {
+        const maybe = await pkg.loadWorkflowExecutorContainer();
+        if (maybe) {
+          WorkflowExecutorContainer = maybe;
+          return;
+        }
+      } catch (err) {
+        // fallthrough to direct subpath import
+      }
+    }
+
+    // Runtime fallback: load the container subpath (only executed at runtime).
+    // This is a last-resort path and will not be evaluated during build-time.
+    const mod = await import('workflow-cloudflare-world/container');
+    WorkflowExecutorContainer = mod.WorkflowExecutorContainer;
+  } catch (err) {
+    // Not available in this environment (e.g., local dev SSR); leave undefined.
+    (globalThis.console ?? console).warn?.('WorkflowExecutorContainer not available at runtime:', err);
+  }
+})();
+`;
+
+      s.append(loaderShim);
+
+      // Minimal container client placeholder to avoid ReferenceError when missing
+      // (preserve original behavior).
       if (!code.includes('__wf__container_client')) {
         const shim = `\n// Minimal container client placeholder. Integrations can set globalThis.__wf__container_client\nif (typeof (globalThis as any).__wf__container_client === 'undefined') {\n  (globalThis as any).__wf__container_client = { execute: undefined };\n}\n`;
         s.append(shim);
