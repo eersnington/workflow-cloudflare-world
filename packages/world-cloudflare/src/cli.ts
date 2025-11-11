@@ -534,7 +534,6 @@ async function main(): Promise<void> {
     dispatchConfig,
     d1DatabaseName,
     outputFile: configPath,
-    queueFilePath,
     migrationFilePath,
   });
 }
@@ -692,7 +691,6 @@ function printOutput({
   dispatchConfig,
   d1DatabaseName,
   outputFile,
-  queueFilePath,
   migrationFilePath,
 }: {
   workerName: string;
@@ -700,7 +698,6 @@ function printOutput({
   dispatchConfig: DispatchConfig;
   d1DatabaseName: string;
   outputFile: string | null;
-  queueFilePath: string | null;
   migrationFilePath: string;
 }): void {
   if (!outputFile) {
@@ -716,16 +713,9 @@ function printOutput({
 
   console.log('\nNext steps:');
   const bullet = (msg: string) => console.log(`\u001b[36m•\u001b[0m ${msg}`);
-  if (queueFilePath) {
-    bullet(
-      `Queue handler scaffolded at ${queueFilePath}. Re-export it from your framework entry so Wrangler picks up both fetch routes and the queue handler.`
-    );
-  } else {
-    bullet(
-      'Create a worker entry that exports StreamCoordinator + queue handler as shown above.'
-    );
-  }
-
+  bullet(
+    'The `main` entry in your wrangler config has been set to the pre-built worker entrypoint from the `workflow-cloudflare-world` package.'
+  );
   bullet(
     'Generated configuration files: wrangler.json, Dockerfile, .dockerignore, and D1 migration.'
   );
