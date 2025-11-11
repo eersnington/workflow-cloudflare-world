@@ -6,3 +6,7 @@ compatibility_flags = ["nodejs_compat_v2"]
 [assets]
 binding = "ASSETS"
 directory = ".output/public"
+
+[[services]]
+binding = "WORKFLOW_EXECUTOR"
+service = "my-workflow-runtime" # IMPORTANT: Change this to the name of your deployed Cloudflare World runtime
