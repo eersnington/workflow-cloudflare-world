@@ -6,9 +6,7 @@ declare global {
     // interface Locals {}
     // interface PageData {}
     // interface PageState {}
-    interface Platform {
-      env: import('workflow-cloudflare-world').CloudflareEnv;
-    }
+    // interface Platform {}
   }
 }
 
