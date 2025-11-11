@@ -1,66 +1,12 @@
 #!/usr/bin/env node
-import { mkdir, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { mkdir, writeFile, readFile } from 'node:fs/promises';
+import { join, resolve, dirname } from 'node:path';
 import process from 'node:process';
+import { fileURLToPath } from 'node:url';
 import { input } from '@inquirer/prompts';
 
 // --- Template for the initial database migration ---
-const MIGRATION_FILENAME = '0000_initial_schema.sql';
-const MIGRATION_TEMPLATE = `-- This is the initial schema for the Workflow Cloudflare World.
--- It creates the necessary tables for runs, events, steps, and hooks.
-
-CREATE TABLE IF NOT EXISTS "__blacksmith_runs" (
-  "runId" text PRIMARY KEY NOT NULL,
-  "workflowName" text NOT NULL,
-  "status" text NOT NULL,
-  "input" text,
-  "output" text,
-  "error" text,
-  "startedAt" integer NOT NULL,
-  "endedAt" integer
-);
-
-CREATE TABLE IF NOT EXISTS "__blacksmith_events" (
-  "eventId" integer PRIMARY KEY AUTOINCREMENT,
-  "runId" text NOT NULL,
-  "type" text NOT NULL,
-  "timestamp" integer NOT NULL,
-  "data" text,
-  FOREIGN KEY ("runId") REFERENCES "__blacksmith_runs"("runId") ON UPDATE no action ON DELETE cascade
-);
-
-CREATE TABLE IF NOT EXISTS "__blacksmith_steps" (
-  "stepId" text PRIMARY KEY NOT NULL,
-  "runId" text NOT NULL,
-  "stepName" text NOT NULL,
-  "status" text NOT NULL,
-  "input" text,
-  "output" text,
-  "error" text,
-  "startedAt" integer NOT NULL,
-  "endedAt" integer,
-  "retries" integer DEFAULT 0 NOT NULL,
-  FOREIGN KEY ("runId") REFERENCES "__blacksmith_runs"("runId") ON UPDATE no action ON DELETE cascade
-);
-
-CREATE TABLE IF NOT EXISTS "__blacksmith_hooks" (
-  "hookId" text PRIMARY KEY NOT NULL,
-  "runId" text NOT NULL,
-  "stepId" text,
-  "target" text NOT NULL,
-  "status" text NOT NULL,
-  "attempts" integer DEFAULT 0 NOT NULL,
-  "createdAt" integer NOT NULL,
-  "nextAttemptAt" integer,
-  FOREIGN KEY ("runId") REFERENCES "__blacksmith_runs"("runId") ON UPDATE no action ON DELETE cascade
-);
-
--- Indexes for common query patterns
-CREATE INDEX IF NOT EXISTS "idx_events_runId" ON "__blacksmith_events" ("runId");
-CREATE INDEX IF NOT EXISTS "idx_steps_runId" ON "__blacksmith_steps" ("runId");
-CREATE INDEX IF NOT EXISTS "idx_hooks_runId" ON "__blacksmith_hooks" ("runId");
-CREATE INDEX IF NOT EXISTS "idx_hooks_status_nextAttemptAt" ON "__blacksmith_hooks" ("status", "nextAttemptAt");
-`;
+const MIGRATION_DESTINATION_FILENAME = '0000_initial_schema.sql';
 
 // --- Template for the generated package.json ---
 const getPackageJsonTemplate = (projectName: string) => `
@@ -321,6 +267,30 @@ async function main(): Promise<void> {
   const migrationsPath = join(destPath, 'migrations');
   await mkdir(migrationsPath);
 
+  // ** FIX: Find and copy the canonical migration SQL file **
+  try {
+    const __dirname = dirname(fileURLToPath(import.meta.url));
+    // This relative path works because the built cli.js is at `dist/src/cli.js`
+    // and the migration file is copied to `dist/src/drizzle/migrations/`
+    const migrationSourcePath = resolve(
+      __dirname,
+      '../drizzle/migrations/0000_workflow_cloudflare.sql'
+    );
+    const migrationContent = await readFile(migrationSourcePath, 'utf-8');
+    await writeFile(
+      join(migrationsPath, MIGRATION_DESTINATION_FILENAME),
+      migrationContent,
+      'utf-8'
+    );
+  } catch (error) {
+    console.error('\n❌ Failed to copy database migration schema.');
+    console.error(
+      'Please ensure the `workflow-cloudflare-world` package was built correctly.'
+    );
+    console.error(error);
+    process.exit(1);
+  }
+
   const filesToWrite = [
     { path: join(destPath, 'wrangler.toml'), content: wranglerTomlContent },
     { path: join(destPath, 'package.json'), content: packageJsonContent },
@@ -328,10 +298,6 @@ async function main(): Promise<void> {
     { path: join(destPath, '.dockerignore'), content: DOCKERIGNORE_TEMPLATE },
     { path: join(destPath, '.gitignore'), content: GITIGNORE_TEMPLATE },
     { path: join(destPath, 'README.md'), content: readmeContent },
-    {
-      path: join(migrationsPath, MIGRATION_FILENAME),
-      content: MIGRATION_TEMPLATE,
-    },
   ];
 
   for (const file of filesToWrite) {
