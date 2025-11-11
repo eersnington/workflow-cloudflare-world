@@ -4,92 +4,80 @@ This document explains the architecture and implementation details of the Cloudf
 
 ## Executive Summary
 
-The Cloudflare workflow world uses a **hybrid architecture** that combines:
-- **Cloudflare Workers** for HTTP handling, queue processing, and orchestration
-- **Cloudflare Containers** for full Node.js workflow execution with `vm.runInContext()`
+The Cloudflare workflow world uses a **two-package architecture** to separate the user-facing application from the workflow runtime:
 
-This hybrid approach provides the edge distribution benefits of Workers with the complete Node.js runtime required for deterministic workflow execution.
+1.  **`cloudflare-workflow-bindings` (Consumer Package)**: A lightweight, Worker-safe package that you install in your application (e.g., a SvelteKit or Next.js app). It provides a Vite plugin and client-side shims that intercept workflow triggers and forward them to the runtime.
 
-## Why Containers Are Required
+2.  **`workflow-cloudflare-world` (Runtime Package)**: A self-contained, deployable application that you deploy to your Cloudflare account. It contains the Node.js execution environment (in a Container), queue handlers, and Durable Objects needed to run workflows.
+
+This split ensures that your application bundle remains small and free of Node.js-specific dependencies, while the heavy lifting of workflow execution is handled by a dedicated, scalable runtime.
+
+## Why a Separate Runtime is Required
 
 Cloudflare Workers have a limited V8 isolates environment that does **not** support:
-- `vm.runInContext()` - essential for deterministic workflow execution
-- Full Node.js runtime APIs
-- Complex module systems
+- `vm.runInContext()`: Essential for the deterministic replay and sandboxing of workflow code.
+- `eval()`: Used by the core serializer for certain complex data types.
+- Certain Node.js APIs relied upon by the workflow core.
 
-Cloudflare Containers provide:
-- Full Node.js runtime environment
-- `vm.runInContext()` support for sandboxed workflow execution
-- Complete access to Node.js built-ins and modules
-- Deterministic execution with seeded randomness and fixed timestamps
+To solve this, the `workflow-cloudflare-world` package runs the workflow engine inside a **Cloudflare Container**, which provides a full Node.js runtime environment. Your application communicates with this runtime instead of trying to execute workflows directly.
 
 ## Architecture Overview
 
 ```mermaid
-graph TB
-    subgraph "Cloudflare Edge"
-        HTTP[HTTP Requests] --> Worker[Worker Runtime]
-        Queue[Cloudflare Queues] --> Worker
-        Worker --> StepHandler[Step Handler<br/>in Worker]
-        Worker -->|workflow jobs| Container[Container with Node.js VM]
-        Container --> D1[(D1 Database)]
-        StepHandler --> D1
-        Worker --> R2[(R2 Storage)]
-        Worker --> DO[Stream Coordinator DO]
+graph TD
+    subgraph "Your Application (e.g., SvelteKit on Cloudflare)"
+        A1[Browser/Client] --> A2[App Worker]
+        A2 -- "import { start } from 'workflow/runtime'" --> A3["`cloudflare-workflow-bindings` (Vite Plugin + Shim)"]
+        A3 -- "Forwards call via HTTP/DO" --> B1
     end
 
-    subgraph "Container Environment"
-        Container --> VM[Node.js VM Context]
-        VM --> Workflow[User Workflow Code]
+    subgraph "Deployed Runtime (`workflow-cloudflare-world`)"
+        B1[Service Binding or Public URL] --> B2[Runtime Worker Entrypoint]
+        B2 --> B3[Cloudflare Queues]
+        B3 --> B2
+        B2 -- "Workflow Job" --> B4[Container with Node.js VM]
+        B4 --> B5[D1 Database]
+        B2 -- "Step Job" --> B6[Step Handler in Worker]
+        B6 --> B5
     end
 ```
 
 ## Component Breakdown
 
-### Workers Runtime
-- **HTTP Handling**: Processes incoming workflow API requests
-- **Queue Processing**: Consumes messages from Cloudflare Queues
-- **Orchestration**: Routes workflow jobs to containers, handles step jobs directly
-- **Service Binding**: Provides internal communication between services
+### 1. `cloudflare-workflow-bindings` (Your App's Dependency)
+- **Vite Plugin**: The core of the integration. It performs two key actions at build time:
+    1.  **Virtual Module Shim**: It intercepts any imports to `workflow/runtime` and replaces them with a "shim" module. This shim exports functions like `start()` that, instead of running workflows locally, forward the call to your deployed runtime.
+    2.  **Entrypoint Rewriting**: It finds the auto-generated workflow queue handlers in your build output and rewrites them to also forward execution to the runtime.
+- **Container Client**: A small, Worker-safe utility for communicating with the runtime via Durable Object bindings or a direct URL.
 
-### Cloudflare Containers
-- **Workflow Execution**: Runs user workflow code in Node.js VM contexts
-- **Deterministic Context**: Provides controlled environment for reproducible execution
-- **Stateless**: Each workflow run gets an isolated container instance
-- **Managed Scaling**: Containers scale based on workflow execution demand
+### 2. `workflow-cloudflare-world` (The Deployed Runtime)
+- **Pre-built Worker Entrypoint**: A `worker.js` file that you point your `wrangler.toml` to. It comes pre-configured to handle queue messages and export the necessary Durable Objects.
+- **Queue Handler**: Logic for consuming messages from Cloudflare Queues and dispatching them. Workflow jobs are sent to the container; step jobs are handled directly in the worker.
+- **Container (`WorkflowExecutorContainer`)**: A Durable Object that runs a Node.js container. This is where `vm.runInContext()` is safely executed.
+- **Durable Object (`StreamCoordinator`)**: Manages state for streaming operations.
+- **Storage Integrations**: Contains the logic for interacting with D1 (state), R2 (streams), and Queues.
+- **CLI Wizard**: A command-line tool (`npx workflow-cloudflare-world init`) that generates the `wrangler.toml` and other configuration needed to deploy the runtime.
 
-### Storage Layer
-- **D1 Database**: SQLite database storing workflow state, events, steps, and hooks
-- **R2 Storage**: Object storage for workflow stream chunks
-- **Durable Objects**: Stateful objects for stream coordination and container management
-
-## Job Processing Flow
+## How a Workflow Runs (Job Processing Flow)
 
 ```mermaid
 sequenceDiagram
-    participant Client as Client Request
-    participant Worker as Worker Runtime
+    participant App as Consumer App Worker
+    participant Bindings as `cloudflare-workflow-bindings`
+    participant Runtime as `world-cloudflare` Runtime Worker
     participant Queue as Cloudflare Queues
-    participant Container as Container
-    participant D1 as D1 Database
+    participant Container as Execution Container
 
-    Client->>Worker: HTTP Request
-    Worker->>Queue: Enqueue workflow/step job
-    Queue->>Worker: Queue consumer receives message
-    Worker->>Worker: Parse job type
-
-    alt Workflow Job
-        Worker->>Container: Dispatch to container
-        Container->>Container: Create VM context
-        Container->>Container: Execute workflow code
-        Container->>D1: Read/write state
-        Container->>Worker: Return result
-    else Step Job
-        Worker->>Worker: Execute step handler
-        Worker->>D1: Read/write state
-    end
-
-    Worker->>Client: Response
+    App->>Bindings: Calls `start('myWorkflow', ...)`
+    Note over App,Bindings: (This call is intercepted by the virtual shim)
+    Bindings->>Runtime: Forwards start request via Service Binding/URL
+    Runtime->>Queue: Enqueues workflow job
+    Queue-->>Runtime: Delivers job to `queue()` handler
+    Runtime->>Container: Dispatches job to Container DO
+    Container->>Container: Creates Node.js VM Context
+    Container->>Container: Executes workflow code (`runInContext`)
+    Note over Container: (Reads/writes to D1, enqueues step jobs, etc.)
+    Container-->>Runtime: Returns result
 ```
 
 ## Queue System
@@ -202,54 +190,18 @@ graph TD
 
 ## Deployment Architecture
 
-### Single Worker Deployment
-The standard deployment pattern uses one Worker that handles:
-- HTTP API endpoints (`/.well-known/workflow/*`)
-- Queue consumption for both workflow and step jobs
-- Stream coordination via Durable Objects
-- Container orchestration
+The architecture relies on two separate deployments to your Cloudflare account:
 
-### Service Binding Communication
-Application Workers connect to the workflow world via service bindings:
-```typescript
-// In application Worker
-"services": [
-  { "binding": "WORKFLOW_DISPATCH", "service": "workflow-world-worker" }
-]
-```
+1.  **Your Application**: This is your main project (e.g., a SvelteKit or Next.js site). It is deployed as a Cloudflare Pages project or a Worker. It has the `cloudflare-workflow-bindings` package installed.
 
-### Container Deployment Strategy
-```mermaid
-graph TB
-    subgraph "Build & Deploy"
-        Code[Source Code] --> Build[Build Process]
-        Build --> Docker[Docker Build]
-        Docker --> Registry[Cloudflare Registry]
-        Registry --> Deploy[wrangler deploy]
-    end
+2.  **The Workflow Runtime**: This is a separate deployment of the `workflow-cloudflare-world` package. You configure and deploy this using the `wrangler.toml` generated by the CLI wizard.
 
-    subgraph "Runtime"
-        Deploy --> Worker[Worker + Container DO]
-        Worker --> Container[Container Instance]
-        Container --> VM[Node.js VM]
-        VM --> Workflow[User Workflow]
-    end
+### Communication Between App and Runtime
+Your application's worker communicates with the runtime worker, typically via a **Service Binding**. This is a secure, low-latency way for two workers on the Cloudflare network to interact.
 
-    Deploy -.-> Rollout[Gradual Rollout<br/>10% → 90%]
-```
+The `cloudflare-workflow-bindings` client will automatically use the service binding if you configure it in your application's `wrangler.toml`.
 
-## Development vs Production
 
-### Local Development
-- **wrangler dev**: Local development with hot reloading
-- **Local Docker**: Container execution in local Docker environment
-- **Local D1**: Local SQLite database for development
-
-### Production Deployment
-- **Global Distribution**: Workers deployed to Cloudflare's edge network
-- **Cloudflare Containers**: Container execution in Cloudflare's infrastructure
-- **Managed Services**: D1, R2, and Queues as managed Cloudflare services
-- **Gradual Rollouts**: Container updates with gradual deployment strategy
 
 ## Performance Characteristics
 
