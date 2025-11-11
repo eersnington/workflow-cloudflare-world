@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { mkdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { input, select } from '@inquirer/prompts';
@@ -252,9 +252,49 @@ coverage
 const banner =
   '\n╭──────────────────────────────────────────────╮\n│  Workflow Cloudflare World Configuration CLI │\n╰──────────────────────────────────────────────╯\n';
 
-async function main(): Promise<void> {
+async function main(dest = '.'): Promise<void> {
+  const destPath = resolve(process.cwd(), dest);
+  if (dest !== '.') {
+    if (!(await pathExists(destPath))) {
+      await mkdir(destPath, { recursive: true });
+    }
+  }
+
+  // Generate package.json for the new project
+  const packageJsonPath = join(destPath, 'package.json');
+  if (!(await pathExists(packageJsonPath))) {
+    const packageJsonContent = {
+      name: basename(destPath),
+      private: true,
+      version: '0.0.1',
+      scripts: {
+        deploy: 'wrangler deploy',
+        'db:create': 'wrangler d1 create',
+        'db:migrate': 'wrangler d1 migrations apply',
+      },
+      dependencies: {
+        'workflow-cloudflare-world': 'workspace:*', // Use workspace version
+      },
+      devDependencies: {
+        wrangler: '^4.45.2', // Pin a recent version
+      },
+    };
+    await writeFile(
+      packageJsonPath,
+      JSON.stringify(packageJsonContent, null, 2),
+      'utf-8'
+    );
+    console.log(`\u001b[32m✨ Created package.json in ${destPath}\u001b[0m`);
+  } else {
+    console.log(
+      `\u001b[33m⚠️  package.json already exists at ${packageJsonPath}, skipping.\u001b[0m`
+    );
+  }
+
   console.log(banner);
 
+  // We still need to check TTY, but process.chdir is not safe with interactive prompts.
+  // Instead, we will resolve all paths from destPath.
   if (!process.stdin.isTTY || !process.stdout.isTTY) {
     console.error(
       'Interactive prompts require a TTY. Please run this command directly in a local terminal (not through pnpm piping or a non-interactive shell).'
@@ -310,14 +350,14 @@ async function main(): Promise<void> {
   // Detect common frameworks to pick sensible defaults for entrypoint and queue handler.
   // This improves UX so users don't need to know the exact build output for their framework.
   const isSvelteKit =
-    (await pathExists(resolve(process.cwd(), 'svelte.config.js'))) ||
-    (await pathExists(resolve(process.cwd(), 'svelte.config.cjs')));
+    (await pathExists(join(destPath, 'svelte.config.js'))) ||
+    (await pathExists(join(destPath, 'svelte.config.cjs')));
   const isNext =
-    (await pathExists(resolve(process.cwd(), 'next.config.js'))) ||
-    (await pathExists(resolve(process.cwd(), 'next.config.mjs')));
+    (await pathExists(join(destPath, 'next.config.js'))) ||
+    (await pathExists(join(destPath, 'next.config.mjs')));
   const isNuxt =
-    (await pathExists(resolve(process.cwd(), 'nuxt.config.js'))) ||
-    (await pathExists(resolve(process.cwd(), 'nuxt.config.ts')));
+    (await pathExists(join(destPath, 'nuxt.config.js'))) ||
+    (await pathExists(join(destPath, 'nuxt.config.ts')));
 
   // Choose default entrypoint per framework; fall back to `dist/index.js`.
   const entryDefault = isSvelteKit
@@ -371,7 +411,7 @@ async function main(): Promise<void> {
   const migrationsDirRelative = migrationsDirInput.trim().length
     ? migrationsDirInput.trim()
     : 'migrations';
-  const migrationsDirAbsolute = resolve(process.cwd(), migrationsDirRelative);
+  const migrationsDir = join(destPath, migrationsDirRelative);
   // Container configuration - always enabled for workflow execution
   const containerConfig: ContainerConfig = {
     enabled: true,
@@ -438,7 +478,7 @@ async function main(): Promise<void> {
     default: '10m',
   });
 
-  const migrationFilePath = await ensureMigrationFile(migrationsDirAbsolute);
+  const migrationFilePath = await ensureMigrationFile(migrationsDir);
 
   // Compatibility date for Wrangler - use today's date (ISO YYYY-MM-DD)
   const compatibilityDate = new Date().toISOString().slice(0, 10);
@@ -464,7 +504,7 @@ async function main(): Promise<void> {
   });
   const configPath =
     configPathInput.trim().length > 0
-      ? resolve(process.cwd(), configPathInput.trim())
+      ? join(destPath, configPathInput.trim())
       : null;
 
   if (configPath) {
@@ -485,7 +525,7 @@ async function main(): Promise<void> {
   });
   const queueFilePath =
     queueFileInput.trim().length > 0
-      ? resolve(process.cwd(), queueFileInput.trim())
+      ? join(destPath, queueFileInput.trim())
       : null;
 
   if (queueFilePath) {
@@ -497,7 +537,7 @@ async function main(): Promise<void> {
   }
 
   // Create Dockerfile for container execution (framework-aware)
-  const dockerfilePath = resolve(process.cwd(), 'Dockerfile');
+  const dockerfilePath = join(destPath, 'Dockerfile');
   const dockerfileExists = await pathExists(dockerfilePath);
   if (!dockerfileExists) {
     // Use the detected framework and the entryPoint to produce a suitable Dockerfile
@@ -515,7 +555,7 @@ async function main(): Promise<void> {
   }
 
   // Create .dockerignore for optimized container builds
-  const dockerignorePath = resolve(process.cwd(), '.dockerignore');
+  const dockerignorePath = join(destPath, '.dockerignore');
   const dockerignoreExists = await pathExists(dockerignorePath);
   if (!dockerignoreExists) {
     await writeFile(dockerignorePath, dockerignoreTemplate, 'utf-8');
@@ -574,6 +614,19 @@ function createWranglerSnippet({
     main: entryPoint,
     compatibility_date: compatibilityDate,
     compatibility_flags: ['nodejs_compat'],
+    observability: {
+      logs: {
+        enabled: true,
+        head_sampling_rate: 1,
+        persist: true,
+        invocation_logs: true,
+      },
+      traces: {
+        enabled: true,
+        head_sampling_rate: 1,
+        persist: true,
+      },
+    },
     d1_databases: [
       {
         binding: d1Binding,
