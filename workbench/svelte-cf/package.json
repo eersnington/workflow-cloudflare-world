@@ -12,6 +12,7 @@
     "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20251109.0",
     "@sveltejs/adapter-auto": "^7.0.0",
     "@sveltejs/adapter-cloudflare": "^7.2.4",
     "@sveltejs/kit": "^2.47.1",
@@ -22,6 +23,6 @@
     "vite": "^7.1.10"
   },
   "dependencies": {
-    "workflow": "4.0.1-beta.13"
+    "workflow-cloudflare-bindings": "workspace:*"
   }
 }
