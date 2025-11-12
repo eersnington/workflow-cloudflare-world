@@ -90,13 +90,12 @@ bindings = [
   { name = "WORKFLOW_EXECUTOR", class_name = "WorkflowExecutorContainer" }
 ]
 
-# Migration for the SQLite-backed Durable Object classes is required by Wrangler.
+# Migration for the new Durable Object classes is required by Wrangler.
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["StreamCoordinator", "WorkflowExecutorContainer"]
+new_classes = ["StreamCoordinator", "WorkflowExecutorContainer"]
 
 [[containers]]
-# Match the Durable Object class name so the container binding resolves correctly.
 class_name = "WorkflowExecutorContainer"
 image = "./Dockerfile"
 
@@ -313,11 +312,21 @@ async function main(): Promise<void> {
   bullet(
     `Run ${colors.yellow}\`pnpm install\`${colors.reset} to install dependencies.`
   );
-  bullet(
-    `Run ${colors.yellow}\`wrangler d1 create ${d1DatabaseName}\`${colors.reset} to create your database.`
+  bullet(`Run the following commands to create your Cloudflare resources:`);
+  console.log(
+    `    ${colors.yellow}\`wrangler d1 create ${d1DatabaseName}\`${colors.reset}`
+  );
+  console.log(
+    `    ${colors.yellow}\`wrangler r2 bucket create ${r2Bucket}\`${colors.reset}`
+  );
+  console.log(
+    `    ${colors.yellow}\`wrangler queues create ${workflowQueue}\`${colors.reset}`
+  );
+  console.log(
+    `    ${colors.yellow}\`wrangler queues create ${stepQueue}\`${colors.reset}`
   );
   bullet(
-    `Run ${colors.yellow}\`wrangler d1 migrations apply ${d1DatabaseName}\`${colors.reset} to set up the schema.`
+    `Run ${colors.yellow}\`wrangler d1 migrations apply ${d1DatabaseName}\`${colors.reset} to set up the database schema.`
   );
   bullet(
     `Run ${colors.yellow}\`wrangler deploy\`${colors.reset} to deploy your workflow runtime.`
