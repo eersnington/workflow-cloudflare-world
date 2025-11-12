@@ -1,7 +1,7 @@
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
-import { workflowPlugin } from 'workflow/sveltekit';
+import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings/vite-plugin';
 
 export default defineConfig({
-  plugins: [sveltekit(), workflowPlugin()],
+  plugins: [cloudflareWorkflowTransformer(), sveltekit()],
 });
