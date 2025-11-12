@@ -12,7 +12,7 @@ import seedrandom from 'seedrandom';
  */
 
 /**
- * Types (same as before)
+ * Types
  */
 export interface WorkflowExecutionContext {
   seed: string;

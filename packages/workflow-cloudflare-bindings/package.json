@@ -8,8 +8,7 @@
   "module": "dist/index.mjs",
   "types": "dist/index.d.ts",
   "files": [
-    "dist",
-    "src"
+    "dist"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json --noEmit false",
@@ -43,6 +42,16 @@
       "import": "./dist/index.mjs",
       "require": "./dist/index.cjs",
       "types": "./dist/index.d.ts"
+    },
+    "./container-client": {
+      "import": "./dist/container-client.mjs",
+      "require": "./dist/container-client.cjs",
+      "types": "./dist/container-client.d.ts"
+    },
+    "./vite-plugin": {
+      "import": "./dist/vite-plugin.mjs",
+      "require": "./dist/vite-plugin.cjs",
+      "types": "./dist/vite-plugin.d.ts"
     },
     "./package.json": "./package.json"
   },

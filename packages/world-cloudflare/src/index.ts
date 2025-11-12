@@ -1,6 +1,11 @@
 import type { Storage, World } from '@workflow/world';
 import type { CloudflareEnv } from './config.js';
 
+import {
+  getWorkflowExecutorContainer,
+  isWorkflowExecutorContainerAvailable,
+  loadWorkflowExecutorContainer,
+} from './container-proxy.js';
 import { createClient, type Drizzle } from './drizzle/index.js';
 import { createQueue, handleQueueMessage } from './queue.js';
 import {
@@ -9,13 +14,8 @@ import {
   createRunsStorage,
   createStepsStorage,
 } from './storage.js';
-import { createStreamer } from './streamer.js';
 import { StreamCoordinator } from './stream-coordinator.js';
-import {
-  getWorkflowExecutorContainer,
-  isWorkflowExecutorContainerAvailable,
-  loadWorkflowExecutorContainer,
-} from './container-proxy.js';
+import { createStreamer } from './streamer.js';
 
 /**
  * Construct a Cloudflare-backed World implementation.
@@ -44,16 +44,19 @@ function createStorage(drizzle: Drizzle): Storage {
 }
 
 // Runtime exports
-export { StreamCoordinator, handleQueueMessage };
+export * as containerProxy from './container-proxy.js';
 export {
-  loadWorkflowExecutorContainer,
+  createQueue,
   getWorkflowExecutorContainer,
+  handleQueueMessage,
   isWorkflowExecutorContainerAvailable,
+  loadWorkflowExecutorContainer,
+  StreamCoordinator,
 };
 
 // Types
-export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
 export type { MessageBatch } from '@cloudflare/workers-types';
+export type { CloudflareEnv, CloudflareWorldConfig } from './config.js';
 export type {
   WorkflowExecutionContext,
   WorkflowExecutionRequest,

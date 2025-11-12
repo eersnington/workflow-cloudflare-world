@@ -2,6 +2,7 @@
   "extends": "@workflow/tsconfig/base.json",
   "compilerOptions": {
     "moduleResolution": "NodeNext",
+    "composite": true,
     "outDir": "dist",
     "types": ["node", "@cloudflare/workers-types"]
   },

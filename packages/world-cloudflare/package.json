@@ -24,9 +24,13 @@
       "types": "./dist/src/worker.d.ts",
       "default": "./dist/src/worker.js"
     },
+    "./queue": {
+      "types": "./dist/src/queue.d.ts",
+      "default": "./dist/src/queue.js"
+    },
     "./container": {
-      "types": "./dist/src/container-proxy.d.ts",
-      "default": "./dist/src/container-proxy.js"
+      "types": "./dist/src/container.d.ts",
+      "default": "./dist/src/container.js"
     },
     "./container-proxy": {
       "types": "./dist/src/container-proxy.d.ts",
@@ -34,9 +38,9 @@
     }
   },
   "scripts": {
-    "build": "pnpm run clean && tsc && node ./scripts/copy-migrations.mjs",
+    "build": "pnpm run clean && pnpm exec tsc && node ./scripts/copy-migrations.mjs",
     "dev": "tsc --watch",
-    "clean": "tsc --build --clean && rm -rf dist",
+    "clean": "rm -rf dist",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
     "db:push": "pnpm exec drizzle-kit --version && drizzle-kit push"
