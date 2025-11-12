@@ -1,4 +1,3 @@
-import { createContext, runInContext } from 'node:vm';
 import seedrandom from 'seedrandom';
 
 /**
@@ -54,6 +53,27 @@ export async function createWorkflowExecutorContainerClass(): Promise<
   any | undefined
 > {
   try {
+    type VmModule = typeof import('vm');
+    const vmSpecifier =
+      typeof (globalThis as any).process?.versions?.node === 'string'
+        ? ['node', 'vm'].join(':')
+        : 'vm';
+    let vmModule: VmModule;
+    try {
+      vmModule = (await import(vmSpecifier)) as VmModule;
+    } catch (err) {
+      console.warn(
+        'WorkflowExecutorContainer is unavailable: this runtime does not expose node:vm.',
+        err
+      );
+      return undefined;
+    }
+
+    const { createContext, runInContext } = vmModule;
+
+    const vmCreateContext = createContext;
+    const vmRunInContext = runInContext;
+
     // Dynamic import is typed as any to accommodate both CJS/ESM shapes.
     const cloudflareContainers: any = await import('@cloudflare/containers');
     const Container =
@@ -111,7 +131,7 @@ export async function createWorkflowExecutorContainerClass(): Promise<
 
           // Execute workflow with VM context
           try {
-            const workflowFn = runInContext(
+            const workflowFn = vmRunInContext(
               `${execRequest.workflowCode}; globalThis.__private_workflows?.get(${JSON.stringify(execRequest.workflowRun.workflowName)})`,
               vmContext.context
             );
@@ -177,9 +197,9 @@ export async function createWorkflowExecutorContainerClass(): Promise<
       private createVMContext(options: WorkflowExecutionContext) {
         let { fixedTimestamp, seed } = options;
         const rng = seedrandom(seed);
-        const context = createContext();
+        const context = vmCreateContext();
 
-        const g = runInContext('globalThis', context);
+        const g = vmRunInContext('globalThis', context);
 
         // Deterministic Math.random()
         g.Math.random = rng;
