@@ -5,9 +5,6 @@ import process from 'node:process';
 import { fileURLToPath } from 'node:url';
 import { input } from '@inquirer/prompts';
 
-// --- Template for the initial database migration ---
-const MIGRATION_DESTINATION_FILENAME = '0000_initial_schema.sql';
-
 // --- Template for the generated package.json ---
 const getPackageJsonTemplate = (projectName: string) => `
 {
@@ -270,15 +267,16 @@ async function main(): Promise<void> {
   // ** FIX: Find and copy the canonical migration SQL file **
   try {
     const __dirname = dirname(fileURLToPath(import.meta.url));
-    // This relative path works because the built cli.js is at `dist/src/cli.js`
-    // and the migration file is copied to `dist/src/drizzle/migrations/`
+    // The compiled cli.js is at `dist/src/cli.js`. The migration file is copied
+    // by the build script to `dist/src/drizzle/migrations/`. This path
+    // resolves from the script's location to the migration file's location.
     const migrationSourcePath = resolve(
       __dirname,
-      '../drizzle/migrations/0000_workflow_cloudflare.sql'
+      'drizzle/migrations/0000_workflow_cloudflare.sql'
     );
     const migrationContent = await readFile(migrationSourcePath, 'utf-8');
     await writeFile(
-      join(migrationsPath, MIGRATION_DESTINATION_FILENAME),
+      join(migrationsPath, '0000_initial_schema.sql'),
       migrationContent,
       'utf-8'
     );
