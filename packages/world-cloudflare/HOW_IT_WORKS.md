@@ -2,7 +2,7 @@
 
 This document explains the architecture and implementation details of the Cloudflare world for workflow management.
 
-## Executive Summary
+## Summary
 
 The Cloudflare workflow world uses a **two-package architecture** to separate the user-facing application from the workflow runtime:
 
