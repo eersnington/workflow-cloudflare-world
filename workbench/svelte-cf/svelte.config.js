@@ -1,5 +1,6 @@
 import adapter from '@sveltejs/adapter-cloudflare';
 import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings/vite-plugin';
 
 /** @type {import('@sveltejs/kit').Config} */
 const config = {
@@ -23,6 +24,26 @@ const config = {
       routes: {
         include: ['/*'],
         exclude: ['<all>'],
+      },
+      vite: {
+        plugins: [cloudflareWorkflowTransformer()],
+        ssr: {
+          noExternal: [
+            'workflow',
+            'workflow/runtime',
+            'workflow/api',
+            'workflow-cloudflare-bindings',
+          ],
+        },
+
+        optimizeDeps: {
+          exclude: [
+            'workflow',
+            'workflow/runtime',
+            'workflow/api',
+            'workflow-cloudflare-bindings',
+          ],
+        },
       },
     }),
   },
