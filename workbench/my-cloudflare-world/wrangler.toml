@@ -13,13 +13,14 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "my-cloudflare-world-db"
 migrations_dir = "migrations"
+database_id = "091e0de3-f21e-41ff-a3a2-2e946bd410ca"
 
 [[queues.producers]]
-binding = "WORKFLOW_QUEUE"
+binding = "my_cloudflare_world_workflows"
 queue = "my-cloudflare-world-workflows"
 
 [[queues.producers]]
-binding = "STEP_QUEUE"
+binding = "my_cloudflare_world_steps"
 queue = "my-cloudflare-world-steps"
 
 [[queues.consumers]]
