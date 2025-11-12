@@ -1281,6 +1281,10 @@ importers:
         version: 4.1.11
 
   workbench/svelte-cf:
+    dependencies:
+      workflow:
+        specifier: 4.0.1-beta.13
+        version: 4.0.1-beta.13(@aws-sdk/client-sts@3.844.0)(@opentelemetry/api@1.9.0)(next@16.0.1(@opentelemetry/api@1.9.0)(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(react-dom@19.2.0(react@19.2.0))(react@19.2.0)(typescript@5.9.3)
     devDependencies:
       '@sveltejs/adapter-auto':
         specifier: ^7.0.0
@@ -11317,7 +11321,7 @@ snapshots:
       '@babel/parser': 7.28.5
       '@babel/types': 7.28.5
       '@jridgewell/gen-mapping': 0.3.12
-      '@jridgewell/trace-mapping': 0.3.29
+      '@jridgewell/trace-mapping': 0.3.31
       jsesc: 3.1.0
 
   '@babel/helper-annotate-as-pure@7.27.3':
