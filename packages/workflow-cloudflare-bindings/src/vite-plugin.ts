@@ -115,6 +115,17 @@ export function cloudflareWorkflowTransformer(): Plugin {
               external: false,
             } as any;
           }
+          if (
+            source === 'workflow/api' ||
+            source === '@workflow/core/api' ||
+            source === 'workflow/api/index' ||
+            source === '@workflow/core/api/index'
+          ) {
+            return {
+              id: 'virtual:workflow-api-remote-shim',
+              external: false,
+            } as any;
+          }
         }
       } catch {
         // ignore and continue resolution
@@ -126,13 +137,12 @@ export function cloudflareWorkflowTransformer(): Plugin {
     // The module exports the public runtime API surface but implements dangerous functions
     // (start, workflowEntrypoint, stepEntrypoint) as forwards to the worker-safe container client.
     async load(id: string) {
-      if (id !== 'virtual:workflow-remote-shim') return null;
-
-      // The virtual module source below intentionally uses the global container client
-      // if present (globalThis.__wf__container_client). If not present at runtime it will
-      // dynamically import the bindings package to obtain the default client. This keeps
-      // the build-time bundle free of runtime-only dependencies.
-      return `
+      if (id === 'virtual:workflow-remote-shim') {
+        // The virtual module source below intentionally uses the global container client
+        // if present (globalThis.__wf__container_client). If not present at runtime it will
+        // dynamically import the bindings package to obtain the default client. This keeps
+        // the build-time bundle free of runtime-only dependencies.
+        return `
 /* virtual module: workflow-remote-shim */
 /* This module is injected by the cloudflare-workflow-transformer plugin and provides
    Worker-safe forwarders for runtime APIs that would otherwise call @workflow/core
@@ -166,6 +176,57 @@ export async function start(...args) {
   const client = await _getClient();
   const res = await client.execute(payload, (globalThis as any).__wf__env);
   return res;
+}
+
+export async function runStep(...args) {
+  const payload = {
+    action: 'runStep',
+    args
+  };
+  const client = await _getClient();
+  return client.execute(payload, (globalThis as any).__wf__env);
+}
+
+export async function resumeHook(...args) {
+  const payload = {
+    action: 'resumeHook',
+    args
+  };
+  const client = await _getClient();
+  return client.execute(payload, (globalThis as any).__wf__env);
+}
+
+export async function resumeWebhook(...args) {
+  const payload = {
+    action: 'resumeWebhook',
+    args
+  };
+  const client = await _getClient();
+  return client.execute(payload, (globalThis as any).__wf__env);
+}
+
+export async function getRun(...args) {
+  const payload = {
+    action: 'getRun',
+    args
+  };
+  const client = await _getClient();
+  return client.execute(payload, (globalThis as any).__wf__env);
+}
+
+export async function getHookByToken(...args) {
+  const payload = {
+    action: 'getHookByToken',
+    args
+  };
+  const client = await _getClient();
+  return client.execute(payload, (globalThis as any).__wf__env);
+}
+
+export class Run {
+  constructor(value) {
+    Object.assign(this, value ?? {});
+  }
 }
 
 export function workflowEntrypoint(workflowCode) {
@@ -212,6 +273,16 @@ export function createWorld() {
   throw new Error('createWorld() cannot be used in the Worker build. Install and configure the workflow-cloudflare-bindings plugin and deploy the world runtime separately.');
 }
 `;
+      }
+      if (id === 'virtual:workflow-api-remote-shim') {
+        return `
+/* virtual module: workflow-api-remote-shim */
+export { start, runStep, resumeHook, resumeWebhook, getRun, getHookByToken, Run } from 'virtual:workflow-remote-shim';
+export { start as startWorkflow } from 'virtual:workflow-remote-shim';
+`;
+      }
+
+      return null;
     },
 
     // Defensive Vite config hook: ensure runtime-only Cloudflare packages and
