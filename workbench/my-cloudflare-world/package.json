@@ -1,0 +1,18 @@
+{
+  "name": "my-cloudflare-world",
+  "private": true,
+  "version": "0.0.1",
+  "scripts": {
+    "deploy": "wrangler deploy",
+    "db:create": "wrangler d1 create",
+    "db:migrate": "wrangler d1 migrations apply",
+    "dev": "wrangler dev",
+    "logs": "wrangler tail"
+  },
+  "dependencies": {
+    "workflow-cloudflare-world": "workbench:"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}

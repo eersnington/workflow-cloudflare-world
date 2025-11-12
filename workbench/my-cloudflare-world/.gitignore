@@ -1,0 +1,9 @@
+# Dependencies
+node_modules
+
+# Wrangler
+.wrangler/
+.mf/
+
+# Logs
+*.log

@@ -9,3 +9,7 @@ command = "pnpm build"
 [assets]
 directory = "./dist"
 binding = "ASSETS"
+
+[[services]]
+binding = "WORKFLOW_RUNTIME"
+service = "my-cloudflare-world"
