@@ -18,5 +18,5 @@ export const POST: RequestHandler = async ({
   // Executes asynchronously and doesn't block your app
   await start(calc, [numberTyped]);
 
-  return json({ message: 'User signup workflow started' });
+  return json({ message: 'Simple number workflow started' });
 };
