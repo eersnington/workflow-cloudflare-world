@@ -90,13 +90,14 @@ bindings = [
   { name = "WORKFLOW_EXECUTOR", class_name = "WorkflowExecutorContainer" }
 ]
 
-# Migration for the new Durable Object classes is required by Wrangler.
+# Migration for the SQLite-backed Durable Object classes is required by Wrangler.
 [[migrations]]
 tag = "v1"
-new_classes = ["StreamCoordinator", "WorkflowExecutorContainer"]
+new_sqlite_classes = ["StreamCoordinator", "WorkflowExecutorContainer"]
 
 [[containers]]
-# The 'binding' is implicitly handled by matching the DO class_name.
+# Match the Durable Object class name so the container binding resolves correctly.
+class_name = "WorkflowExecutorContainer"
 image = "./Dockerfile"
 
 # Service binding for inter-worker communication
