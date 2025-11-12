@@ -34,7 +34,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && node ./scripts/copy-migrations.mjs",
+    "build": "pnpm run clean && tsc && node ./scripts/copy-migrations.mjs",
     "dev": "tsc --watch",
     "clean": "tsc --build --clean && rm -rf dist",
     "test": "vitest run",
