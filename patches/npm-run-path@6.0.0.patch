@@ -1,0 +1,14 @@
+diff --git a/index.js b/index.js
+index 4bb97161081a690c941a6fcc68df9ae9117589d5..c7dd79852b9b21cf66a47966502d0fc8afc7e70b 100644
+--- a/index.js
++++ b/index.js
+@@ -1,7 +1,8 @@
+ import process from 'node:process';
+ import path from 'node:path';
+ import pathKey from 'path-key';
+-import {toPath, traversePathUp} from 'unicorn-magic';
++import * as unicornMagic from 'unicorn-magic';
++const { toPath, traversePathUp } = unicornMagic;
+ 
+ export const npmRunPath = ({
+ 	cwd = process.cwd(),

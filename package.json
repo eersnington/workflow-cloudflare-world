@@ -23,7 +23,10 @@
     },
     "onlyBuiltDependencies": [
       "bun"
-    ]
+    ],
+    "patchedDependencies": {
+      "npm-run-path@6.0.0": "patches/npm-run-path@6.0.0.patch"
+    }
   },
   "scripts": {
     "prepare": "husky",
