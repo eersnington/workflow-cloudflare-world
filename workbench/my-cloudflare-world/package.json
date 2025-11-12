@@ -10,7 +10,7 @@
     "logs": "wrangler tail"
   },
   "dependencies": {
-    "workflow-cloudflare-world": "workbench:"
+    "workflow-cloudflare-world": "workspace:*"
   },
   "devDependencies": {
     "wrangler": "latest"
