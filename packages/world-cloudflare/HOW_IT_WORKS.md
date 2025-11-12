@@ -131,7 +131,7 @@ crypto.randomUUID = deterministicUUID;
 
 ### Container Execution Model
 
-**Critical**: Each container instance executes **one workflow at a time** (sequentially), not multiple workflows concurrently.
+**Critical**: Each container instance executes **one workflow at a time** (sequentially), not multiple workflows concurrently. I am still working on this limitation.
 
 ```mermaid
 graph LR
@@ -188,7 +188,7 @@ graph TD
     Reader2[Reader] -->|WebSocket-like stream| DO
 ```
 
-## Deployment Architecture
+## Deployment
 
 The architecture relies on two separate deployments to your Cloudflare account:
 
@@ -200,16 +200,6 @@ The architecture relies on two separate deployments to your Cloudflare account:
 Your application's worker communicates with the runtime worker, typically via a **Service Binding**. This is a secure, low-latency way for two workers on the Cloudflare network to interact.
 
 The `workflow-cloudflare-bindings` client will automatically use the service binding if you configure it in your application's `wrangler.toml`.
-
-
-
-## Performance Characteristics
-
-### Latency
-- **HTTP Requests**: Edge-optimized latency (milliseconds)
-- **Workflow Jobs**: Cold start 2-3s, warm execution ~0ms
-- **Step Jobs**: Immediate execution in Workers
-- **Queue Processing**: Batch processing with configurable timeouts
 
 ### Scaling
 - **Workers**: Auto-scale based on request volume
@@ -249,23 +239,3 @@ wrangler queues list
 - **Regional D1 Writes**: Write latency varies by region
 - **Queue Retries**: Failed messages automatically retry with backoff
 - **Stream Connections**: Durable Objects manage connection lifecycle
-
-## Best Practices
-
-### Performance
-- Use appropriate container instance types for workflow complexity
-- Configure warming periods based on usage patterns
-- Monitor container instance utilization
-- Optimize D1 query patterns for regional writes
-
-### Reliability
-- Implement proper error handling in workflow code
-- Use idempotency keys for critical operations
-- Monitor queue depths and processing rates
-- Set appropriate retry policies for different failure types
-
-### Security
-- Use service bindings for internal communication
-- Validate all input data in workflow handlers
-- Implement proper authentication for external API calls
-- Regularly update dependencies and container base images

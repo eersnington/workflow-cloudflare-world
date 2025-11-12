@@ -56,10 +56,10 @@ After deploying your runtime, you need to connect your separate application to i
 
 **1. Install the Bindings Package**
 
-In your application's project directory (e.g., your SvelteKit or Next.js app), add the `workflow-cloudflare-bindings` package.
+In your application's project directory (e.g., your SvelteKit app), add the `workflow-cloudflare-bindings` package.
 
 ```bash
-# In your SvelteKit, Next.js, or other Worker-based project
+# In your SvelteKit or other Worker-based project
 pnpm add workflow-cloudflare-bindings
 ```
 
@@ -156,8 +156,3 @@ graph TB
 ```
 
 **Why Containers Are Required**: Cloudflare Workers do not support `vm.runInContext()`, which is essential for the deterministic replay and sandboxing that powers the Workflow system. Cloudflare Containers provide the necessary full Node.js runtime.
-
-## Support
-
-- **Architecture**: See [HOW_IT_WORKS.md](./HOW_IT_WORKS.md) for a detailed architecture guide.
-- **Issues**: Report bugs or request features on the GitHub repository.
