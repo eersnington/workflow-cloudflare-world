@@ -47,10 +47,7 @@ if (!WorkflowExecutorContainer) {
   class WorkflowExecutorContainerUnavailable {
     constructor() {
       throw new Error(
-        'WorkflowExecutorContainer is not available in this environment. ' +
-          'This usually means the Cloudflare container runtime is unavailable locally. ' +
-          'Call `await import(\"workflow-cloudflare-world\").loadWorkflowExecutorContainer()` ' +
-          'or run in a Cloudflare-compatible environment.'
+        `WorkflowExecutorContainer is not available in this environment. This usually means the Cloudflare container runtime is unavailable locally. Call \`await import("workflow-cloudflare-world").loadWorkflowExecutorContainer()\` or run in a Cloudflare-compatible environment.`
       );
     }
   }
