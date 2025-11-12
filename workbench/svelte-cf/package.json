@@ -23,6 +23,7 @@
     "vite": "^7.1.10"
   },
   "dependencies": {
+    "workflow": "4.0.1-beta.13",
     "workflow-cloudflare-bindings": "workspace:*"
   }
 }
