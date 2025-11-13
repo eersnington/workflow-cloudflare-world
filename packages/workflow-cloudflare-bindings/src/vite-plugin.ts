@@ -166,6 +166,18 @@ async function _getClient() {
   throw new Error('No workflow container client available (install workflow-cloudflare-bindings and call setupGlobalContainerClient(env) or configure WORKFLOW_EXECUTOR_URL).');
 }
 
+function _getEnv(baseEnv) {
+  const runtimeEnv =
+    typeof (globalThis as any).__wf__env === 'object'
+      ? (globalThis as any).__wf__env
+      : undefined;
+  return {
+    WORKFLOW_TARGET_WORLD: 'workflow-cloudflare-world',
+    ...(runtimeEnv || {}),
+    ...(baseEnv || {})
+  };
+}
+
 export async function start(...args) {
   // Caller-facing shim for start(...). Translate args to a compact payload and forward.
   // NOTE: Inputs must be JSON-safe or pre-staged; this shim does not attempt eval-based serialization.
@@ -174,8 +186,7 @@ export async function start(...args) {
     args
   };
   const client = await _getClient();
-  const res = await client.execute(payload, (globalThis as any).__wf__env);
-  return res;
+  return client.execute(payload, _getEnv());
 }
 
 export async function runStep(...args) {
@@ -184,7 +195,7 @@ export async function runStep(...args) {
     args
   };
   const client = await _getClient();
-  return client.execute(payload, (globalThis as any).__wf__env);
+  return client.execute(payload, _getEnv());
 }
 
 export async function resumeHook(...args) {
@@ -193,7 +204,7 @@ export async function resumeHook(...args) {
     args
   };
   const client = await _getClient();
-  return client.execute(payload, (globalThis as any).__wf__env);
+  return client.execute(payload, _getEnv());
 }
 
 export async function resumeWebhook(...args) {
@@ -202,7 +213,7 @@ export async function resumeWebhook(...args) {
     args
   };
   const client = await _getClient();
-  return client.execute(payload, (globalThis as any).__wf__env);
+  return client.execute(payload, _getEnv());
 }
 
 export async function getRun(...args) {
@@ -211,7 +222,7 @@ export async function getRun(...args) {
     args
   };
   const client = await _getClient();
-  return client.execute(payload, (globalThis as any).__wf__env);
+  return client.execute(payload, _getEnv());
 }
 
 export async function getHookByToken(...args) {
@@ -220,7 +231,7 @@ export async function getHookByToken(...args) {
     args
   };
   const client = await _getClient();
-  return client.execute(payload, (globalThis as any).__wf__env);
+  return client.execute(payload, _getEnv());
 }
 
 export class Run {
@@ -243,7 +254,7 @@ export function workflowEntrypoint(workflowCode) {
       body
     };
     const client = await _getClient();
-    const res = await client.execute(payload, env);
+    const res = await client.execute(payload, _getEnv(env));
     if (res instanceof Response) return res;
     return new Response(JSON.stringify(res), { status: res && res.success ? 200 : 500 });
   };
@@ -262,7 +273,7 @@ export function stepEntrypoint(...args) {
       body
     };
     const client = await _getClient();
-    const res = await client.execute(payload, env);
+    const res = await client.execute(payload, _getEnv(env));
     if (res instanceof Response) return res;
     return new Response(JSON.stringify(res), { status: res && res.success ? 200 : 500 });
   };
@@ -453,6 +464,16 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       return config;
     },
     async transform(code: string, id: string) {
+      if (id.includes('api/trigger') && code.includes('workflow/api')) {
+        const modified = code.replace(
+          /from\s+['"]workflow\/api['"]/g,
+          "from 'virtual:workflow-api-remote-shim'"
+        );
+        if (modified !== code) {
+          console.log('[workflow-bindings] transformed api/trigger import');
+          return { code: modified };
+        }
+      }
       // Only transform relevant JS/TS files
       if (!/\.(js|ts|mjs|cjs|jsx|tsx)$/.test(id)) return null;
 
