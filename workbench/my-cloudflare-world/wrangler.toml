@@ -4,7 +4,7 @@
 name = "my-cloudflare-world"
 main = "./node_modules/workflow-cloudflare-world/dist/src/worker.js"
 compatibility_date = "2024-05-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "enable_weak_ref"]
 
 # Bindings for the workflow system's state and orchestration
 # -----------------------------------------------------------

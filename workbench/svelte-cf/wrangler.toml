@@ -1,6 +1,6 @@
 name = "workflow-svelte-cf-app"
 compatibility_date = "2025-01-01"
-compatibility_flags = ["nodejs_compat"]
+compatibility_flags = ["nodejs_compat", "enable_weak_ref"]
 main = "./.svelte-kit/cloudflare/index.js"
 
 [build]
