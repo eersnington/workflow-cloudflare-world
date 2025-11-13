@@ -72,6 +72,7 @@ export function cloudflareWorkflowTransformer(): Plugin {
     // an object with external:true ensures Rollup/Vite does not try to load the
     // module (and thus avoids encountering the unsupported cloudflare: scheme).
     resolveId(source: string) {
+      console.log('[workflow-bindings] resolveId called with:', source);
       try {
         if (typeof source === 'string') {
           // Explicitly externalize the exact cloudflare:workers specifier
@@ -135,6 +136,7 @@ export function cloudflareWorkflowTransformer(): Plugin {
     // The module exports the public runtime API surface but implements dangerous functions
     // (start, workflowEntrypoint, stepEntrypoint) as forwards to the worker-safe container client.
     async load(id: string) {
+      console.log('[workflow-bindings] load called with:', id);
       if (id === 'virtual:workflow-remote-shim') {
         // The virtual module source below intentionally uses the global container client
         // if present (globalThis.__wf__container_client). If not present at runtime it will
