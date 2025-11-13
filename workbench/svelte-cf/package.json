@@ -24,6 +24,7 @@
   },
   "dependencies": {
     "workflow": "4.0.1-beta.12",
-    "workflow-cloudflare-bindings": "workspace:*"
+    "workflow-cloudflare-bindings": "workspace:*",
+    "workflow-cloudflare-world": "file:./workflow-cloudflare-world-4.0.1-beta.12.tgz"
   }
 }

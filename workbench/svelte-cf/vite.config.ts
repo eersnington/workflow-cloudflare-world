@@ -4,22 +4,9 @@ import { workflowPlugin } from 'workflow/sveltekit';
 import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings/vite-plugin';
 
 export default defineConfig({
-  ssr: {
-    noExternal: [
-      'workflow',
-      'workflow/runtime',
-      'workflow/api',
-      'workflow-cloudflare-bindings',
-    ],
-  },
-
   optimizeDeps: {
-    exclude: [
-      'workflow',
-      'workflow/runtime',
-      'workflow/api',
-      'workflow-cloudflare-bindings',
-    ],
+    include: ['workflow'],
+    exclude: ['@workflow/world-local'],
   },
   plugins: [
     workflowPlugin(), // compile "use workflow"/"use step"
