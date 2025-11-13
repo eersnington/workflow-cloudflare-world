@@ -184,6 +184,7 @@ Reality:
 - Modern SvelteKit emits `const POST = async ({ request }) => { ... return workflowEntrypoint(workflowCode)(request); }`.
 - Result: no transform, Worker bundle still imports `workflow/runtime`, which brings `workflow/api`, which drags in `@workflow/world-local`, Undici, `WeakRef`, `FinalizationRegistry`. Workers don’t ship those globals, so the route crashes before reaching my proxy.
 - Removing `optimizeDeps` overrides doesn’t change anything. The issue is purely that the transformer never runs.
+- Temporary mitigation: add `compatibility_flags = ["nodejs_compat", "enable_weak_ref"]` in both the app Worker and the world Worker wrangler configs. That polyfills `WeakRef`/`FinalizationRegistry` so Undici stops crashing, but it still bundles the local world—treat this as a stopgap only.
 
 Until the Vite plugin can detect the new handler shape (or we add a `generateBundle` codemod that rewrites `.svelte-kit/output/server/entries/endpoints/**/*.js` post-build), the app Worker will always bundle the local world and crash on Cloudflare.
 
