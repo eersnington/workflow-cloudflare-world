@@ -10887,7 +10887,7 @@ packages:
     hasBin: true
 
   workflow-cloudflare-bindings@file:workbench/svelte-cf/workflow-cloudflare-bindings-0.1.0.tgz:
-    resolution: {integrity: sha512-UYJDaTtJI11Qy8ndf2A43ePY6dtWR2w/kbpLM/zQeUx4+YLtxp01/VkgFnV7kjwGkPVKrDkwVutJuKzm2MjJww==, tarball: file:workbench/svelte-cf/workflow-cloudflare-bindings-0.1.0.tgz}
+    resolution: {integrity: sha512-fJqYWPR2W6DcbrcYfS7iy1rvdTa1nYRB7l1NMpZohjhr/HeEjugmf5aTmA9A6uhRP5JYR9k/MwAl2pBHPCLL3A==, tarball: file:workbench/svelte-cf/workflow-cloudflare-bindings-0.1.0.tgz}
     version: 0.1.0
     engines: {node: '>=16'}
     peerDependencies:

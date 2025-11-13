@@ -1,5 +1,3 @@
-// @ts-nocheck
-/* eslint-disable @typescript-eslint/no-var-requires */
 /* Purpose: this file is a Vite plugin shipped as plain JS-compatible code.
    We disable TS checking here and declare `require` so the file can be used in
    mixed environments (Node builds and Worker-safe bundling) without TypeScript
@@ -304,9 +302,15 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       if (!optExcludes.includes('@cloudflare/containers'))
         optExcludes.push('@cloudflare/containers');
       // also defensively exclude the workspace workflow package and common subpath(s)
-      if (!optExcludes.includes('workflow')) optExcludes.push('workflow');
-      if (!optExcludes.includes('workflow/runtime'))
-        optExcludes.push('workflow/runtime');
+      const workflowDeps = [
+        'workflow',
+        'workflow/runtime',
+        'workflow/api',
+        '@workflow/core/api',
+      ];
+      for (const id of workflowDeps) {
+        if (!optExcludes.includes(id)) optExcludes.push(id);
+      }
       config.optimizeDeps.exclude = optExcludes;
 
       // --- ssr.external: include direct package & container subpath and workflow runtime ---
@@ -322,12 +326,16 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       ) {
         existingSsrExternal.push('workflow-cloudflare-world/container');
       }
-      // Add workflow runtime/package to SSR external list to avoid server-side resolution
-      if (!existingSsrExternal.includes('workflow')) {
-        existingSsrExternal.push('workflow');
-      }
-      if (!existingSsrExternal.includes('workflow/runtime')) {
-        existingSsrExternal.push('workflow/runtime');
+      const workflowExternals = [
+        'workflow',
+        'workflow/runtime',
+        'workflow/api',
+        '@workflow/core/api',
+      ];
+      for (const id of workflowExternals) {
+        if (!existingSsrExternal.includes(id)) {
+          existingSsrExternal.push(id);
+        }
       }
       config.ssr.external = existingSsrExternal;
 
@@ -353,6 +361,15 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
             return true;
           // workspace workflow package and common runtime subpath
           if (id === 'workflow' || id.startsWith('workflow/')) return true;
+          if (id === '@workflow/core' || id.startsWith('@workflow/core/'))
+            return true;
+          if (id === 'workflow/api' || id.startsWith('workflow/api'))
+            return true;
+          if (
+            id === '@workflow/core/api' ||
+            id.startsWith('@workflow/core/api')
+          )
+            return true;
           // any import using the cloudflare: scheme should be treated external
           if (id.startsWith('cloudflare:')) return true;
           return false;
@@ -380,6 +397,8 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
           arr.push('workflow-cloudflare-world/container');
         if (!arr.includes('workflow')) arr.push('workflow');
         if (!arr.includes('workflow/runtime')) arr.push('workflow/runtime');
+        if (!arr.includes('workflow/api')) arr.push('workflow/api');
+        if (!arr.includes('@workflow/core/api')) arr.push('@workflow/core/api');
         // Append function rule to cover cloudflare: scheme and subpath prefixes
         arr.push((id: unknown) => isCloudflareId(id));
         config.build.rollupOptions.external = arr;
