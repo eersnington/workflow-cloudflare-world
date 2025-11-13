@@ -31,3 +31,5 @@ head_sampling_rate = 1
 
 [vars]
 WORKFLOW_TARGET_WORLD = "workflow-cloudflare-world"
+# This alone will not reroute the workflow executions to the cloudflare world, so you have to set the 
+# This is there to prevent WORKFLOW_TARGET_WORLD to be set as local by default
