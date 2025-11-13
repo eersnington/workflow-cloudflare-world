@@ -21,10 +21,18 @@ export function setupGlobalContainerClient(env?: Record<string, any>) {
   if (typeof (globalThis as any).__wf__container_client === 'undefined') {
     (globalThis as any).__wf__container_client = defaultContainerClient;
   }
-  if (env) {
-    // store a reference to env for shims that may want to use it
-    (globalThis as any).__wf__env = env;
+  const previousEnv =
+    typeof (globalThis as any).__wf__env === 'object'
+      ? (globalThis as any).__wf__env
+      : {};
+  const mergedEnv = {
+    ...previousEnv,
+    ...(env ?? {}),
+  };
+  if (!mergedEnv.WORKFLOW_TARGET_WORLD) {
+    mergedEnv.WORKFLOW_TARGET_WORLD = 'workflow-cloudflare-world';
   }
+  (globalThis as any).__wf__env = mergedEnv;
 }
 
 export { ContainerClient, defaultContainerClient };
