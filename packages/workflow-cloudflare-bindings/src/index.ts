@@ -1,11 +1,10 @@
-// @ts-nocheck
 // Worker-safe bindings package entrypoint
 // Exports:
 //  - ContainerClient: a Worker-safe client for invoking the runtime executor (DO / service binding / URL)
 //  - defaultContainerClient: a shared client instance
 //  - setupGlobalContainerClient(env): helper to set globalThis.__wf__container_client and optionally __wf__env
 
-import { ContainerClient, defaultContainerClient } from './container-client';
+import { ContainerClient, defaultContainerClient } from './container-client.js';
 
 /**
  * Helper to set up a global container client reference that the injected runtime
