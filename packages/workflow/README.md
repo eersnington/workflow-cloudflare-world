@@ -5,87 +5,85 @@
       <img alt="Workflow DevKit logo" src="https://useworkflow.dev/workflow-circle-symbol-light.svg" height="128">
     </picture>
   </a>
-  <h1>Workflow DevKit</h1>
+  <h1>Workflow Cloudflare World (RFC)</h1>
 </div>
 
-**Workflow DevKit** is a durable functions framework for JavaScript/TypeScript that enables you to write long-running, stateful application logic on top of stateless compute. The runtime persists progress as an event log and deterministically replays code to reconstruct state after cold starts, failures, or scale events.
+> This is an experimental Cloudflare-focused fork that hosts the runtime (`workflow-cloudflare-world`), the app bindings (`workflow-cloudflare-bindings`), and the SvelteKit demo workbench. It is **not** the upstream Workflow DevKit repo. For official docs visit [useworkflow.dev](https://useworkflow.dev).
 
-This repository hosts the core Workflow SDK, world implementations for various platforms, and example applications. For full documentation, visit [useworkflow.dev](https://useworkflow.dev).
+## What’s in this repo
 
-## Core Concepts
+- `packages/world-cloudflare`: the deployable Cloudflare world that uses D1, Queues, R2, Durable Objects, and Cloudflare Containers to execute workflows off-app.
+- `packages/workflow-cloudflare-bindings`: the client/bindings package that rewrites workflow handlers and forwards `workflow/api` calls to the remote runtime.
+- `workbench/svelte-cf`: a SvelteKit + Workers starter wired to the bindings package and Wrangler service bindings.
+- `problems.md`: running RFC / issue log describing current blockers (notably the Vite transformer gap).
 
-- **Workflows (`"use workflow"`)**: Orchestrator functions that define the high-level logic of a process. They run in a deterministic, sandboxed environment and must not perform side effects directly.
-- **Steps (`"use step"`)**: Functions that perform the actual work, such as calling APIs, querying databases, or running business logic. They have full access to the Node.js runtime.
-- **Worlds**: Platform-specific implementations that provide the necessary backend primitives (storage, queues, streaming) for the workflow runtime to operate.
+Everything else in this repo exists only to support the Cloudflare world experiments.
 
-## Architecture & Packages
+## Quick start
 
-This repository is a monorepo containing the following key packages:
+1. Scaffold and deploy the runtime:
 
--   **`packages/core`**: The core workflow runtime, primitives, and type definitions (`@workflow/core`).
--   **`packages/workflow`**: The main public package that you install in your applications (`workflow`).
--   **`packages/world`**: Defines the standard interface that all "World" implementations must adhere to (`@workflow/world`).
+    ```bash
+    npx workflow-cloudflare-world init my-workflow-runtime
+    cd my-workflow-runtime
+    pnpm install
+    wrangler d1 create <db-name>
+    wrangler d1 migrations apply <db-name>
+    wrangler deploy
+    ```
 
-### World Implementations
+    The CLI drops `wrangler.toml`, Dockerfile + container config, and the initial D1 migration so the worker/runtime can run queues, streams, and containers out of the box.
 
-Worlds provide the "backend" for the workflow system on a specific platform.
+2. Connect your app (e.g., SvelteKit Worker):
 
--   **`packages/world-local`**: A filesystem-based world for local development and testing.
--   **`packages/world-vercel`**: A production-ready world for Vercel deployments, using Vercel KV, Postgres, and Queues.
--   **`packages/world-cloudflare`**: A deployable, standalone runtime for Cloudflare, using D1, R2, Queues, and Containers.
--   **`packages/workflow-cloudflare-bindings`**: A lightweight package for consumer applications to connect to a deployed Cloudflare World.
+    ```bash
+    pnpm add workflow-cloudflare-bindings
+    ```
 
-### Framework Integrations
+    ```ts
+    // vite.config.ts
+    import { cloudflareWorkflowTransformer } from 'workflow-cloudflare-bindings/vite-plugin';
+    export default defineConfig({
+      plugins: [
+        cloudflareWorkflowTransformer(),
+        sveltekit(),
+      ],
+    });
+    ```
 
--   **`packages/next`**: Next.js integration (`@workflow/next`).
--   **`packages/sveltekit`**: SvelteKit integration (`@workflow/sveltekit`).
+    ```toml
+    [[services]]
+    binding = "WORKFLOW_RUNTIME"
+    service = "my-workflow-runtime"
+    ```
 
-### Tooling
+    ```ts
+    // hooks.server.ts (SvelteKit) or Worker entry
+    import { setupGlobalContainerClient } from 'workflow-cloudflare-bindings';
+    export const handle = async ({ event, resolve }) => {
+      setupGlobalContainerClient(event.platform?.env);
+      return resolve(event);
+    };
+    ```
 
--   **`packages/cli`**: The command-line interface for building and managing workflows (`@workflow/cli`).
--   **`packages/swc-plugin-workflow`**: The SWC compiler plugin that transforms `"use workflow"` and `"use step"` functions at build time.
+    With the binding set, calls to `workflow/api` are proxied to the containerized executor running in your Cloudflare account.
 
-## Getting Started
+## How the Cloudflare world works
 
-The easiest way to get started is by using a framework-specific starter template. Visit [useworkflow.dev/docs/getting-started](https://useworkflow.dev/docs/getting-started) for guides on Next.js, SvelteKit, and more.
+- **Queues**: `WORKFLOW_QUEUE` handles workflow jobs, `STEP_QUEUE` handles step retries. `handleQueueMessage` dispatches workflow jobs to the container executor via service binding or HTTPS, while step jobs run directly in the Worker.
+- **Storage**: A D1 schema (see `packages/world-cloudflare/src/drizzle/schema.ts`) persists runs, steps, events, and hooks. The CLI copies the base migration into new projects.
+- **Streaming**: A `StreamCoordinator` Durable Object fans out chunks to readers and persists them to R2.
+- **Containers**: Cloudflare Containers host the Workflow VM because Workers do not support `vm.runInContext`, deterministic Math.random, or other sandbox requirements. The Worker queues jobs into the container via `WORKFLOW_EXECUTOR`.
+- **Bindings package**: The Vite plugin swaps `workflow/runtime` imports with remote shims so Workers never bundle `@workflow/world-local`. `setupGlobalContainerClient` stores a singleton client that knows how to talk to the executor via service binding or `WORKFLOW_EXECUTOR_URL`.
 
-### Local Development
+For a deeper dive, read:
 
-1.  **Clone the repository.**
-2.  **Install dependencies:** `pnpm install`
-3.  **Build all packages:** `pnpm build`
+- [`packages/world-cloudflare/README.md`](packages/world-cloudflare/README.md)
+- [`packages/workflow-cloudflare-bindings/README.md`](packages/workflow-cloudflare-bindings/README.md)
+- [`packages/world-cloudflare/HOW_IT_WORKS.md`](packages/world-cloudflare/HOW_IT_WORKS.md)
 
-To run a specific example, navigate to its directory in the `workbench` and follow the instructions in its `README.md`.
+## Status & RFC
 
-For example, to run the Next.js Turbopack example:
+This project is still in flux. The runtime + CLI + workbench deploy cleanly, but the bindings plugin must be updated to match modern SvelteKit output (see [problems.md](./problems.md)). Until that transformer lands, Workers may still bundle the local world and crash on Cloudflare.
 
-```bash
-cd workbench/nextjs-turbopack
-pnpm dev
-```
-
-## How It Works
-
-The Workflow DevKit uses a compiler-driven approach. The SWC plugin (`swc-plugin-workflow`) traverses your code at build time and transforms functions marked with `"use workflow"` or `"use step"`.
-
-1.  **Workflow Functions** are compiled to run within a deterministic, sandboxed VM. All external communication happens by dispatching step functions.
-2.  **Step Functions** are extracted and exposed as independent, invokable endpoints.
-3.  The runtime records every step function call and its result in an event log (the "world").
-4.  If a workflow execution is interrupted, the runtime replays the event log, restoring the workflow's state to exactly where it left off without re-executing already completed steps.
-
-This event-sourcing model is what makes workflows durable and resilient to failures.
-
-## Contributing
-
-Contributions are welcome! Please see the [Contributing Guide](https://github.com/vercel/workflow/blob/main/CONTRIBUTING.md) for guidelines on how to submit changes.
-
-## Support
-
--   **Documentation**: [useworkflow.dev](https://useworkflow.dev)
--   **Questions & Discussions**: [GitHub Discussions](https://github.com/vercel/workflow/discussions)
--   **Bugs & Issues**: [GitHub Issues](https://github.com/vercel/workflow/issues)
-
-## Support
-
-- Questions / discussions: [GitHub Discussions](https://github.com/vercel/workflow/discussions)
-- Bugs specific to this world implementation: open an issue in this repo with details about your Worker setup, Wrangler config, and any relevant logs.
+Contributions, repro cases, and ideas are welcome via GitHub Discussions or issues in this repo. Please include Wrangler config, bindings, and `.svelte-kit` output snippets when reporting bugs.
