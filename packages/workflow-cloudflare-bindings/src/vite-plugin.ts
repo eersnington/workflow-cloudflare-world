@@ -464,17 +464,6 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       return config;
     },
     async transform(code: string, id: string) {
-      if (id.includes('api/trigger') && code.includes('workflow/api')) {
-        const modified = code.replace(
-          /from\s+['"]workflow\/api['"]/g,
-          "from 'virtual:workflow-api-remote-shim'"
-        );
-        if (modified !== code) {
-          console.log('[workflow-bindings] transformed api/trigger import');
-          return { code: modified };
-        }
-      }
-      // Only transform relevant JS/TS files
       if (!/\.(js|ts|mjs|cjs|jsx|tsx)$/.test(id)) return null;
 
       const hasEntrypointImport =
@@ -493,7 +482,6 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       );
       if (postExprIndex === -1) return null;
 
-      // Determine end of the statement to replace
       let postExprEnd = code.indexOf(';', postExprIndex);
       if (postExprEnd === -1) {
         // fallback to newline
