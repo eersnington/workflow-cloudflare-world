@@ -6,6 +6,7 @@ declare function require(name: string): any;
 
 type Plugin = any;
 let MagicString: any;
+let acorn: any;
 try {
   // Load magic-string at runtime to avoid a hard dependency during build/test runs.
   // Prefer the default export when present.
@@ -33,6 +34,12 @@ try {
       return null;
     }
   };
+}
+
+try {
+  acorn = require('acorn');
+} catch {
+  acorn = null;
 }
 
 /**
@@ -99,6 +106,38 @@ export function cloudflareWorkflowTransformer(): Plugin {
             return { id: source, external: true } as any;
           }
 
+          if (
+            /workflow(?:\/|\\)dist(?:\/|\\).*runtime(?:\/|\\)world(?:\.js)?$/.test(
+              source
+            ) ||
+            source === 'workflow/runtime/world'
+          ) {
+            return {
+              id: '\0workflow-cloudflare-world-module',
+              external: false,
+            };
+          }
+
+          if (
+            source === '@workflow/world-local' ||
+            source.startsWith('@workflow/world-local/')
+          ) {
+            return {
+              id: '\0workflow-world-local-stub',
+              external: false,
+            };
+          }
+
+          if (
+            source === '@workflow/world-vercel' ||
+            source.startsWith('@workflow/world-vercel/')
+          ) {
+            return {
+              id: '\0workflow-world-vercel-stub',
+              external: false,
+            };
+          }
+
           // Provide a virtual module for runtime imports so app code that imports
           // `workflow/runtime` or `@workflow/core/runtime` receives a safe shim
           // that forwards to the remote executor rather than invoking core VM/serialize.
@@ -125,6 +164,28 @@ export function cloudflareWorkflowTransformer(): Plugin {
               external: false,
             } as any;
           }
+          if (
+            /workflow(?:\/|\\)dist(?:\/|\\).*runtime(?:\/|\\)(?:index)?(?:\.js)?$/.test(
+              source
+            ) ||
+            /workflow(?:\/|\\)dist(?:\/|\\)runtime(?:\.js)?$/.test(source)
+          ) {
+            return {
+              id: 'virtual:workflow-remote-shim',
+              external: false,
+            } as any;
+          }
+          if (
+            /workflow(?:\/|\\)dist(?:\/|\\).*api(?:\/|\\)(?:index)?(?:\.js)?$/.test(
+              source
+            ) ||
+            /workflow(?:\/|\\)dist(?:\/|\\)api(?:\.js)?$/.test(source)
+          ) {
+            return {
+              id: 'virtual:workflow-api-remote-shim',
+              external: false,
+            } as any;
+          }
         }
       } catch {
         // ignore and continue resolution
@@ -137,6 +198,33 @@ export function cloudflareWorkflowTransformer(): Plugin {
     // (start, workflowEntrypoint, stepEntrypoint) as forwards to the worker-safe container client.
     async load(id: string) {
       console.log('[workflow-bindings] load called with:', id);
+      if (id === '\0workflow-cloudflare-world-module') {
+        return `
+const message = 'workflow-cloudflare-bindings: createWorld() is unavailable in Cloudflare Worker builds. Install and configure the Cloudflare world runtime, then call the APIs exported by workflow-cloudflare-bindings.';
+
+export function createWorld() {
+  throw new Error(message);
+}
+
+export const getWorld = createWorld;
+
+export function getWorldHandlers() {
+  throw new Error(message);
+}
+
+export function setWorld() {}
+`;
+      }
+
+      if (
+        id === '\0workflow-world-local-stub' ||
+        id === '\0workflow-world-vercel-stub'
+      ) {
+        return `
+throw new Error('${id.includes('local') ? '@workflow/world-local' : '@workflow/world-vercel'} cannot be bundled in Cloudflare Worker builds. Install workflow-cloudflare-bindings and use the remote world instead.');
+`;
+      }
+
       if (id === 'virtual:workflow-remote-shim') {
         // The virtual module source below intentionally uses the global container client
         // if present (globalThis.__wf__container_client). If not present at runtime it will
@@ -305,7 +393,55 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
     // config while the transformer ensures the container package and related
     // subpaths aren't parsed at build-time.
     config(config: any) {
-      // --- optimizeDeps.exclude: add @cloudflare/containers and workflow packages defensively ---
+      config.resolve = config.resolve || {};
+      const aliasEntries = [
+        {
+          find: /workflow(?:\/|\\)dist(?:\/|\\).*runtime(?:\/|\\)world(?:\.js)?$/,
+          replacement: '\0workflow-cloudflare-world-module',
+        },
+        {
+          find: /workflow(?:\/|\\)runtime(?:\/|\\)world$/,
+          replacement: '\0workflow-cloudflare-world-module',
+        },
+        {
+          find: '@workflow/world-local',
+          replacement: '\0workflow-world-local-stub',
+        },
+        {
+          find: '@workflow/world-vercel',
+          replacement: '\0workflow-world-vercel-stub',
+        },
+        {
+          find: /^workflow\/runtime(?:\/index)?$/,
+          replacement: 'virtual:workflow-remote-shim',
+        },
+        {
+          find: /^workflow\/api(?:\/index)?$/,
+          replacement: 'virtual:workflow-api-remote-shim',
+        },
+        {
+          find: /^@workflow\/core\/runtime(?:\/index)?$/,
+          replacement: 'virtual:workflow-remote-shim',
+        },
+        {
+          find: /^@workflow\/core\/api(?:\/index)?$/,
+          replacement: 'virtual:workflow-api-remote-shim',
+        },
+      ];
+      if (!config.resolve.alias) {
+        config.resolve.alias = aliasEntries;
+      } else if (Array.isArray(config.resolve.alias)) {
+        config.resolve.alias.push(...aliasEntries);
+      } else if (typeof config.resolve.alias === 'object') {
+        const flattened = Object.entries(config.resolve.alias).map(
+          ([find, replacement]) => ({
+            find,
+            replacement,
+          })
+        );
+        config.resolve.alias = [...flattened, ...aliasEntries];
+      }
+      // --- optimizeDeps.exclude: add @cloudflare/containers defensively ---
       config.optimizeDeps = config.optimizeDeps || {};
       const existingOptimizeExclude = Array.isArray(config.optimizeDeps.exclude)
         ? config.optimizeDeps.exclude
@@ -314,19 +450,9 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       const optExcludes = existingOptimizeExclude.slice();
       if (!optExcludes.includes('@cloudflare/containers'))
         optExcludes.push('@cloudflare/containers');
-      // also defensively exclude the workspace workflow package and common subpath(s)
-      const workflowDeps = [
-        'workflow',
-        'workflow/runtime',
-        'workflow/api',
-        '@workflow/core/api',
-      ];
-      for (const id of workflowDeps) {
-        if (!optExcludes.includes(id)) optExcludes.push(id);
-      }
       config.optimizeDeps.exclude = optExcludes;
 
-      // --- ssr.external: include direct package & container subpath and workflow runtime ---
+      // --- ssr.external: include direct package & container subpath ---
       config.ssr = config.ssr || {};
       const existingSsrExternal = Array.isArray(config.ssr.external)
         ? config.ssr.external.slice()
@@ -338,17 +464,6 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
         !existingSsrExternal.includes('workflow-cloudflare-world/container')
       ) {
         existingSsrExternal.push('workflow-cloudflare-world/container');
-      }
-      const workflowExternals = [
-        'workflow',
-        'workflow/runtime',
-        'workflow/api',
-        '@workflow/core/api',
-      ];
-      for (const id of workflowExternals) {
-        if (!existingSsrExternal.includes(id)) {
-          existingSsrExternal.push(id);
-        }
       }
       config.ssr.external = existingSsrExternal;
 
@@ -370,17 +485,6 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
           if (
             id === 'workflow-cloudflare-world/container' ||
             id.startsWith('workflow-cloudflare-world/container')
-          )
-            return true;
-          // workspace workflow package and common runtime subpath
-          if (id === 'workflow' || id.startsWith('workflow/')) return true;
-          if (id === '@workflow/core' || id.startsWith('@workflow/core/'))
-            return true;
-          if (id === 'workflow/api' || id.startsWith('workflow/api'))
-            return true;
-          if (
-            id === '@workflow/core/api' ||
-            id.startsWith('@workflow/core/api')
           )
             return true;
           // any import using the cloudflare: scheme should be treated external
@@ -408,10 +512,6 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
           arr.push('@cloudflare/containers');
         if (!arr.includes('workflow-cloudflare-world/container'))
           arr.push('workflow-cloudflare-world/container');
-        if (!arr.includes('workflow')) arr.push('workflow');
-        if (!arr.includes('workflow/runtime')) arr.push('workflow/runtime');
-        if (!arr.includes('workflow/api')) arr.push('workflow/api');
-        if (!arr.includes('@workflow/core/api')) arr.push('@workflow/core/api');
         // Append function rule to cover cloudflare: scheme and subpath prefixes
         arr.push((id: unknown) => isCloudflareId(id));
         config.build.rollupOptions.external = arr;
@@ -474,22 +574,12 @@ export { start as startWorkflow } from 'virtual:workflow-remote-shim';
       if (!hasEntrypointImport) return null;
 
       if (!code.includes('const workflowCode =')) return null;
-      if (!code.includes('export const POST = workflowEntrypoint('))
-        return null;
+      if (!code.includes('workflowEntrypoint(')) return null;
 
-      const postExprIndex = code.indexOf(
-        'export const POST = workflowEntrypoint('
-      );
-      if (postExprIndex === -1) return null;
-
-      let postExprEnd = code.indexOf(';', postExprIndex);
-      if (postExprEnd === -1) {
-        // fallback to newline
-        const nl = code.indexOf('\n', postExprIndex);
-        postExprEnd = nl === -1 ? postExprIndex + 1 : nl + 1;
-      } else {
-        postExprEnd += 1;
-      }
+      const handlerRange =
+        findLegacyPostHandlerRange(code) ??
+        findModernPostHandlerRange(code, acorn);
+      if (!handlerRange) return null;
 
       const s = new MagicString(code);
 
@@ -671,7 +761,7 @@ export const POST = async function(request, env) {
 `;
 
       // Replace the original export with our handler
-      s.overwrite(postExprIndex, postExprEnd, injectedHandler);
+      s.overwrite(handlerRange.start, handlerRange.end, injectedHandler);
 
       // Conservative handling: avoid destructive global text rewrites on the
       // generated bundle. Aggressive regex replacements are brittle and have
@@ -758,3 +848,242 @@ export const POST = async function(request, env) {
 
 // Export a default to make subpath `vite-plugin` provide a default entrypoint
 export default cloudflareWorkflowTransformer;
+
+function findLegacyPostHandlerRange(
+  code: string
+): { start: number; end: number } | null {
+  const postExprIndex = code.indexOf('export const POST = workflowEntrypoint(');
+  if (postExprIndex === -1) return null;
+  let postExprEnd = code.indexOf(';', postExprIndex);
+  if (postExprEnd === -1) {
+    const nl = code.indexOf('\n', postExprIndex);
+    postExprEnd = nl === -1 ? postExprIndex + 1 : nl + 1;
+  } else {
+    postExprEnd += 1;
+  }
+  return { start: postExprIndex, end: postExprEnd };
+}
+
+function findModernPostHandlerRange(
+  code: string,
+  acornLib: any
+): { start: number; end: number } | null {
+  if (acornLib) {
+    try {
+      const ast = acornLib.parse(code, {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        allowAwaitOutsideFunction: true,
+      });
+      let range: { start: number; end: number } | null = null;
+
+      const visit = (node: any, parent: any) => {
+        if (!node || range) return;
+        switch (node.type) {
+          case 'Program':
+            for (const stmt of node.body) visit(stmt, node);
+            break;
+          case 'ExportNamedDeclaration':
+            if (node.declaration) {
+              visit(node.declaration, node);
+            }
+            break;
+          case 'VariableDeclaration': {
+            const container =
+              parent && parent.type === 'ExportNamedDeclaration'
+                ? parent
+                : node;
+            for (const decl of node.declarations ?? []) {
+              if (range) break;
+              inspectDeclarator(decl, container);
+            }
+            break;
+          }
+          default:
+            for (const key in node) {
+              if (range) break;
+              if (key === 'start' || key === 'end') continue;
+              const value = (node as any)[key];
+              if (!value) continue;
+              if (Array.isArray(value)) {
+                for (const child of value) {
+                  visit(child, node);
+                  if (range) break;
+                }
+              } else if (typeof value === 'object') {
+                visit(value, node);
+              }
+            }
+        }
+      };
+
+      const inspectDeclarator = (decl: any, container: any) => {
+        if (!decl || decl.type !== 'VariableDeclarator') return;
+        if (!decl.id || decl.id.type !== 'Identifier') return;
+        if (decl.id.name !== 'POST') return;
+        const init = decl.init;
+        if (!init) return;
+        if (isWorkflowEntrypointCall(init)) {
+          range = { start: container.start, end: container.end };
+          return;
+        }
+        if (
+          init.type === 'ArrowFunctionExpression' ||
+          init.type === 'FunctionExpression'
+        ) {
+          if (nodeHasWorkflowEntrypointCall(init.body ?? init)) {
+            range = { start: container.start, end: container.end };
+          }
+        }
+      };
+
+      visit(ast, null);
+      if (range) {
+        return consumeTrailingSemicolon(code, range);
+      }
+    } catch {
+      // ignore parse failure and fall back to heuristic
+    }
+  }
+  return findArrowHandlerHeuristic(code);
+}
+
+function isWorkflowEntrypointCall(node: any): boolean {
+  if (!node || node.type !== 'CallExpression') return false;
+  const callee = node.callee;
+  return (
+    callee &&
+    callee.type === 'Identifier' &&
+    callee.name === 'workflowEntrypoint'
+  );
+}
+
+function nodeHasWorkflowEntrypointCall(node: any): boolean {
+  if (!node) return false;
+  const stack: any[] = [node];
+  const seen = new Set<any>();
+  while (stack.length) {
+    const current = stack.pop();
+    if (!current || typeof current !== 'object' || seen.has(current)) continue;
+    seen.add(current);
+    if (
+      current.type === 'CallExpression' &&
+      isWorkflowEntrypointCall(current)
+    ) {
+      return true;
+    }
+    for (const key in current) {
+      if (key === 'start' || key === 'end') continue;
+      const value = current[key];
+      if (!value) continue;
+      if (Array.isArray(value)) {
+        for (const child of value) stack.push(child);
+      } else if (typeof value === 'object') {
+        stack.push(value);
+      }
+    }
+  }
+  return false;
+}
+
+function findArrowHandlerHeuristic(
+  code: string
+): { start: number; end: number } | null {
+  const postIdx = code.indexOf('const POST');
+  if (postIdx === -1) return null;
+  const arrowIdx = code.indexOf('=>', postIdx);
+  if (arrowIdx === -1) return null;
+  const openingBrace = code.indexOf('{', arrowIdx);
+  if (openingBrace === -1) return null;
+  const closingBrace = findMatchingBrace(code, openingBrace);
+  if (closingBrace === -1) return null;
+  let end = closingBrace + 1;
+  while (end < code.length && /\s/.test(code[end] ?? '')) {
+    end += 1;
+  }
+  if (code[end] === ';') {
+    end += 1;
+  }
+  return { start: postIdx, end };
+}
+
+function findMatchingBrace(source: string, startIndex: number): number {
+  let depth = 0;
+  for (let i = startIndex; i < source.length; i++) {
+    const ch = source[i];
+    if (ch === "'" || ch === '"' || ch === '`') {
+      i = skipString(source, i, ch);
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '/') {
+      i = skipLineComment(source, i + 2);
+      continue;
+    }
+    if (ch === '/' && source[i + 1] === '*') {
+      i = skipBlockComment(source, i + 2);
+      continue;
+    }
+    if (ch === '{') {
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+function skipString(source: string, start: number, quote: string): number {
+  let i = start + 1;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (quote === '`' && ch === '$' && source[i + 1] === '{') {
+      const end = findMatchingBrace(source, i + 1);
+      if (end === -1) return source.length;
+      i = end + 1;
+      continue;
+    }
+    if (ch === quote) return i;
+    i += 1;
+  }
+  return source.length;
+}
+
+function skipLineComment(source: string, start: number): number {
+  let i = start;
+  while (i < source.length) {
+    const ch = source[i];
+    if (ch === '\n' || ch === '\r') break;
+    i += 1;
+  }
+  return i;
+}
+
+function skipBlockComment(source: string, start: number): number {
+  let i = start;
+  while (i < source.length - 1) {
+    if (source[i] === '*' && source[i + 1] === '/') {
+      return i + 1;
+    }
+    i += 1;
+  }
+  return source.length;
+}
+
+function consumeTrailingSemicolon(
+  code: string,
+  range: { start: number; end: number }
+): { start: number; end: number } {
+  let end = range.end;
+  while (end < code.length && /\s/.test(code[end] ?? '')) {
+    end += 1;
+  }
+  if (code[end] === ';') {
+    end += 1;
+  }
+  return { start: range.start, end };
+}
