@@ -1,0 +1,17 @@
+{
+  "name": "workflow-bun-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "bun run server.ts --build",
+    "start": "bun run server.ts"
+  },
+  "dependencies": {
+    "workflow": "workspace:*",
+    "workflow-bun": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/bun": "1.3.2",
+    "tsx": "4.19.2"
+  }
+}
