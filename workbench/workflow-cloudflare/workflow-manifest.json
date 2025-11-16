@@ -1,0 +1,7 @@
+{
+  "workflows/example.js": {
+    "handleGreeting": {
+      "workflowId": "workflow//workflows/example.js//handleGreeting"
+    }
+  }
+}

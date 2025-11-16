@@ -1,0 +1,9 @@
+{
+  "name": "workflow-cloudflare-example",
+  "main": "worker.ts",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": [
+    "nodejs_compat",
+    "enable_weak_ref"
+  ],
+}

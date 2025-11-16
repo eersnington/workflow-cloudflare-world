@@ -1,0 +1,21 @@
+{
+  "name": "workflow-cloudflare-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node ./server.mjs --build",
+    "start": "node ./server.mjs"
+  },
+  "dependencies": {
+    "workflow": "workspace:*",
+    "workflow-cloudflare": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  },
+  "pnpm": {
+    "patchedDependencies": {
+      "npm-run-path@6.0.0": "patches/npm-run-path@6.0.0.patch"
+    }
+  }
+}

@@ -409,6 +409,25 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/cloudflare:
+    dependencies:
+      '@workflow/builders':
+        specifier: workspace:*
+        version: link:../builders
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.0
+      '@workflow/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@22.19.0)(jiti@2.6.1)(lightningcss@1.30.1)(terser@5.44.0)(tsx@4.20.6)(yaml@2.8.1)
+
   packages/core:
     dependencies:
       '@aws-sdk/credential-provider-web-identity':
@@ -1441,6 +1460,54 @@ importers:
         specifier: 'catalog:'
         version: 4.1.11
 
+<<<<<<< Updated upstream
+=======
+  workbench/workflow-bun:
+    dependencies:
+      workflow:
+        specifier: workspace:*
+        version: link:../../packages/workflow
+      workflow-bun:
+        specifier: workspace:*
+        version: link:../../packages/bun
+    devDependencies:
+      '@types/bun':
+        specifier: 1.3.2
+        version: 1.3.2(@types/react@19.1.13)
+      tsx:
+        specifier: 4.19.2
+        version: 4.19.2
+
+  workbench/workflow-cloudflare:
+    dependencies:
+      workflow:
+        specifier: workspace:*
+        version: link:../../packages/workflow
+      workflow-cloudflare:
+        specifier: workspace:*
+        version: link:../../packages/cloudflare
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+  workbench/workflow-node:
+    dependencies:
+      workflow:
+        specifier: workspace:*
+        version: link:../../packages/workflow
+      workflow-node:
+        specifier: workspace:*
+        version: link:../../packages/node
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
+>>>>>>> Stashed changes
 packages:
 
   '@ai-sdk/gateway@2.0.0':

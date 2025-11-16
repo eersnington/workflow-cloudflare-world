@@ -1,0 +1,41 @@
+{
+  "name": "workflow-cloudflare",
+  "version": "4.0.1-beta.14",
+  "description": "Cloudflare Workers integration helpers for Workflow DevKit",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vercel/workflow.git",
+    "directory": "packages/cloudflare"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./builder": "./dist/builder.js",
+    "./server": "./dist/server.js",
+    "./manifest": "./dist/manifest.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "clean": "tsc -p tsconfig.json --build --clean && rm -rf dist",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "@workflow/builders": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@workflow/tsconfig": "workspace:*",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
