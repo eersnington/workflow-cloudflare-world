@@ -3,8 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsx ./server.ts --build",
-    "start": "tsx ./server.ts"
+    "build": "tsc -p tsconfig.json && node ./dist/server.js --build",
+    "start": "node ./dist/server.js"
   },
   "dependencies": {
     "workflow": "workspace:*",
@@ -12,6 +12,6 @@
   },
   "devDependencies": {
     "@types/node": "catalog:",
-    "tsx": "4.19.2"
+    "typescript": "catalog:"
   }
 }
