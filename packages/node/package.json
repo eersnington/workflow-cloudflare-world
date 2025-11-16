@@ -1,7 +1,7 @@
 {
   "name": "workflow-node",
-  "version": "0.1.0",
-  "description": "Node.js integration helpers for Workflow DevKit",
+  "version": "4.0.1-beta.14",
+  "description": "Community integration Node.js helpers for Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

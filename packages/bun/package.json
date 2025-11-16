@@ -1,7 +1,7 @@
 {
   "name": "workflow-bun",
-  "version": "0.0.0",
-  "description": "Bun integration helpers for Workflow DevKit",
+  "version": "4.0.1-beta.14",
+  "description": "Community integration Bun helpers for Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
