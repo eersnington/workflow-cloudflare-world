@@ -1,0 +1,38 @@
+{
+  "name": "workflow-node",
+  "version": "0.1.0",
+  "description": "Node.js integration helpers for Workflow DevKit",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vercel/workflow.git",
+    "directory": "packages/node"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./builder": "./dist/builder.js",
+    "./server": "./dist/server.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "tsc -p tsconfig.json --watch",
+    "clean": "tsc -p tsconfig.json --build --clean && rm -rf dist"
+  },
+  "dependencies": {
+    "@workflow/builders": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@workflow/tsconfig": "workspace:*",
+    "typescript": "catalog:"
+  }
+}
