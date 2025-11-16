@@ -1,0 +1,8 @@
+diff --git a/index.js b/index.js
+index 0c86e49..a63a33f 100644
+--- a/index.js
++++ b/index.js
+@@
+-import * as unicornMagic from 'unicorn-magic';
+-const { toPath, traversePathUp } = unicornMagic;
++import {toPath, traversePathUp} from 'unicorn-magic/node.js';
