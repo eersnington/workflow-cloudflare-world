@@ -2,8 +2,8 @@ import { mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import {
   BaseBuilder,
-  VercelBuildOutputAPIBuilder,
   createBaseBuilderConfig,
+  VercelBuildOutputAPIBuilder,
   type WorkflowConfig,
 } from '@workflow/builders';
 import { HANDLER_FILENAMES } from './constants.js';
@@ -106,9 +106,16 @@ export function createWorkflowNodeBuilder(
 ): BaseBuilder {
   const target = resolveBuildTarget(options.target);
   if (target === 'vercel') {
-    return new WorkflowNodeVercelBuilder(options);
+    return new WorkflowNodeVercelBuilder({
+      ...options,
+      outDir: undefined,
+      target: 'vercel',
+    });
   }
-  return new WorkflowNodeLocalBuilder(options);
+  return new WorkflowNodeLocalBuilder({
+    ...options,
+    target: 'local',
+  });
 }
 
 function resolveWorkflowDirs(customDirs?: string[]): string[] {

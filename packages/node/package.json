@@ -20,7 +20,8 @@
   "exports": {
     ".": "./dist/index.js",
     "./builder": "./dist/builder.js",
-    "./server": "./dist/server.js"
+    "./server": "./dist/server.js",
+    "./manifest": "./dist/manifest.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

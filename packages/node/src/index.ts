@@ -1,15 +1,23 @@
 export {
+  createWorkflowNodeBuilder,
   WorkflowNodeLocalBuilder,
   WorkflowNodeVercelBuilder,
-  createWorkflowNodeBuilder,
   type WorkflowNodeBuilderOptions,
   type WorkflowNodeBuilderTarget,
 } from './builder.js';
 export {
-  createWorkflowNodeServer,
+  annotateWorkflowsFromManifest,
+  loadWorkflowManifest,
+  type AnnotateWorkflowsOptions,
+  type LoadWorkflowManifestOptions,
+  type WorkflowManifest,
+  type WorkflowMetadata,
+} from './manifest.js';
+export {
   createWorkflowNodeFetchHandler,
-  type WorkflowNodeServer,
-  type WorkflowNodeServerOptions,
+  createWorkflowNodeServer,
   type WorkflowNodeFetchHandler,
   type WorkflowNodeFetchHandlerOptions,
+  type WorkflowNodeServer,
+  type WorkflowNodeServerOptions,
 } from './server.js';

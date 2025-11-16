@@ -12,15 +12,14 @@ import {
 } from './load-handlers.js';
 import { createRequestFromNode, sendNodeResponse } from './request-adapter.js';
 
+type MaybePromise<T> = T | Promise<T>;
+
 export interface WorkflowNodeServerOptions {
   buildDir?: string;
   port?: number;
   hostname?: string;
   logger?: Pick<Console, 'info' | 'error' | 'debug'>;
-  customHandler?: (
-    req: IncomingMessage,
-    res: ServerResponse
-  ) => Promise<boolean | void> | boolean | void;
+  customHandler?: WorkflowNodeCustomHandler;
 }
 
 export interface WorkflowNodeServer {
@@ -33,6 +32,11 @@ export interface WorkflowNodeFetchHandlerOptions {
   buildDir?: string;
   logger?: Pick<Console, 'info' | 'error' | 'debug'>;
 }
+
+export type WorkflowNodeCustomHandler = (
+  req: IncomingMessage,
+  res: ServerResponse
+) => MaybePromise<boolean | undefined>;
 
 export type WorkflowNodeFetchHandler = (
   req: IncomingMessage,
