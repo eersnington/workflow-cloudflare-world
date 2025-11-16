@@ -1504,9 +1504,9 @@ importers:
       '@types/node':
         specifier: 'catalog:'
         version: 22.19.0
-      tsx:
-        specifier: 4.19.2
-        version: 4.19.2
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
 
 packages:
 
