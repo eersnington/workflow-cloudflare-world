@@ -1,0 +1,17 @@
+{
+  "name": "workflow-node-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsx ./server.ts --build",
+    "start": "tsx ./server.ts"
+  },
+  "dependencies": {
+    "workflow": "workspace:*",
+    "workflow-node": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "4.19.2"
+  }
+}
