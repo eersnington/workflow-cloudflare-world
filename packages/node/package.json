@@ -26,7 +26,8 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "tsc -p tsconfig.json --watch",
-    "clean": "tsc -p tsconfig.json --build --clean && rm -rf dist"
+    "clean": "tsc -p tsconfig.json --build --clean && rm -rf dist",
+    "test": "vitest run src"
   },
   "dependencies": {
     "@workflow/builders": "workspace:*"
@@ -34,6 +35,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@workflow/tsconfig": "workspace:*",
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   }
 }
