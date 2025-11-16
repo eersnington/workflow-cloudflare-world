@@ -17,6 +17,10 @@ export interface WorkflowNodeServerOptions {
   port?: number;
   hostname?: string;
   logger?: Pick<Console, 'info' | 'error' | 'debug'>;
+  customHandler?: (
+    req: IncomingMessage,
+    res: ServerResponse
+  ) => Promise<boolean | void> | boolean | void;
 }
 
 export interface WorkflowNodeServer {
@@ -25,18 +29,46 @@ export interface WorkflowNodeServer {
   server: ReturnType<typeof createServer>;
 }
 
+export interface WorkflowNodeFetchHandlerOptions {
+  buildDir?: string;
+  logger?: Pick<Console, 'info' | 'error' | 'debug'>;
+}
+
+export type WorkflowNodeFetchHandler = (
+  req: IncomingMessage,
+  res: ServerResponse
+) => Promise<boolean>;
+
 export async function createWorkflowNodeServer(
   options: WorkflowNodeServerOptions = {}
 ): Promise<WorkflowNodeServer> {
   const logger = options.logger ?? console;
-  const buildDir = resolve(
-    options.buildDir ?? join(process.cwd(), '.well-known/workflow/v1')
-  );
-
-  const handlers = await loadWorkflowHandlers(buildDir);
+  const workflowHandler = await createWorkflowNodeFetchHandler({
+    buildDir: options.buildDir,
+    logger,
+  });
 
   const server = createServer(async (req, res) => {
-    await handleIncomingRequest(req, res, handlers, logger);
+    if (options.customHandler) {
+      try {
+        const handled = await options.customHandler(req, res);
+        if (handled || res.writableEnded) {
+          return;
+        }
+      } catch (error) {
+        logger.error?.('Error in custom handler', error);
+        if (!res.headersSent) {
+          res.statusCode = 500;
+          res.end('Internal Server Error');
+        }
+        return;
+      }
+    }
+    const handledByWorkflow = await workflowHandler(req, res);
+    if (!handledByWorkflow && !res.headersSent) {
+      res.statusCode = 404;
+      res.end('Not Found');
+    }
   });
 
   const hostname = options.hostname ?? '127.0.0.1';
@@ -70,23 +102,36 @@ export async function createWorkflowNodeServer(
   };
 }
 
-async function handleIncomingRequest(
-  req: IncomingMessage,
-  res: ServerResponse,
-  handlers: WorkflowHandlers,
-  logger: Pick<Console, 'info' | 'error' | 'debug'>
-): Promise<void> {
-  try {
-    const request = await createRequestFromNode(req);
-    const response = await dispatchWorkflowRequest(request, handlers);
-    await sendNodeResponse(res, response);
-  } catch (error) {
-    logger.error?.('Unhandled workflow request', error);
-    if (!res.headersSent) {
-      res.statusCode = 500;
+export async function createWorkflowNodeFetchHandler(
+  options: WorkflowNodeFetchHandlerOptions = {}
+): Promise<WorkflowNodeFetchHandler> {
+  const logger = options.logger ?? console;
+  const buildDir = resolve(
+    options.buildDir ?? join(process.cwd(), '.well-known/workflow/v1')
+  );
+  const handlers = await loadWorkflowHandlers(buildDir);
+
+  return async (req: IncomingMessage, res: ServerResponse) => {
+    const pathname = getRequestPathname(req);
+    const shouldHandle = matchesWorkflowRoute(pathname);
+    if (!shouldHandle) {
+      return false;
     }
-    res.end('Internal Server Error');
-  }
+
+    try {
+      const request = await createRequestFromNode(req);
+      const response = await dispatchWorkflowRequest(request, handlers);
+      await sendNodeResponse(res, response);
+      return true;
+    } catch (error) {
+      logger.error?.('Unhandled workflow request', error);
+      if (!res.headersSent) {
+        res.statusCode = 500;
+        res.end('Internal Server Error');
+      }
+      return true;
+    }
+  };
 }
 
 async function dispatchWorkflowRequest(
@@ -144,4 +189,24 @@ function deriveServerUrl(
 
   const host = address.address === '::' ? '127.0.0.1' : address.address;
   return `http://${host}:${address.port}`;
+}
+
+function getRequestPathname(req: IncomingMessage): string {
+  const url = req.url ?? '';
+  try {
+    return new URL(url, 'http://localhost').pathname;
+  } catch {
+    return '/';
+  }
+}
+
+function matchesWorkflowRoute(pathname: string): boolean {
+  if (pathname === WORKFLOW_ROUTES.flow || pathname === WORKFLOW_ROUTES.step) {
+    return true;
+  }
+
+  return (
+    pathname === WORKFLOW_ROUTES.webhook ||
+    pathname.startsWith(`${WORKFLOW_ROUTES.webhook}/`)
+  );
 }
