@@ -115,7 +115,7 @@ describe('createWorkflowExpressRouter', () => {
       .map((layer: any) => layer.route?.path)
       .filter(Boolean);
     expect(paths).toContain('/.well-known/workflow/v1/webhook');
-    expect(paths).toContain('/.well-known/workflow/v1/webhook/:rest(*)');
+    expect(paths).toContain('/.well-known/workflow/v1/webhook/:rest*');
   });
 
   it('passes POST /flow to the flow handler', async () => {
@@ -145,7 +145,7 @@ describe('createWorkflowExpressRouter', () => {
     const router = await createWorkflowExpressRouter({ logger });
     const handler = getRouteHandler(
       router,
-      '/.well-known/workflow/v1/webhook/:rest(*)'
+      '/.well-known/workflow/v1/webhook/:rest*'
     );
     const req = createMockRequest({
       method: 'POST',
