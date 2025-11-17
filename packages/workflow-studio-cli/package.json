@@ -1,7 +1,7 @@
 {
   "name": "workflow-studio",
-  "version": "0.1.0",
-  "description": "Next-generation Workflow Studio CLI with Clack prompts",
+  "version": "0.1.0-beta",
+  "description": "A CLI tool help you scaffold Workflow DevKit projects and a web view for observability",
   "type": "module",
   "bin": {
     "workflow-studio": "./dist/index.js",
