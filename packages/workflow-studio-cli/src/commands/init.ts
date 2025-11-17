@@ -35,6 +35,10 @@ const PACKAGE_MANAGERS = {
     nextFlag: '--use-npm',
     installArgs: (deps: string[]) => ['install', ...deps],
     runScript: (script: string) => `npm run ${script}`,
+    createExecutor: {
+      command: 'npx',
+      args: [],
+    },
   },
   pnpm: {
     label: 'pnpm',
@@ -42,6 +46,10 @@ const PACKAGE_MANAGERS = {
     nextFlag: '--use-pnpm',
     installArgs: (deps: string[]) => ['add', ...deps],
     runScript: (script: string) => `pnpm ${script}`,
+    createExecutor: {
+      command: 'pnpm',
+      args: ['dlx'],
+    },
   },
   yarn: {
     label: 'yarn',
@@ -49,6 +57,10 @@ const PACKAGE_MANAGERS = {
     nextFlag: '--use-yarn',
     installArgs: (deps: string[]) => ['add', ...deps],
     runScript: (script: string) => `yarn ${script}`,
+    createExecutor: {
+      command: 'yarn',
+      args: ['dlx'],
+    },
   },
   bun: {
     label: 'bun',
@@ -56,6 +68,10 @@ const PACKAGE_MANAGERS = {
     nextFlag: '--use-bun',
     installArgs: (deps: string[]) => ['add', ...deps],
     runScript: (script: string) => `bun run ${script}`,
+    createExecutor: {
+      command: 'bunx',
+      args: [],
+    },
   },
 } as const;
 
@@ -197,6 +213,23 @@ async function runCommand(
   });
 }
 
+async function runWithPackageManagerExecutor({
+  packageManager,
+  cli,
+  cliArgs,
+  cwd,
+}: {
+  packageManager: PackageManagerName;
+  cli: string;
+  cliArgs: string[];
+  cwd: string;
+}) {
+  const executor = PACKAGE_MANAGERS[packageManager].createExecutor;
+  const args = [...executor.args, cli, ...cliArgs];
+  log.message(pc.blue(`\n> ${executor.command} ${args.join(' ')}`));
+  await runCommand(executor.command, args, { cwd });
+}
+
 async function scaffoldWithFrameworkCli({
   template,
   projectName,
@@ -212,8 +245,7 @@ async function scaffoldWithFrameworkCli({
     const flags = [
       packageManager ? PACKAGE_MANAGERS[packageManager].nextFlag : '',
     ].filter(Boolean) as string[];
-    const args = [
-      'create-next-app@latest',
+    const cliArgs = [
       projectName,
       '--typescript',
       '--tailwind',
@@ -223,22 +255,29 @@ async function scaffoldWithFrameworkCli({
       '--yes',
       ...flags,
     ];
-    log.message(pc.blue(`\n> npx ${args.join(' ')}`));
-    await runCommand('npx', args, { cwd });
+    await runWithPackageManagerExecutor({
+      packageManager,
+      cli: 'create-next-app@latest',
+      cliArgs,
+      cwd,
+    });
     return;
   }
 
   if (template === 'sveltekit') {
-    const args = [
-      'sv',
+    const cliArgs = [
       'create',
       projectName,
       '--template=minimal',
       '--types=ts',
       '--no-add-ons',
     ];
-    log.message(pc.blue(`\n> npx ${args.join(' ')}`));
-    await runCommand('npx', args, { cwd });
+    await runWithPackageManagerExecutor({
+      packageManager,
+      cli: 'sv',
+      cliArgs,
+      cwd,
+    });
     return;
   }
 
@@ -280,9 +319,9 @@ async function ensureWorkflowScript(projectDir: string) {
 export async function runInitCommand(options: InitOptions) {
   intro(pc.cyan('Workflow Studio'));
 
-  const invocationDir = process.env.INIT_CWD
-    ? resolve(process.env.INIT_CWD)
-    : process.cwd();
+  const invocationDir =
+    (process.env.PWD && resolve(process.env.PWD)) ??
+    (process.env.INIT_CWD ? resolve(process.env.INIT_CWD) : process.cwd());
 
   let projectNameInput = options.projectName;
   if (!projectNameInput) {
