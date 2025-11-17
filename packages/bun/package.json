@@ -1,6 +1,6 @@
 {
   "name": "workflow-bun",
-  "version": "4.0.1-beta.12",
+  "version": "4.0.1-beta.13",
   "description": "Community maintained Bun server helpers for Vercel Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
