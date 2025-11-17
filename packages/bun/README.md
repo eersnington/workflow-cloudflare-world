@@ -1,38 +1,54 @@
 # workflow-bun
 
-Workflow DevKit helpers tailored for Bun runtime + Bun.serve(). The package mirrors the Node version but uses Bun’s native APIs wherever possible:
-
-- **Builder** – generates `.well-known/workflow/v1` bundles and the workflow manifest, auto-selecting `local` vs `vercel`.
-- **Fetch helper** – drop-in handler for `Bun.serve()` so you don’t have to manually import the generated files.
+Workflow DevKit helpers for Bun’s runtime. Ship the `.well-known/workflow/v1` bundle and mount the HTTP routes without writing any Bun-specific glue.
 
 ## Installation
 
 ```bash
-bun add workflow-bun
+bun add workflow workflow-bun
+```
+
+Install the core `workflow` package alongside `workflow-bun` so you can define workflows (`'use workflow'`), call helpers such as `sleep()`, and run the Workflow CLI.
+
+## Create a workflow
+
+```ts
+// ./workflows/handle-greeting.ts
+import { sleep } from 'workflow';
+
+export async function handleGreeting(name: string) {
+  'use workflow';
+  await sayHello(name);
+  await sleep('1s');
+  await sayHello(`${name}, again`);
+}
+
+async function sayHello(name: string) {
+  'use step';
+  console.log(`[bun] Hello ${name}`);
+}
 ```
 
 ## Generate workflow bundles
 
-Run `bun x workflow build` or invoke the builder directly:
+Run the Workflow CLI (`bun x workflow build`) or call the builder when you need more control:
 
 ```ts
 import { createWorkflowBunBuilder } from 'workflow-bun/builder';
 
-const builder = createWorkflowBunBuilder({
+await createWorkflowBunBuilder({
   watch: process.env.NODE_ENV !== 'production',
-});
-
-await builder.build();
+}).build();
 ```
 
-The builder writes the handlers into `.well-known/workflow/v1` locally and switches to the Vercel Build Output API target automatically during deployments.
+The builder emits `.well-known/workflow/v1` locally and switches to the Vercel Build Output API target during deployments.
 
 ## Mount inside Bun.serve()
 
 ```ts
 import { createWorkflowBunFetchHandler } from 'workflow-bun';
 import { start } from 'workflow/api';
-import { handleGreeting } from './workflows/handle-greeting.ts';
+import { handleGreeting } from './workflows/handle-greeting';
 
 const workflowHandler = await createWorkflowBunFetchHandler();
 
@@ -57,7 +73,7 @@ const server = Bun.serve({
 console.log(`Workflow Bun example listening on http://localhost:${server.port}`);
 ```
 
-Prefer routing tables? The fetch handler returns a `Response | undefined`, so you can integrate it inside any router (Elysia, Hono, etc.) by delegating the `/.well-known/workflow/v1/*` routes to it.
+The fetch handler returns `Response | undefined`, so you can hand off the `/.well-known/workflow/v1/*` routes to your router of choice (Elysia, Hono, etc.).
 
 ## Optional: annotate workflows from the manifest
 
@@ -69,4 +85,4 @@ await annotateWorkflowsFromManifest({
 });
 ```
 
-This mirrors what the SWC client transform would inject, letting you call `start()` with plain workflow functions even without a bundler transform.
+This mirrors the SWC client transform so `start()` can accept plain workflow functions even if you skip the transform.

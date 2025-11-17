@@ -1,31 +1,47 @@
 # workflow-node
 
-Helpers for running [Workflow DevKit](https://useworkflow.dev) workflows inside plain Node.js servers. The package bundles three pieces:
-
-- **Builder** – generates the `.well-known/workflow/v1` handlers and workflow manifest with zero config, picking `local` vs `vercel` automatically.
-- **Server/fetch helpers** – mount the Workflow HTTP routes inside any Node HTTP framework (native `http`, Fastify, Express, etc.).
+Workflow DevKit helpers for plain Node.js servers: build the `.well-known/workflow/v1` bundle and mount the Workflow HTTP routes in any HTTP framework.
 
 ## Installation
 
 ```bash
-npm add workflow-node
+npm add workflow workflow-node
+```
+
+Install the core `workflow` package together with `workflow-node` to define workflows, call helpers such as `sleep()`, and run the Workflow CLI.
+
+## Create a workflow
+
+```ts
+// ./workflows/handle-greeting.ts
+import { sleep } from 'workflow';
+
+export async function handleGreeting(name: string) {
+  'use workflow';
+  await sayHello(name);
+  await sleep('1s');
+  await sayHello(`${name}, again`);
+}
+
+async function sayHello(name: string) {
+  'use step';
+  console.log(`[node] Hello ${name}`);
+}
 ```
 
 ## Generate workflow bundles
 
-Run the Workflow CLI (`npx workflow build`) or call the builder directly:
+Run the Workflow CLI (`npx workflow build`) or use the builder API when you need to script it:
 
 ```ts
 import { createWorkflowNodeBuilder } from 'workflow-node/builder';
 
-const builder = createWorkflowNodeBuilder({
+await createWorkflowNodeBuilder({
   watch: process.env.NODE_ENV !== 'production',
-});
-
-await builder.build();
+}).build();
 ```
 
-`createWorkflowNodeBuilder` produces a local builder by default and automatically switches to the `vercel` target inside Vercel builds (the same code path the Next/Nuxt/Nitro adapters use).
+The builder emits `.well-known/workflow/v1` locally and switches to the Vercel target automatically inside Vercel builds (matching the framework adapters).
 
 ## Mount inside an existing server
 
@@ -33,7 +49,7 @@ await builder.build();
 import http from 'node:http';
 import { createWorkflowNodeFetchHandler } from 'workflow-node';
 import { start } from 'workflow/api';
-import { handleGreeting } from './workflows/handle-greeting.js';
+import { handleGreeting } from './workflows/handle-greeting';
 
 async function main() {
   const workflowHandler = await createWorkflowNodeFetchHandler();
@@ -65,7 +81,7 @@ main().catch((error) => {
 });
 ```
 
-Prefer a fully managed server? Call `createWorkflowNodeServer()` – it boots a minimal HTTP server that only serves the Workflow routes. Supply `customHandler` when you want to add extra endpoints.
+Prefer a hosted-only server? `createWorkflowNodeServer()` boots a minimal HTTP server that only exposes the Workflow routes; pass `customHandler` if you need extra endpoints.
 
 ## Optional: annotate workflows from the manifest
 
@@ -79,4 +95,4 @@ await annotateWorkflowsFromManifest({
 });
 ```
 
-This attaches the same metadata that the SWC transform would have injected, so `start()` can resolve your workflow functions deterministically.
+This injects the metadata that the SWC transform would normally add so `start()` can find your workflow functions deterministically.
