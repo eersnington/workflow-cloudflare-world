@@ -1554,6 +1554,28 @@ importers:
         specifier: 4.19.2
         version: 4.19.2
 
+  workbench/workflow-express:
+    dependencies:
+      express:
+        specifier: 4.19.2
+        version: 4.19.2
+      workflow:
+        specifier: workspace:*
+        version: link:../../packages/workflow
+      workflow-express:
+        specifier: workspace:*
+        version: link:../../packages/express
+    devDependencies:
+      '@types/express':
+        specifier: 4.17.21
+        version: 4.17.21
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+
   workbench/workflow-node:
     dependencies:
       workflow:
