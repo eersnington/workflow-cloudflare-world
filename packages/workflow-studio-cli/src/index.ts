@@ -16,7 +16,7 @@ async function showHelp() {
   log.message(
     '  init [name] [--template <framework>] [--example <example>] [--package-manager <pm>]'
   );
-  log.message('  inspect <runs|steps|workflows> [...options]');
+  log.message('  inspect <runs|steps|hooks> [...options]');
   log.message('  start <workflow-name> [...args]');
   log.message('  web');
   log.message('\nExamples:');
