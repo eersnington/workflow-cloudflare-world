@@ -6,7 +6,7 @@ workflow-express wires the Workflow DevKit runtime into any Express server: comp
 npm add workflow workflow-express
 ```
 
-Enable the Workflow SWC transform once at startup so `start()` can locate your workflows. The helper registers `@swc-node/register` with the Workflow plugin under the hood.
+Enable the Workflow SWC transform once at startup so `start()` can locate your workflows. The helper registers `@swc-node/register` with the Workflow plugin and, when a manifest exists at `.well-known/workflow/manifest.json`, automatically annotates workflows for you.
 
 ```ts
 // server.ts
@@ -32,10 +32,10 @@ async function sayHello(name: string) {
 }
 ```
 
-Compile the runtime bundles before booting the server:
+Compile the runtime bundles (and manifest) before booting the server:
 
 ```bash
-npx workflow build
+npx workflow build --workflow-manifest .well-known/workflow/manifest.json
 ```
 
 Keep your existing routes (`/health`, `/trigger`) and add the workflow router, which only intercepts `/.well-known/workflow/v1/*`:
@@ -86,12 +86,12 @@ Alias for `createWorkflowExpressRouter()`. Provided for parity with other server
 Boots a dedicated Express application, mounts the Workflow router, and listens on the provided `port`. You can inject extra middleware or routes via `enhanceApp(app)` before the Workflow routes are attached.
 
 ### `createWorkflowExpressBuilder({ watch, dirs, workingDir, target, workflowManifestPath })`
-Wraps the base Workflow builder with sensible defaults for Express projects. By default it outputs `/.well-known/workflow/v1/{flow,step,webhook}.mjs`, watches your workflow directories during development, and automatically targets the Vercel Build Output API when `VERCEL` env vars are set.
+Wraps the base Workflow builder with sensible defaults for Express projects. By default it outputs `/.well-known/workflow/v1/{flow,step,webhook}.mjs`, writes `.well-known/workflow/manifest.json`, watches your workflow directories during development, and automatically targets the Vercel Build Output API when `VERCEL` env vars are set.
 
 ### `annotateWorkflowsFromManifest({ manifestPath, manifest, workingDir, logger })`
 Optional fallback for environments that cannot run the SWC transform. Load the manifest generated during `workflow build` and attach the recorded `workflowId`s onto each exported workflow function before calling `start()`.
 
 ### `registerWorkflowExpress(options)`
-Installs the Workflow SWC transform globally by delegating to `@swc-node/register`. It runs automatically when you `import 'workflow-express/register'`, but you can call it manually to pass custom SWC options or set `skip: true` to opt out (for example, when your bundler already runs the transform).
+Installs the Workflow SWC transform globally by delegating to `@swc-node/register`. It runs automatically when you `import 'workflow-express/register'`, annotates workflows from `.well-known/workflow/manifest.json` (override with `WORKFLOW_MANIFEST_PATH`), and can be called manually to pass custom SWC options or set `skip: true` to opt out (for example, when your bundler already runs the transform).
 
 Official Docs for Custom Integration: https://useworkflow.dev/docs/how-it-works/framework-integrations

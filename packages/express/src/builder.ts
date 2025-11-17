@@ -39,6 +39,12 @@ export class WorkflowExpressLocalBuilder extends BaseBuilder {
     const resolvedOutDir = options.outDir
       ? resolve(workingDir, options.outDir)
       : join(workingDir, '.well-known/workflow/v1');
+    const defaultManifestPath = join(
+      '.well-known',
+      'workflow',
+      'manifest.json'
+    );
+    const manifestPath = options.workflowManifestPath ?? defaultManifestPath;
 
     super({
       ...createBaseBuilderConfig({
@@ -47,7 +53,7 @@ export class WorkflowExpressLocalBuilder extends BaseBuilder {
         dirs: resolveWorkflowDirs(options.dirs),
         externalPackages: options.externalPackages,
       }),
-      workflowManifestPath: options.workflowManifestPath,
+      workflowManifestPath: manifestPath,
       buildTarget: 'standalone',
     });
 
@@ -87,6 +93,8 @@ export class WorkflowExpressLocalBuilder extends BaseBuilder {
 export class WorkflowExpressVercelBuilder extends VercelBuildOutputAPIBuilder {
   constructor(options: WorkflowExpressBuilderOptions = {}) {
     const workingDir = options.workingDir ?? process.cwd();
+    const manifestPath =
+      options.workflowManifestPath ?? '.well-known/workflow/manifest.json';
 
     super({
       ...createBaseBuilderConfig({
@@ -95,7 +103,7 @@ export class WorkflowExpressVercelBuilder extends VercelBuildOutputAPIBuilder {
         watch: false,
         externalPackages: options.externalPackages,
       }),
-      workflowManifestPath: options.workflowManifestPath,
+      workflowManifestPath: manifestPath,
       buildTarget: 'vercel-build-output-api',
     });
   }

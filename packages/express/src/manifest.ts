@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -53,17 +53,12 @@ export async function annotateWorkflowsFromManifest(
   const entries = Object.entries(manifest);
   await Promise.all(
     entries.map(async ([relativePath, exportsMap]) => {
-      const absolutePath = resolve(cwd, relativePath);
-      const moduleUrl = pathToFileURL(absolutePath).href;
-
-      let moduleExports: Record<string, unknown>;
-      try {
-        moduleExports = (await import(moduleUrl)) as Record<string, unknown>;
-      } catch (error) {
-        logger.error?.(
-          `Failed to import workflow module at "${relativePath}".`,
-          error
-        );
+      const moduleExports = await importWorkflowModule(
+        cwd,
+        relativePath,
+        logger
+      );
+      if (!moduleExports) {
         return;
       }
 
@@ -89,6 +84,65 @@ export async function annotateWorkflowsFromManifest(
       }
     })
   );
+}
+
+async function importWorkflowModule(
+  cwd: string,
+  relativePath: string,
+  logger: Pick<Console, 'error'>
+): Promise<Record<string, unknown> | undefined> {
+  const candidates = createPathCandidates(relativePath);
+  const roots = createSearchRoots(cwd);
+
+  for (const candidate of candidates) {
+    for (const root of roots) {
+      const absolutePath = resolve(root, candidate);
+      try {
+        await access(absolutePath);
+      } catch {
+        continue;
+      }
+
+      try {
+        return (await import(pathToFileURL(absolutePath).href)) as Record<
+          string,
+          unknown
+        >;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  logger.error?.(
+    `Failed to import workflow module for "${relativePath}". Checked roots: ${roots.join(
+      ', '
+    )}`
+  );
+  return undefined;
+}
+
+function createPathCandidates(relativePath: string): string[] {
+  const candidates = new Set<string>([relativePath]);
+  if (relativePath.endsWith('.js')) {
+    candidates.add(relativePath.replace(/\.js$/, '.ts'));
+    candidates.add(relativePath.replace(/\.js$/, '.tsx'));
+  } else if (relativePath.endsWith('.mjs')) {
+    candidates.add(relativePath.replace(/\.mjs$/, '.ts'));
+    candidates.add(relativePath.replace(/\.mjs$/, '.tsx'));
+  }
+  return Array.from(candidates);
+}
+
+function createSearchRoots(cwd: string): string[] {
+  const roots = new Set<string>([cwd]);
+  roots.add(resolve(cwd, 'dist'));
+  roots.add(resolve(cwd, 'build'));
+  const customRoot = process.env.WORKFLOW_EXPRESS_SOURCE_ROOT;
+  if (customRoot) {
+    roots.add(resolve(cwd, customRoot));
+  }
+  return Array.from(roots);
 }
 
 type WorkflowFunctionWithMetadata = {
