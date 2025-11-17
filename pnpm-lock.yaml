@@ -1112,22 +1112,6 @@ importers:
         specifier: 3.2.0
         version: 3.2.0
 
-  workbench/cli-test:
-    dependencies:
-      workflow:
-        specifier: workspace:*
-        version: link:../../packages/workflow
-      workflow-node:
-        specifier: workspace:*
-        version: link:../../packages/node
-    devDependencies:
-      '@types/node':
-        specifier: 'catalog:'
-        version: 22.19.0
-      typescript:
-        specifier: 'catalog:'
-        version: 5.9.3
-
   workbench/example:
     dependencies:
       '@vercel/functions':
