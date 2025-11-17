@@ -1,21 +1,22 @@
 {
   "name": "workflow-bun",
-  "version": "4.0.1-beta.14",
-  "description": "Community integration Bun helpers for Workflow DevKit",
+  "version": "4.0.1-beta.10",
+  "description": "Community maintained Bun server helpers for Vercel Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
+  "publish-branch": "bun-node-support",
   "publishConfig": {
     "access": "public"
   },
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
-    "url": "https://github.com/vercel/workflow.git",
-    "directory": "packages/bun"
+    "url": "https://github.com/eersnington/workflow-cloudflare-world.git",
+    "directory": "packages/node"
   },
   "exports": {
     ".": "./dist/index.js",

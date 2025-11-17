@@ -8,6 +8,7 @@
   "files": [
     "dist"
   ],
+  "publish-branch": "bun-node-support",
   "publishConfig": {
     "access": "public"
   },
