@@ -1,12 +1,12 @@
 # workflow-express
 
-workflow-express wires the Workflow DevKit runtime into any Express server: compile workflows into `/.well-known/workflow/v1`, preload the SWC transform for DX, and mount the Workflow HTTP routes without touching your existing handlers.
+workflow-express wires the Workflow DevKit runtime into any Express server: compile workflows into `/.well-known/workflow/v1`, annotate them from the manifest, and mount the Workflow HTTP routes without touching your existing handlers.
 
 ```bash
 npm add workflow workflow-express
 ```
 
-Enable the Workflow SWC transform once at startup so `start()` can locate your workflows. The helper registers `@swc-node/register` with the Workflow plugin and, when a manifest exists at `.well-known/workflow/manifest.json`, automatically annotates workflows for you.
+Enable workflow annotations once at startup so `start()` can locate your workflows. The helper scans `.well-known/workflow/manifest.json` (if present) and patches each exported workflow function with the matching `workflowId`.
 
 ```ts
 // server.ts
@@ -72,7 +72,7 @@ app.listen(Number(process.env.PORT ?? 3154), () => {
 });
 ```
 
-> **Note:** Mount the workflow router before any middleware that consumes the raw request body (e.g. `express.json()`) for `/.well-known/workflow/v1/*` routes so the generated handlers can read the payload.
+> **Note:** Mount the workflow router before any middleware that consumes the raw request body (e.g. `express.json()`) for `/.well-known/workflow/v1/*` routes so the generated handlers can read the payload. The server must run JavaScript emitted by your build (no runtime TypeScript compilation).
 
 ## API reference
 
@@ -92,6 +92,6 @@ Wraps the base Workflow builder with sensible defaults for Express projects. By 
 Optional fallback for environments that cannot run the SWC transform. Load the manifest generated during `workflow build` and attach the recorded `workflowId`s onto each exported workflow function before calling `start()`.
 
 ### `registerWorkflowExpress(options)`
-Installs the Workflow SWC transform globally by delegating to `@swc-node/register`. It runs automatically when you `import 'workflow-express/register'`, annotates workflows from `.well-known/workflow/manifest.json` (override with `WORKFLOW_MANIFEST_PATH`), and can be called manually to pass custom SWC options or set `skip: true` to opt out (for example, when your bundler already runs the transform).
+Annotates workflows from `.well-known/workflow/manifest.json` (override with `WORKFLOW_MANIFEST_PATH`) so `start()` receives valid workflow functions. It runs automatically when you `import 'workflow-express/register'` and can be called manually with `{ skip: true }` if you prefer to control annotation yourself.
 
 Official Docs for Custom Integration: https://useworkflow.dev/docs/how-it-works/framework-integrations
