@@ -107,4 +107,18 @@ describe('annotateWorkflowsFromManifest', () => {
     expect(typeof fn).toBe('function');
     expect(fn.workflowId).toBe('workflow/test/dist-example');
   });
+
+  it('treats empty or undefined manifest files as having no workflows', async () => {
+    const cwd = await createTempDir();
+    await mkdir(join(cwd, '.well-known/workflow'), { recursive: true });
+    const manifestPath = join('.well-known', 'workflow', 'manifest.json');
+    await writeFile(join(cwd, manifestPath), 'undefined', 'utf8');
+
+    await expect(
+      annotateWorkflowsFromManifest({
+        workingDir: cwd,
+        manifestPath,
+      })
+    ).resolves.not.toThrow();
+  });
 });

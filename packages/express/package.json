@@ -1,6 +1,6 @@
 {
   "name": "workflow-express",
-  "version": "4.0.1-beta.10",
+  "version": "4.0.1-beta.14",
   "description": "Express helpers for Vercel Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",

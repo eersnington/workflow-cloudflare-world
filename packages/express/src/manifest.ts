@@ -26,7 +26,11 @@ export async function loadWorkflowManifest(
   const cwd = options.workingDir ?? process.cwd();
   const resolvedPath = resolve(cwd, options.manifestPath);
   const raw = await readFile(resolvedPath, 'utf8');
-  return JSON.parse(raw) as WorkflowManifest;
+  const normalized = raw.trim();
+  if (!normalized || normalized === 'undefined') {
+    return {};
+  }
+  return JSON.parse(normalized) as WorkflowManifest;
 }
 
 export async function annotateWorkflowsFromManifest(

@@ -74,7 +74,7 @@ export async function createWorkflowExpressRouter(
   );
 
   router.all(WORKFLOW_ROUTES.webhook, webhookHandler);
-  router.all(`${WORKFLOW_ROUTES.webhook}/*`, webhookHandler);
+  router.all(`${WORKFLOW_ROUTES.webhook}/:rest(*)`, webhookHandler);
 
   return router;
 }
