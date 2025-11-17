@@ -11,7 +11,8 @@
     "lint-staged": "^16.1.0",
     "turbo": "^2.5.4",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:",
+    "workflow-studio": "workspace:*"
   },
   "engines": {
     "node": "^18.0.0 || ^20.0.0 || ^22.0.0 || ^24.0.0"
