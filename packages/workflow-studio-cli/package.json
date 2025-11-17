@@ -1,0 +1,39 @@
+{
+  "name": "workflow-studio",
+  "version": "0.1.0",
+  "description": "Next-generation Workflow Studio CLI with Clack prompts",
+  "type": "module",
+  "bin": {
+    "workflow-studio": "./dist/index.js",
+    "studio": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates"
+  ],
+  "scripts": {
+    "build": "tsc && chmod +x dist/index.js",
+    "clean": "tsc --build --clean && rm -rf dist ||:",
+    "dev": "tsc --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@clack/prompts": "^0.11.0",
+    "@workflow/cli": "workspace:*",
+    "picocolors": "^1.0.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@workflow/tsconfig": "workspace:*",
+    "@types/node": "catalog:"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vercel/workflow.git",
+    "directory": "packages/workflow-studio-cli"
+  }
+}
