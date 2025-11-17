@@ -1,6 +1,6 @@
 {
   "name": "workflow-node",
-  "version": "4.0.1-beta.12",
+  "version": "4.0.1-beta.15",
   "description": "Community maintained Node server helpers for Vercel Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
