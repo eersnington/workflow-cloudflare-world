@@ -1,7 +1,7 @@
 import type { TemplateDefinition, TemplateFileFactory } from './types.js';
 
 const honoPlaceholders: TemplateFileFactory = {
-  'workflows/example.ts': () =>
+  'workflows/user-signup.ts': () =>
     `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_HONO_MINIMAL__';
 `,
 };
