@@ -1,5 +1,7 @@
+import Module from 'node:module';
+import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import type { WorkflowOptions } from './types.js';
 import { DEFAULT_OUTPUT_DIR, HANDLER_FILENAMES } from './constants.js';
 
@@ -152,7 +154,7 @@ async function loadHandler(
   const resolvedPath = join(process.cwd(), outputDir, filename);
 
   if (!handlerCache.has(resolvedPath)) {
-    const module = await import(pathToFileURL(resolvedPath).href);
+    const module = await loadModule(resolvedPath);
     handlerCache.set(resolvedPath, module);
   }
 
@@ -169,4 +171,18 @@ async function loadHandler(
     );
   }
   return exported;
+}
+
+async function loadModule(resolvedPath: string): Promise<any> {
+  if (resolvedPath.endsWith('.mjs')) {
+    return import(pathToFileURL(resolvedPath).href);
+  }
+
+  const source = await readFile(resolvedPath, 'utf8');
+  const NativeModule = (Module as unknown as { Module: any }).Module;
+  const mod = new NativeModule(resolvedPath);
+  mod.filename = resolvedPath;
+  mod.paths = NativeModule._nodeModulePaths?.(dirname(resolvedPath)) ?? [];
+  mod._compile(source, resolvedPath);
+  return mod.exports;
 }
