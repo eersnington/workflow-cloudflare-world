@@ -87,6 +87,8 @@ const svelteCronPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SVELTE_CRON__';\n";
 const honoPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_HONO_MINIMAL__';\n";
+const nitroPlaceholder =
+  "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NITRO_MINIMAL__';\n";
 
 const honoDefaultIndex = `import { Hono } from 'hono';
 
@@ -108,6 +110,28 @@ const honoPackageJson = `{
   "name": "hono-app",
   "scripts": {
     "dev": "tsx watch src/index.ts"
+  }
+}
+`;
+
+const nitroConfig = `import { defineConfig } from 'nitro';
+
+export default defineConfig({
+  serverDir: "./server",
+});
+`;
+
+const nitroTsconfig = `{
+  "compilerOptions": {
+    "target": "es2022"
+  }
+}
+`;
+
+const nitroPackageJson = `{
+  "name": "nitro-app",
+  "scripts": {
+    "build": "webpack"
   }
 }
 `;
@@ -354,4 +378,51 @@ test('hono package codemod updates scripts', async () => {
 
   expect(output['package.json']).toContain('"dev": "nitro dev"');
   expect(output['package.json']).toContain('"build": "nitro build"');
+});
+
+test('nitro workflow codemod populates workflow', async () => {
+  const output = await runCodemod('nitro/workflow', {
+    'workflows/user-signup.ts': nitroPlaceholder,
+  });
+
+  expect(
+    containsExpectedContent(output['workflows/user-signup.ts'], [
+      "import { FatalError, sleep } from 'workflow';",
+      'export async function handleUserSignup(email: string)',
+      '"use workflow";',
+      'await sleep',
+      '"use step";',
+      "throw new FatalError('Invalid Email')",
+    ])
+  ).toBe(true);
+
+  expect(output['workflows/user-signup.ts']).not.toContain(
+    '__WORKFLOW_NITRO_MINIMAL__'
+  );
+});
+
+test('nitro config codemod adds workflow module', async () => {
+  const output = await runCodemod('nitro/config/with-workflow', {
+    'nitro.config.ts': nitroConfig,
+  });
+
+  expect(output['nitro.config.ts']).toContain("modules: ['workflow/nitro']");
+});
+
+test('nitro tsconfig codemod adds workflow plugin', async () => {
+  const output = await runCodemod('nitro/tsconfig/plugin', {
+    'tsconfig.json': nitroTsconfig,
+  });
+
+  expect(output['tsconfig.json']).toContain('"name": "workflow"');
+});
+
+test('nitro package codemod updates scripts', async () => {
+  const output = await runCodemod('nitro/package/scripts', {
+    'package.json': nitroPackageJson,
+  });
+
+  expect(output['package.json']).toContain('"dev": "nitro dev"');
+  expect(output['package.json']).toContain('"build": "nitro build"');
+  expect(output['package.json']).toContain('"preview": "nitro preview"');
 });

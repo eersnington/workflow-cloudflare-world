@@ -18,15 +18,13 @@ import {
   type TemplateContext,
   type TemplateName,
 } from '../templates.js';
-import { writeTemplateFiles } from '../utils/files.js';
 import { runAstGrep } from '../utils/ast-grep.js';
+import { writeTemplateFiles } from '../utils/files.js';
 import {
   ensureProjectDirectoryReady,
   normalizeProjectName,
 } from '../utils/project.js';
 import {
-  type WorldChoice,
-  type WorldSelection,
   WORLD_SKIP_VALUE,
   collectWorldEntriesWithComments,
   detectDefaultEnvFile,
@@ -35,6 +33,8 @@ import {
   promptEnvFileLocation,
   promptWorldChoiceWithSkip,
   writeEnvValuesWithComments,
+  type WorldChoice,
+  type WorldSelection,
 } from '../worlds.js';
 
 type InitOptions = {
@@ -495,6 +495,21 @@ async function scaffoldWithFrameworkCli({
       runWithPackageManagerExecutor({
         packageManager,
         cli: 'create-hono@latest',
+        cliArgs,
+        cwd,
+        label,
+        successMessage,
+      })
+    );
+    return;
+  }
+
+  if (template === 'nitro') {
+    const cliArgs = [projectSpecifier];
+    await withWorkspaceFileHidden(cwd, () =>
+      runWithPackageManagerExecutor({
+        packageManager,
+        cli: 'create-nitro-app@latest',
         cliArgs,
         cwd,
         label,
