@@ -557,7 +557,12 @@ async function ensureWorkflowScript(projectDir: string) {
   );
 }
 
-async function configureWorldForProject({
+type WorldConfig = {
+  envFileRelative: string;
+  entries: Record<string, string>;
+};
+
+async function collectWorldConfig({
   selection,
   projectDir,
   skipEnvPrompt,
@@ -565,7 +570,7 @@ async function configureWorldForProject({
   selection: WorldSelection;
   projectDir: string;
   skipEnvPrompt: boolean;
-}): Promise<string[] | null> {
+}): Promise<WorldConfig | null> {
   if (selection === WORLD_SKIP_VALUE) {
     return null;
   }
@@ -573,14 +578,32 @@ async function configureWorldForProject({
   const envFileRelative = skipEnvPrompt
     ? defaultEnvFile
     : await promptEnvFileLocation(defaultEnvFile);
-  const envFilePath = join(projectDir, envFileRelative);
   const entries = await collectWorldEntries(selection);
-  const changed = await writeEnvValues(envFilePath, entries);
+  return { envFileRelative, entries };
+}
+
+async function applyWorldConfig({
+  selection,
+  projectDir,
+  config,
+}: {
+  selection: WorldSelection;
+  projectDir: string;
+  config: WorldConfig | null;
+}): Promise<string[] | null> {
+  if (selection === WORLD_SKIP_VALUE) {
+    return null;
+  }
+  if (!config) {
+    return null;
+  }
+  const envFilePath = join(projectDir, config.envFileRelative);
+  const changed = await writeEnvValues(envFilePath, config.entries);
 
   const summaryLines = [
-    `${pc.green('Configured')} ${pc.bold(relative(projectDir, envFilePath) || envFileRelative)} for ${pc.yellow(
-      getWorldLabel(selection)
-    )}.`,
+    `${pc.green('Configured')} ${pc.bold(
+      relative(projectDir, envFilePath) || config.envFileRelative
+    )} for ${pc.yellow(getWorldLabel(selection))}.`,
     changed ? 'Environment updated.' : 'Environment already up to date.',
   ];
 
@@ -651,6 +674,11 @@ export async function runInitCommand(options: InitOptions) {
   const template = templates[templateName];
   const example = template.examples[exampleName];
   const worldSelection = await resolveWorldSelection(Boolean(options.yes));
+  const worldConfig = await collectWorldConfig({
+    selection: worldSelection,
+    projectDir: targetDir,
+    skipEnvPrompt: Boolean(options.yes),
+  });
 
   await scaffoldWithFrameworkCli({
     template: templateName,
@@ -677,19 +705,11 @@ export async function runInitCommand(options: InitOptions) {
     factories: example.files,
     projectName: projectDirName,
   });
-  if (example.codemods?.length) {
-    await runCodemods({
-      projectDir: targetDir,
-      codemods: example.codemods,
-    });
-  }
   await ensureWorkflowScript(targetDir);
-  spin.stop('Project ready');
-
-  const worldSummary = await configureWorldForProject({
+  const worldSummary = await applyWorldConfig({
     selection: worldSelection,
     projectDir: targetDir,
-    skipEnvPrompt: Boolean(options.yes),
+    config: worldConfig,
   });
   if (worldSummary?.length) {
     log.message('');
@@ -698,6 +718,13 @@ export async function runInitCommand(options: InitOptions) {
     }
     log.message('');
   }
+  if (example.codemods?.length) {
+    await runCodemods({
+      projectDir: targetDir,
+      codemods: example.codemods,
+    });
+  }
+  spin.stop('Project ready');
 
   const projectSuccessLabel = usingCurrentDirectory
     ? projectDirName
