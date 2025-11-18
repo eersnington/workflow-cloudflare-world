@@ -393,10 +393,7 @@ async function ensureWorkflowScript(projectDir: string) {
 export async function runInitCommand(options: InitOptions) {
   intro(pc.cyan('Workflow Studio'));
 
-  const invocationDir =
-    (process.env.INIT_CWD && resolve(process.env.INIT_CWD)) ??
-    (process.env.PWD && resolve(process.env.PWD)) ??
-    process.cwd();
+  const invocationDir = resolve(process.cwd());
 
   let projectNameInput = options.projectName;
   if (!projectNameInput) {
