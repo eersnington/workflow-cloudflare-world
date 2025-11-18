@@ -1,37 +1,11 @@
 import { Buffer } from 'node:buffer';
 import http from 'node:http';
-import { dirname, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import process from 'node:process';
-import {
-  createWorkflowNodeBuilder,
-  createWorkflowNodeFetchHandler,
-} from 'workflow-node';
-import { annotateWorkflowsFromManifest } from 'workflow-node/manifest';
+import { createWorkflowNodeFetchHandler, getWorkflow } from 'workflow-node';
 import { start } from 'workflow/api';
-import { handleGreeting } from './workflows/example.js';
 
-const cwd = resolve(dirname(fileURLToPath(import.meta.url))); // workbench/workflow-node
-const mode = process.argv.includes('--build') ? 'build' : 'serve';
-const manifestPath = resolve(cwd, 'workflow-manifest.json');
-
-await createWorkflowNodeBuilder({
-  workingDir: cwd,
-  workflowManifestPath: manifestPath,
-}).build();
-await annotateWorkflowsFromManifest({
-  manifestPath,
-  workingDir: cwd,
-});
-
-if (mode === 'build') {
-  console.log('Workflow bundles generated in .well-known/workflow/v1');
-  process.exit(0);
-}
-
-const workflowHandler = await createWorkflowNodeFetchHandler({
-  buildDir: resolve(cwd, '.well-known/workflow/v1'),
-});
+const workflowHandler = await createWorkflowNodeFetchHandler();
+const handleGreeting = await getWorkflow('handleGreeting');
 
 const server = http.createServer(async (req, res) => {
   if (await workflowHandler(req, res)) {
