@@ -12,12 +12,25 @@ import { constants } from 'node:fs';
 import { join, relative, resolve } from 'node:path';
 import pc from 'picocolors';
 
-type WorldChoice = 'local' | 'postgres';
+const WORLD_OPTIONS = [
+  {
+    value: 'local',
+    label: 'Local world (@workflow/world-local)',
+    community: false,
+  },
+  {
+    value: 'postgres',
+    label: 'Postgres world (@workflow/world-postgres)',
+    community: false,
+  },
+  {
+    value: 'jazz',
+    label: 'Jazz world (workflow-world-jazz)',
+    community: true,
+  },
+] as const;
 
-const WORLD_LABELS: Record<WorldChoice, string> = {
-  local: 'Local world (@workflow/world-local)',
-  postgres: 'Postgres world (@workflow/world-postgres)',
-};
+type WorldChoice = (typeof WORLD_OPTIONS)[number]['value'];
 
 const DEFAULT_ENV_FILES = ['.env.local', '.env'];
 
@@ -103,9 +116,9 @@ const promptEnvFile = async (cwd: string): Promise<string> => {
 const promptWorldChoice = async (): Promise<WorldChoice> => {
   const selected = await select({
     message: 'Select a Workflow world',
-    options: (Object.keys(WORLD_LABELS) as WorldChoice[]).map((value) => ({
-      value,
-      label: WORLD_LABELS[value],
+    options: WORLD_OPTIONS.map((option) => ({
+      value: option.value,
+      label: `${option.label}${option.community ? ' *' : ''}`,
     })),
   });
   return ensureNotCancelled(selected) as WorldChoice;
@@ -159,6 +172,122 @@ const LOCAL_WORLD_ENV = {
   WORKFLOW_TARGET_WORLD: 'local',
 };
 
+const filterEnvEntries = (
+  entries: Record<string, string | undefined>
+): Record<string, string> => {
+  return Object.fromEntries(
+    Object.entries(entries).filter((entry): entry is [string, string] =>
+      Boolean(entry[1] && entry[1].length > 0)
+    )
+  );
+};
+
+const isCommunityWorld = (world: WorldChoice) =>
+  WORLD_OPTIONS.some((option) => option.value === world && option.community);
+
+const promptRequiredText = async ({
+  message,
+  defaultValue,
+}: {
+  message: string;
+  defaultValue?: string;
+}) => {
+  return ensureNotCancelled(
+    await text({
+      message,
+      defaultValue,
+      validate(value) {
+        if (!value || !value.trim()) {
+          return 'This field is required';
+        }
+        return undefined;
+      },
+    })
+  ).trim();
+};
+
+const promptOptionalText = async ({
+  message,
+  defaultValue,
+}: {
+  message: string;
+  defaultValue?: string;
+}) => {
+  return ensureNotCancelled(
+    await text({
+      message,
+      defaultValue,
+    })
+  ).trim();
+};
+
+const promptJazzMode = async () => {
+  const selected = await select({
+    message: 'How will you use Jazz?',
+    options: [
+      {
+        value: 'cloud',
+        label: 'Jazz Cloud (recommended)',
+      },
+      {
+        value: 'self-hosted',
+        label: 'Self-hosted (sync server & webhook registry)',
+      },
+    ],
+  });
+  return ensureNotCancelled(selected) as 'cloud' | 'self-hosted';
+};
+
+const promptJazzConfig = async () => {
+  const mode = await promptJazzMode();
+
+  const workerAccount = await promptRequiredText({
+    message: 'Jazz worker account',
+  });
+  const workerSecret = await promptRequiredText({
+    message: 'Jazz worker secret',
+  });
+  const webhookRegistryId = await promptRequiredText({
+    message: 'Jazz webhook registry ID',
+  });
+  const webhookEndpoint = await promptOptionalText({
+    message: 'Webhook endpoint (public URL)',
+    defaultValue: 'http://localhost:3000',
+  });
+
+  if (mode === 'cloud') {
+    const apiKey = await promptRequiredText({
+      message: 'Jazz API key',
+    });
+    return {
+      WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
+      JAZZ_API_KEY: apiKey,
+      JAZZ_WORKER_ACCOUNT: workerAccount,
+      JAZZ_WORKER_SECRET: workerSecret,
+      JAZZ_WEBHOOK_REGISTRY_ID: webhookRegistryId,
+      JAZZ_WEBHOOK_ENDPOINT: webhookEndpoint,
+    };
+  }
+
+  const syncServer = await promptOptionalText({
+    message: 'Jazz sync server URL',
+    defaultValue: 'http://localhost:4200',
+  });
+  const webhookRegistrySecret = await promptOptionalText({
+    message: 'Jazz webhook registry secret (optional)',
+  });
+
+  return {
+    WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
+    JAZZ_WORKER_ACCOUNT: workerAccount,
+    JAZZ_WORKER_SECRET: workerSecret,
+    JAZZ_WEBHOOK_REGISTRY_ID: webhookRegistryId,
+    JAZZ_WEBHOOK_REGISTRY_SECRET: webhookRegistrySecret,
+    JAZZ_SYNC_SERVER: syncServer,
+    JAZZ_WEBHOOK_ENDPOINT: webhookEndpoint,
+  };
+};
+
 export async function runWorldCommand() {
   intro(pc.cyan('Workflow Studio Worlds'));
 
@@ -177,26 +306,41 @@ export async function runWorldCommand() {
 
   const world = await promptWorldChoice();
 
-  let entries: Record<string, string> = LOCAL_WORLD_ENV;
+  let entries: Record<string, string | undefined> = LOCAL_WORLD_ENV;
   if (world === 'postgres') {
     entries = await promptPostgresConfig();
+  } else if (world === 'jazz') {
+    entries = await promptJazzConfig();
   }
 
   const spin = spinner();
   spin.start(
     `Updating ${relative(invocationDir, envFilePath) || envFileRelative}`
   );
-  const changed = await writeEnvValues(envFilePath, entries);
+  const filteredEntries = filterEnvEntries(entries);
+  const changed = await writeEnvValues(envFilePath, filteredEntries);
   spin.stop(changed ? 'Environment updated' : 'Environment already up to date');
 
+  const worldLabel =
+    WORLD_OPTIONS.find((option) => option.value === world)?.label ?? world;
   const summaryLines = [
-    `${pc.green('Configured')} ${pc.bold(relative(invocationDir, envFilePath) || envFileRelative)} for ${pc.yellow(WORLD_LABELS[world])}.`,
+    `${pc.green('Configured')} ${pc.bold(relative(invocationDir, envFilePath) || envFileRelative)} for ${pc.yellow(worldLabel)}.`,
   ];
 
   if (world === 'postgres') {
     summaryLines.push(
       'Remember to run `pnpm exec workflow-postgres-setup` and seed your database before starting workers.'
     );
+  }
+
+  if (world === 'jazz') {
+    summaryLines.push(
+      'Install the community world with `pnpm add workflow-world-jazz` if you have not already.'
+    );
+  }
+
+  if (isCommunityWorld(world)) {
+    summaryLines.push('* Community-maintained world implementation');
   }
 
   outro(summaryLines.join('\n'));
