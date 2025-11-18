@@ -1,6 +1,6 @@
 {
   "name": "workflow-studio",
-  "version": "0.1.0-beta",
+  "version": "0.1.0-alpha",
   "description": "A CLI tool help you scaffold Workflow DevKit projects and a web view for observability",
   "type": "module",
   "bin": {

@@ -83,6 +83,32 @@ const svelteMinimalPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SVELTE_MINIMAL__';\n";
 const svelteCronPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SVELTE_CRON__';\n";
+const honoPlaceholder =
+  "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_HONO_MINIMAL__';\n";
+
+const honoDefaultIndex = `import { Hono } from 'hono';
+
+const app = new Hono();
+
+app.get('/', (c) => c.text('Hello Hono!'));
+
+export default app;
+`;
+
+const honoTsconfig = `{
+  "compilerOptions": {
+    "target": "es2022"
+  }
+}
+`;
+
+const honoPackageJson = `{
+  "name": "hono-app",
+  "scripts": {
+    "dev": "tsx watch src/index.ts"
+  }
+}
+`;
 
 test('next minimal page codemod transforms default page content', async () => {
   const output = await runCodemod('next/minimal/page', {
@@ -230,4 +256,49 @@ test('svelte cron workflow codemod populates workflow', async () => {
   expect(output['workflows/example.ts']).not.toContain(
     '__WORKFLOW_SVELTE_CRON__'
   );
+});
+
+test('hono route codemod transforms default handler', async () => {
+  const output = await runCodemod('hono/index/route', {
+    'src/index.ts': honoDefaultIndex,
+  });
+
+  expect(
+    containsExpectedContent(output['src/index.ts'], [
+      "import { start } from 'workflow/api';",
+      "import { handleUserSignup } from '../workflows/example.js';",
+      "app.post('/api/signup'",
+    ])
+  ).toBe(true);
+});
+
+test('hono workflow codemod populates workflow', async () => {
+  const output = await runCodemod('hono/workflow', {
+    'workflows/example.ts': honoPlaceholder,
+  });
+
+  expect(
+    containsExpectedContent(output['workflows/example.ts'], [
+      "name: 'example-hono'",
+      "return 'Hello from Workflow Studio'",
+    ])
+  ).toBe(true);
+});
+
+test('hono tsconfig codemod adds workflow plugin', async () => {
+  const output = await runCodemod('hono/tsconfig/plugin', {
+    'tsconfig.json': honoTsconfig,
+  });
+
+  expect(output['tsconfig.json']).toContain('"plugins"');
+  expect(output['tsconfig.json']).toContain('"name": "workflow"');
+});
+
+test('hono package codemod updates scripts', async () => {
+  const output = await runCodemod('hono/package/scripts', {
+    'package.json': honoPackageJson,
+  });
+
+  expect(output['package.json']).toContain('"dev": "nitro dev"');
+  expect(output['package.json']).toContain('"build": "nitro build"');
 });

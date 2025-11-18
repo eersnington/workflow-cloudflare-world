@@ -359,6 +359,17 @@ async function scaffoldWithFrameworkCli({
     return;
   }
 
+  if (template === 'hono') {
+    const cliArgs = [projectSpecifier, '--', '--template=nodejs'];
+    await runWithPackageManagerExecutor({
+      packageManager,
+      cli: 'create-hono@latest',
+      cliArgs,
+      cwd,
+    });
+    return;
+  }
+
   throw new Error(`Unsupported template "${template}"`);
 }
 

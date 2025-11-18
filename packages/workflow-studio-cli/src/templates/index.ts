@@ -1,3 +1,4 @@
+import { honoTemplates } from './hono.js';
 import { nextTemplates } from './next.js';
 import { svelteTemplates } from './svelte.js';
 
@@ -5,6 +6,7 @@ export type { TemplateContext } from './types.js';
 export type { TemplateDefinition, TemplateExample } from './types.js';
 
 export const templates = {
+  hono: honoTemplates,
   nextjs: nextTemplates,
   sveltekit: svelteTemplates,
 } as const;

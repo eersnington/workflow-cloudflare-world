@@ -1,8 +1,10 @@
+import { honoCodemods } from './hono.js';
 import { nextCodemods } from './next.js';
 import { svelteCodemods } from './svelte.js';
 import type { CodemodDefinition } from './types.js';
 
 const codemodDefinitions = {
+  ...honoCodemods,
   ...nextCodemods,
   ...svelteCodemods,
 } as const satisfies Record<string, CodemodDefinition>;
