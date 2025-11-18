@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import pc from 'picocolors';
 import { runInitCommand } from './commands/init.js';
 import { proxyWorkflowCommand } from './commands/proxy.js';
+import { runWorldCommand } from './commands/world.js';
 
 const [command, ...rest] = process.argv.slice(2);
 
@@ -19,6 +20,7 @@ async function showHelp() {
   log.message('  inspect <runs|steps|hooks> [...options]');
   log.message('  start <workflow-name> [...args]');
   log.message('  web');
+  log.message('  world');
   log.message('\nExamples:');
   log.message(
     '  workflow-studio init my-app --template nextjs --example minimal'
@@ -26,11 +28,17 @@ async function showHelp() {
   log.message('  workflow-studio inspect runs --limit 5');
   log.message('  workflow-studio start example');
   log.message('  workflow-studio web');
+  log.message('  workflow-studio world');
 }
 
 async function main() {
   if (!command || command === '--help' || command === '-h') {
     await showHelp();
+    return;
+  }
+
+  if (command === 'world') {
+    await runWorldCommand();
     return;
   }
 
