@@ -9,13 +9,21 @@ import {
   text,
 } from '@clack/prompts';
 import { spawn } from 'node:child_process';
-import { existsSync } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import pc from 'picocolors';
-import { z } from 'zod';
-import { templates, type TemplateName } from '../templates.js';
+import { getCodemodDefinition, type CodemodId } from '../codemods.js';
+import {
+  templates,
+  type TemplateContext,
+  type TemplateName,
+} from '../templates.js';
 import { writeTemplateFiles } from '../utils/files.js';
+import { runAstGrep } from '../utils/ast-grep.js';
+import {
+  ensureProjectDirectoryReady,
+  normalizeProjectName,
+} from '../utils/project.js';
 
 type InitOptions = {
   projectName?: string;
@@ -184,7 +192,14 @@ const resolvePackageManager = async (
 };
 
 const isWindows = process.platform === 'win32';
-const resolveCommand = (bin: string) => (isWindows ? `${bin}.cmd` : bin);
+const isPathCommand = (value: string) =>
+  value.includes('/') || value.includes('\\');
+const resolveCommand = (bin: string) => {
+  if (!isWindows || isPathCommand(bin)) {
+    return bin;
+  }
+  return bin.endsWith('.cmd') ? bin : `${bin}.cmd`;
+};
 
 async function runCommand(
   command: string,
@@ -213,6 +228,65 @@ async function runCommand(
   });
 }
 
+async function runCodemods({
+  projectDir,
+  codemods,
+}: {
+  projectDir: string;
+  codemods: CodemodId[];
+}) {
+  for (const codemodId of codemods) {
+    const { rule, globs } = getCodemodDefinition(codemodId);
+    log.message(
+      pc.blue(
+        `\n> ast-grep codemod ${codemodId}${
+          globs && globs.length
+            ? ` ${globs.map((glob) => `--globs ${glob}`).join(' ')}`
+            : ''
+        }`
+      )
+    );
+    try {
+      await runAstGrep({
+        rule,
+        globs,
+        cwd: projectDir,
+      });
+    } catch (error) {
+      throw new Error(
+        `Failed to run ast-grep codemod "${codemodId}". Ensure @ast-grep/napi is installed and try again.\n${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+    }
+  }
+}
+
+type FileFactoryMap =
+  | Record<string, (ctx: TemplateContext) => string>
+  | undefined;
+
+async function writeFactories({
+  targetDir,
+  factories,
+  projectName,
+}: {
+  targetDir: string;
+  factories: FileFactoryMap;
+  projectName: string;
+}) {
+  if (!factories) {
+    return;
+  }
+  const files = Object.fromEntries(
+    Object.entries(factories).map(([filePath, factory]) => [
+      filePath,
+      factory({ projectName }),
+    ])
+  );
+  await writeTemplateFiles(targetDir, files);
+}
+
 async function runWithPackageManagerExecutor({
   packageManager,
   cli,
@@ -232,12 +306,12 @@ async function runWithPackageManagerExecutor({
 
 async function scaffoldWithFrameworkCli({
   template,
-  projectName,
+  projectSpecifier,
   packageManager,
   cwd,
 }: {
   template: TemplateName;
-  projectName: string;
+  projectSpecifier: string;
   packageManager: PackageManagerName;
   cwd: string;
 }) {
@@ -246,7 +320,7 @@ async function scaffoldWithFrameworkCli({
       packageManager ? PACKAGE_MANAGERS[packageManager].nextFlag : '',
     ].filter(Boolean) as string[];
     const cliArgs = [
-      projectName,
+      projectSpecifier,
       '--typescript',
       '--tailwind',
       '--react-compiler',
@@ -267,7 +341,7 @@ async function scaffoldWithFrameworkCli({
   if (template === 'sveltekit') {
     const cliArgs = [
       'create',
-      projectName,
+      projectSpecifier,
       '--template=minimal',
       '--types=ts',
       '--no-add-ons',
@@ -337,22 +411,17 @@ export async function runInitCommand(options: InitOptions) {
     }
   }
 
-  const ProjectNameSchema = z
-    .string()
-    .min(1, 'Project name cannot be empty')
-    .regex(
-      /^[a-zA-Z0-9-_]+$/,
-      'Project name may only include letters, numbers, dashes, and underscores'
-    );
-
-  const projectName = ProjectNameSchema.parse(projectNameInput.trim());
-
-  const targetDir = resolve(invocationDir, projectName);
-  if (existsSync(targetDir)) {
-    throw new Error(
-      `Directory "${projectName}" already exists. Choose a different name or remove it.`
-    );
-  }
+  const { specifier: projectSpecifier, usingCurrentDirectory } =
+    normalizeProjectName(projectNameInput);
+  const targetDir = usingCurrentDirectory
+    ? invocationDir
+    : resolve(invocationDir, projectSpecifier);
+  await ensureProjectDirectoryReady({
+    directory: targetDir,
+    usingCurrentDirectory,
+    displayName: usingCurrentDirectory ? '.' : projectSpecifier,
+  });
+  const projectDirName = basename(targetDir);
 
   const packageManager = await resolvePackageManager(
     options.packageManager,
@@ -374,7 +443,7 @@ export async function runInitCommand(options: InitOptions) {
 
   await scaffoldWithFrameworkCli({
     template: templateName,
-    projectName,
+    projectSpecifier,
     packageManager,
     cwd: invocationDir,
   });
@@ -386,25 +455,39 @@ export async function runInitCommand(options: InitOptions) {
 
   const spin = spinner();
   spin.start('Configuring Workflow Studio files');
-  await writeTemplateFiles(
+  await writeFactories({
     targetDir,
-    Object.fromEntries(
-      Object.entries(example.files).map(([filePath, factory]) => [
-        filePath,
-        factory({ projectName }),
-      ])
-    )
-  );
+    factories: example.placeholders,
+    projectName: projectDirName,
+  });
+  await writeFactories({
+    targetDir,
+    factories: example.files,
+    projectName: projectDirName,
+  });
+  if (example.codemods?.length) {
+    await runCodemods({
+      projectDir: targetDir,
+      codemods: example.codemods,
+    });
+  }
   await ensureWorkflowScript(targetDir);
   spin.stop('Project ready');
 
+  const projectSuccessLabel = usingCurrentDirectory
+    ? projectDirName
+    : projectSpecifier;
+  const nextSteps = [
+    usingCurrentDirectory ? null : `cd ${projectSpecifier}`,
+    PACKAGE_MANAGERS[packageManager].runScript('dev'),
+    'npx workflow-studio web',
+  ].filter((step): step is string => Boolean(step));
+
   outro(
     `${pc.green('Success!')} Created ${pc.bold(
-      projectName
+      projectSuccessLabel
     )} with template ${pc.yellow(
       template.label
-    )} (${example.label}).\n\nNext steps:\n  cd ${projectName}\n  ${PACKAGE_MANAGERS[
-      packageManager
-    ].runScript('dev')}\n  npx workflow-studio web`
+    )} (${example.label}).\n\nNext steps:\n  ${nextSteps.join('\n  ')}`
   );
 }
