@@ -1,6 +1,5 @@
 import { cancel, isCancel, select, text } from '@clack/prompts';
-import { access, constants, readFile, writeFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, writeFile } from 'node:fs/promises';
 
 export const WORLD_OPTIONS = [
   {
@@ -32,21 +31,8 @@ const ensureNotCancelled = <T>(value: T | symbol): T => {
   return value;
 };
 
-const fileExists = async (path: string) => {
-  try {
-    await access(path, constants.F_OK);
-    return true;
-  } catch {
-    return false;
-  }
-};
-
 export async function detectDefaultEnvFile(cwd: string): Promise<string> {
-  for (const filename of DEFAULT_ENV_FILES) {
-    if (await fileExists(join(cwd, filename))) {
-      return filename;
-    }
-  }
+  void cwd;
   return DEFAULT_ENV_FILES[0];
 }
 
