@@ -22,7 +22,8 @@
     ".": "./dist/index.js",
     "./builder": "./dist/builder.js",
     "./server": "./dist/server.js",
-    "./manifest": "./dist/manifest.js"
+    "./manifest": "./dist/manifest.js",
+    "./workflows": "./dist/workflows.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
