@@ -68,20 +68,53 @@ export default async function Page() {
 }
 `;
 
-const nextMinimalWorkflowContent = `import { workflow } from '@workflow/core';
+const nextMinimalWorkflowContent = `import { sleep } from 'workflow';
+import { FatalError } from 'workflow';
 
-export const example = workflow({
-  name: 'example-minimal',
-  run: async ({ step }) => {
-    const greeting = await step('greet', async () => {
-      return 'Hello from Workflow Studio';
-    });
-    return greeting;
-  },
-});
+export async function handleUserSignup(email: string) {
+  "use workflow";
+
+  const user = await createUser(email);
+  await sendWelcomeEmail(user);
+
+  await sleep('5s');
+  await sendOnboardingEmail(user);
+
+  console.log("Workflow is complete! Run 'npx workflow web' to inspect your run");
+
+  return { userId: user.id, status: 'onboarded' };
+}
+
+async function createUser(email: string) {
+  "use step";
+
+  console.log('Creating user with email: ' + email);
+
+  return { id: crypto.randomUUID(), email };
+}
+
+async function sendWelcomeEmail(user: { id: string; email: string }) {
+  "use step";
+
+  console.log('Sending welcome email to user: ' + user.id);
+
+  if (Math.random() < 0.3) {
+    throw new Error('Retryable!');
+  }
+}
+
+async function sendOnboardingEmail(user: { id: string; email: string }) {
+  "use step";
+
+  if (!user.email.includes('@')) {
+    throw new FatalError('Invalid Email');
+  }
+
+  console.log('Sending onboarding email to user: ' + user.id);
+}
 `;
 
-const nextAiWorkflowContent = `import { workflow } from '@workflow/core';
+const nextAiWorkflowContent = `import { workflow } from 'workflow';
 
 export const example = workflow({
   name: 'example-ai',
@@ -120,7 +153,7 @@ const nextMinimalPage: CodemodDefinition = {
 };
 
 const nextMinimalWorkflow: CodemodDefinition = {
-  globs: ['workflows/example.ts'],
+  globs: ['workflows/user-signup.ts'],
   transform(source) {
     if (!source.includes('__WORKFLOW_NEXT_MINIMAL__')) {
       return null;
@@ -146,7 +179,7 @@ const nextAiPage: CodemodDefinition = {
 };
 
 const nextAiWorkflow: CodemodDefinition = {
-  globs: ['workflows/example.ts'],
+  globs: ['workflows/user-signup.ts'],
   transform(source) {
     if (!source.includes('__WORKFLOW_NEXT_AI__')) {
       return null;

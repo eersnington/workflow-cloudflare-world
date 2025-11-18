@@ -1,13 +1,13 @@
 import type { TemplateDefinition, TemplateFileFactory } from './types.js';
 
 const nextPlaceholders: TemplateFileFactory = {
-  'workflows/example.ts': () =>
+  'workflows/user-signup.ts': () =>
     `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NEXT_MINIMAL__';
 `,
 };
 
 const nextAiPlaceholders: TemplateFileFactory = {
-  'workflows/example.ts': () =>
+  'workflows/user-signup.ts': () =>
     `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NEXT_AI__';
 `,
 };
@@ -20,6 +20,18 @@ export const nextTemplates: TemplateDefinition = {
       label: 'Minimal workflow starter',
       description: 'Hello-world workflow wired into a basic Next.js app.',
       placeholders: nextPlaceholders,
+      files: {
+        'app/api/signup/route.ts': () => `import { start } from 'workflow/api';
+import { handleUserSignup } from '@/workflows/user-signup';
+import { NextResponse } from 'next/server';
+
+export async function POST(request: Request) {
+  const { email } = await request.json();
+  await start(handleUserSignup, [email]);
+  return NextResponse.json({ message: 'User signup workflow started' });
+}
+`,
+      },
       codemods: [
         'next/config/with-workflow',
         'next/typescript/plugin',

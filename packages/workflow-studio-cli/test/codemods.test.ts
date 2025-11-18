@@ -132,21 +132,22 @@ test('next minimal page codemod transforms default page content', async () => {
   );
 });
 
-test('next minimal workflow codemod populates workflow with placeholder', async () => {
+test('next minimal workflow codemod replaces placeholder with orchestrator workflow', async () => {
   const output = await runCodemod('next/minimal/workflow', {
-    'workflows/example.ts': nextMinimalPlaceholder,
+    'workflows/user-signup.ts': nextMinimalPlaceholder,
   });
 
   expect(
-    containsExpectedContent(output['workflows/example.ts'], [
-      "import { workflow } from '@workflow/core';",
-      "name: 'example-minimal'",
-      'run: async ({ step }) =>',
-      "return 'Hello from Workflow Studio'",
+    containsExpectedContent(output['workflows/user-signup.ts'], [
+      'export async function handleUserSignup(email: string)',
+      '"use workflow";',
+      'await sleep',
+      '"use step";',
+      'throw new FatalError',
     ])
   ).toBe(true);
 
-  expect(output['workflows/example.ts']).not.toContain(
+  expect(output['workflows/user-signup.ts']).not.toContain(
     '__WORKFLOW_NEXT_MINIMAL__'
   );
 });
@@ -167,13 +168,13 @@ test('next ai page codemod transforms default page content', async () => {
   ).toBe(true);
 });
 
-test('next ai workflow codemod populates workflow with AI logic', async () => {
+test('next ai workflow codemod populates analytics workflow', async () => {
   const output = await runCodemod('next/ai/workflow', {
-    'workflows/example.ts': nextAIPlaceholder,
+    'workflows/user-signup.ts': nextAIPlaceholder,
   });
 
   expect(
-    containsExpectedContent(output['workflows/example.ts'], [
+    containsExpectedContent(output['workflows/user-signup.ts'], [
       "name: 'example-ai'",
       "const plan = await step('plan'",
       "return ['collect data', 'analyze', 'summarize']",
@@ -182,7 +183,9 @@ test('next ai workflow codemod populates workflow with AI logic', async () => {
     ])
   ).toBe(true);
 
-  expect(output['workflows/example.ts']).not.toContain('__WORKFLOW_NEXT_AI__');
+  expect(output['workflows/user-signup.ts']).not.toContain(
+    '__WORKFLOW_NEXT_AI__'
+  );
 });
 
 test('svelte minimal page codemod transforms default route', async () => {

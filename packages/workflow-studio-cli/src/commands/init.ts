@@ -178,7 +178,8 @@ const resolveWorldSelection = async (
     { value: WORLD_SKIP_VALUE, label: 'Skip for now' },
   ];
   const selected = await select({
-    message: 'Which Workflow world do you want to use?',
+    message:
+      'Which Workflow world do you want to use? (* - Community maintained)',
     options,
   });
   return ensureNotCancelled(selected) as WorldSelection;
@@ -529,7 +530,7 @@ async function installWorkflowDeps({
   packageManager: PackageManagerName;
   projectDir: string;
 }) {
-  const deps = ['@workflow/cli@latest', '@workflow/core@latest'];
+  const deps = ['workflow@latest'];
   const args = PACKAGE_MANAGERS[packageManager].installArgs(deps);
   log.message(
     pc.blue(`\n> ${packageManager} ${args.join(' ')} (${projectDir})`)
