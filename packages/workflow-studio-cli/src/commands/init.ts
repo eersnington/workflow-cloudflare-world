@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { readFile, writeFile } from 'node:fs/promises';
 import { basename, join, resolve } from 'node:path';
 import pc from 'picocolors';
-import { getCodemodDefinition, type CodemodId } from '../codemods.js';
+import { getCodemodGlobs, type CodemodId } from '../codemods.js';
 import {
   templates,
   type TemplateContext,
@@ -93,6 +93,10 @@ const ensureNotCancelled = <T>(value: T | symbol): T => {
   return value;
 };
 
+const isTemplateName = (value: string): value is TemplateName => {
+  return Object.prototype.hasOwnProperty.call(templates, value);
+};
+
 const resolveTemplateSelection = async (
   templateFlag: string | undefined,
   yes: boolean
@@ -103,7 +107,7 @@ const resolveTemplateSelection = async (
   }));
 
   if (templateFlag) {
-    if (!templates[templateFlag]) {
+    if (!isTemplateName(templateFlag)) {
       throw new Error(
         `Unknown template "${templateFlag}". Available templates: ${templateEntries
           .map((entry) => entry.value)
@@ -236,7 +240,8 @@ async function runCodemods({
   codemods: CodemodId[];
 }) {
   for (const codemodId of codemods) {
-    const { rule, globs } = getCodemodDefinition(codemodId);
+    const globs = getCodemodGlobs(codemodId);
+
     log.message(
       pc.blue(
         `\n> ast-grep codemod ${codemodId}${
@@ -248,8 +253,7 @@ async function runCodemods({
     );
     try {
       await runAstGrep({
-        rule,
-        globs,
+        codemodId,
         cwd: projectDir,
       });
     } catch (error) {
@@ -425,7 +429,7 @@ export async function runInitCommand(options: InitOptions) {
     Boolean(options.yes)
   );
 
-  const templateName = await resolveTemplateSelection(
+  const templateName: TemplateName = await resolveTemplateSelection(
     options.template,
     Boolean(options.yes)
   );

@@ -3,19 +3,18 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { expect, test } from 'vitest';
 
-const { getCodemodDefinition } = await import(
-  new URL('../dist/codemods.js', import.meta.url).href
-);
-const { runAstGrep } = await import(
+type RunAstGrep = typeof import('../src/utils/ast-grep.ts').runAstGrep;
+
+const { runAstGrep } = (await import(
   new URL('../dist/utils/ast-grep.js', import.meta.url).href
-);
+)) as { runAstGrep: RunAstGrep };
+
+type RunAstGrepArgs = Parameters<RunAstGrep>[0];
+type CodemodId = RunAstGrepArgs['codemodId'];
 
 type FileMap = Record<string, string>;
 
-async function runCodemod(
-  codemodId: Parameters<typeof getCodemodDefinition>[0],
-  files: FileMap
-) {
+async function runCodemod(codemodId: CodemodId, files: FileMap) {
   const dir = await mkdtemp(join(tmpdir(), 'workflow-codemod-'));
   await Promise.all(
     Object.entries(files).map(async ([relativePath, contents]) => {
@@ -25,10 +24,8 @@ async function runCodemod(
     })
   );
 
-  const { rule, globs } = getCodemodDefinition(codemodId);
   await runAstGrep({
-    rule,
-    globs,
+    codemodId,
     cwd: dir,
   });
 
