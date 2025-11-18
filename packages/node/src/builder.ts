@@ -6,18 +6,11 @@ import {
   VercelBuildOutputAPIBuilder,
   type WorkflowConfig,
 } from '@workflow/builders';
-import { HANDLER_FILENAMES } from './constants.js';
-
-const DEFAULT_WORKFLOW_DIRS = [
-  'workflows',
-  'src/workflows',
-  'app',
-  'src/app',
-  'routes',
-  'src/routes',
-  'api',
-  'src/api',
-];
+import {
+  DEFAULT_OUTPUT_DIR,
+  DEFAULT_WORKFLOW_DIRS,
+  HANDLER_FILENAMES,
+} from './constants.js';
 
 export type WorkflowNodeBuilderTarget = 'local' | 'vercel';
 
@@ -26,42 +19,66 @@ export interface WorkflowNodeBuilderOptions {
   watch?: boolean;
   dirs?: string[];
   outDir?: string;
+  /**
+   * Alias for outDir. Prefer this going forward for consistency with other adapters.
+   */
+  outputDir?: string;
   workflowManifestPath?: WorkflowConfig['workflowManifestPath'];
   externalPackages?: string[];
   target?: WorkflowNodeBuilderTarget | 'auto';
 }
 
 export class WorkflowNodeLocalBuilder extends BaseBuilder {
-  #outDir: string;
+  #outputDir: string;
 
   constructor(options: WorkflowNodeBuilderOptions = {}) {
     const workingDir = options.workingDir ?? process.cwd();
-    const resolvedOutDir = options.outDir
-      ? resolve(workingDir, options.outDir)
-      : join(workingDir, '.well-known/workflow/v1');
+    const resolvedDirs = resolveWorkflowDirs(options.dirs);
+    const resolvedOutputDir = resolveOutputDir(
+      workingDir,
+      options.outputDir ?? options.outDir
+    );
 
     super({
       ...createBaseBuilderConfig({
         workingDir,
         watch: options.watch,
-        dirs: resolveWorkflowDirs(options.dirs),
+        dirs: resolvedDirs,
         externalPackages: options.externalPackages,
       }),
       workflowManifestPath: options.workflowManifestPath,
       buildTarget: 'standalone',
+      stepsBundlePath: join(resolvedOutputDir, `${HANDLER_FILENAMES.step}.js`),
+      workflowsBundlePath: join(
+        resolvedOutputDir,
+        `${HANDLER_FILENAMES.flow}.js`
+      ),
+      webhookBundlePath: join(
+        resolvedOutputDir,
+        `${HANDLER_FILENAMES.webhook}.js`
+      ),
+      clientBundlePath: join(
+        resolvedOutputDir,
+        `${HANDLER_FILENAMES.client}.js`
+      ),
     });
 
-    this.#outDir = resolvedOutDir;
+    this.#outputDir = resolvedOutputDir;
   }
 
   override async build(): Promise<void> {
     const inputFiles = await this.getInputFiles();
+    if (inputFiles.length === 0) {
+      console.log('[workflow-node] No workflow files found');
+      return;
+    }
+
     const tsConfig = await this.getTsConfigOptions();
-    await mkdir(this.#outDir, { recursive: true });
+    await mkdir(this.#outputDir, { recursive: true });
 
     await this.createWorkflowsBundle({
       inputFiles,
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.flow}.mjs`),
+      outfile: this.config.workflowsBundlePath,
       format: 'esm',
       bundleFinalOutput: false,
       tsBaseUrl: tsConfig.baseUrl,
@@ -70,7 +87,7 @@ export class WorkflowNodeLocalBuilder extends BaseBuilder {
 
     await this.createStepsBundle({
       inputFiles,
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.step}.mjs`),
+      outfile: this.config.stepsBundlePath,
       externalizeNonSteps: true,
       format: 'esm',
       tsBaseUrl: tsConfig.baseUrl,
@@ -78,15 +95,30 @@ export class WorkflowNodeLocalBuilder extends BaseBuilder {
     });
 
     await this.createWebhookBundle({
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.webhook}.mjs`),
+      outfile: this.config.webhookBundlePath,
       bundle: false,
     });
+
+    await this.createClientLibrary();
+
+    console.log('[workflow-node] Build completed successfully!');
+    console.log('[workflow-node] Generated files:');
+    console.log(`  - ${this.config.stepsBundlePath}`);
+    console.log(`  - ${this.config.workflowsBundlePath}`);
+    console.log(`  - ${this.config.webhookBundlePath}`);
+    if (this.config.clientBundlePath) {
+      console.log(`  - ${this.config.clientBundlePath}`);
+    }
   }
 }
 
 export class WorkflowNodeVercelBuilder extends VercelBuildOutputAPIBuilder {
   constructor(options: WorkflowNodeBuilderOptions = {}) {
     const workingDir = options.workingDir ?? process.cwd();
+    const resolvedOutputDir = resolveOutputDir(
+      workingDir,
+      options.outputDir ?? options.outDir
+    );
 
     super({
       ...createBaseBuilderConfig({
@@ -97,6 +129,10 @@ export class WorkflowNodeVercelBuilder extends VercelBuildOutputAPIBuilder {
       }),
       workflowManifestPath: options.workflowManifestPath,
       buildTarget: 'vercel-build-output-api',
+      clientBundlePath: join(
+        resolvedOutputDir,
+        `${HANDLER_FILENAMES.client}.js`
+      ),
     });
   }
 }
@@ -122,6 +158,13 @@ function resolveWorkflowDirs(customDirs?: string[]): string[] {
   const dirs =
     customDirs && customDirs.length > 0 ? customDirs : DEFAULT_WORKFLOW_DIRS;
   return Array.from(new Set(dirs));
+}
+
+function resolveOutputDir(workingDir: string, customDir?: string): string {
+  if (customDir) {
+    return resolve(workingDir, customDir);
+  }
+  return resolve(workingDir, DEFAULT_OUTPUT_DIR);
 }
 
 function resolveBuildTarget(

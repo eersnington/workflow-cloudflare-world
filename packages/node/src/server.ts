@@ -4,7 +4,7 @@ import {
   type ServerResponse,
 } from 'node:http';
 import { join, resolve } from 'node:path';
-import { WORKFLOW_ROUTES } from './constants.js';
+import { DEFAULT_OUTPUT_DIR, WORKFLOW_ROUTES } from './constants.js';
 import {
   loadWorkflowHandlers,
   type WorkflowHandlers,
@@ -111,9 +111,14 @@ export async function createWorkflowNodeFetchHandler(
 ): Promise<WorkflowNodeFetchHandler> {
   const logger = options.logger ?? console;
   const buildDir = resolve(
-    options.buildDir ?? join(process.cwd(), '.well-known/workflow/v1')
+    options.buildDir ?? join(process.cwd(), DEFAULT_OUTPUT_DIR)
   );
-  const handlers = await loadWorkflowHandlers(buildDir);
+  let handlers: WorkflowHandlers;
+  try {
+    handlers = await loadWorkflowHandlers(buildDir);
+  } catch (error) {
+    throw wrapMissingBundlesError(error, buildDir);
+  }
 
   return async (req: IncomingMessage, res: ServerResponse) => {
     const pathname = getRequestPathname(req);
@@ -213,4 +218,27 @@ function matchesWorkflowRoute(pathname: string): boolean {
     pathname === WORKFLOW_ROUTES.webhook ||
     pathname.startsWith(`${WORKFLOW_ROUTES.webhook}/`)
   );
+}
+
+const WORKFLOW_DOCS_URL =
+  'https://useworkflow.dev/docs/how-it-works/framework-integrations';
+
+function wrapMissingBundlesError(
+  error: unknown,
+  buildDir: string
+): Error | unknown {
+  if (
+    error instanceof Error &&
+    error.message.includes('Could not find handler file')
+  ) {
+    return new Error(
+      [
+        'Workflow bundles missing. Please run "workflow build" before starting your server.',
+        `Looked for handler files inside: ${buildDir}`,
+        `See: ${WORKFLOW_DOCS_URL}`,
+      ].join('\n'),
+      { cause: error }
+    );
+  }
+  return error;
 }

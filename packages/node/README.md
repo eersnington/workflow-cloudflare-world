@@ -1,12 +1,14 @@
 # workflow-node
 
-workflow-node is the Workflow DevKit adapter for plain Node.js servers. Build `.well-known/workflow/v1`, restore workflow IDs from the manifest, and mount the Workflow HTTP routes inside any framework that speaks the Node `http` interface.
+Adapter utilities that wire Workflow DevKit into any Node.js server. Build the `.well-known/workflow/v1` handlers once, mount the HTTP routes, and fetch workflow functions with metadata via the generated `client.js`.
 
 ```bash
 npm add workflow workflow-node
 ```
 
-Unless your bundler already runs the Workflow SWC transform, always emit the workflow manifest and call `annotateWorkflowsFromManifest()` before invoking `start()`.
+## Quick Start
+
+1. **Author a workflow**
 
 ```ts
 // workflows/handle-greeting.ts
@@ -14,6 +16,7 @@ import { sleep } from 'workflow';
 
 export async function handleGreeting(name: string) {
   'use workflow';
+
   await sayHello(name);
   await sleep('1s');
   await sayHello(`${name}, again`);
@@ -25,86 +28,82 @@ async function sayHello(name: string) {
 }
 ```
 
+2. **Build the handlers**
+
 ```bash
-npx workflow build --workflow-manifest .well-known/workflow/manifest.json
+workflow build
 ```
 
-Prefer scripting over CLI flags? Instantiate the builder directly:
+The CLI (or `createWorkflowNodeBuilder`) emits:
+
+- `./.well-known/workflow/v1/flow.js`
+- `./.well-known/workflow/v1/step.js`
+- `./.well-known/workflow/v1/webhook.js`
+- `./.well-known/workflow/v1/client.js`
+
+3. **Wire up your server**
 
 ```ts
-import { createWorkflowNodeBuilder } from 'workflow-node/builder';
-
-await createWorkflowNodeBuilder({
-  workflowManifestPath: '.well-known/workflow/manifest.json',
-  watch: process.env.NODE_ENV !== 'production',
-}).build();
-```
-
-```ts
+// server.ts
 import http from 'node:http';
-import { createWorkflowNodeFetchHandler } from 'workflow-node';
-import { annotateWorkflowsFromManifest } from 'workflow-node/manifest';
+import { createWorkflowNodeFetchHandler, getWorkflow } from 'workflow-node';
 import { start } from 'workflow/api';
-import { handleGreeting } from './workflows/handle-greeting';
 
-async function main() {
-  await annotateWorkflowsFromManifest({
-    manifestPath: '.well-known/workflow/manifest.json',
-  });
+const workflowHandler = await createWorkflowNodeFetchHandler();
+const handleGreeting = await getWorkflow('handleGreeting');
 
-  const workflowHandler = await createWorkflowNodeFetchHandler();
+const server = http.createServer(async (req, res) => {
+  if (await workflowHandler(req, res)) {
+    return;
+  }
 
-  const server = http.createServer(async (req, res) => {
-    if (await workflowHandler(req, res)) {
-      return;
+  if (req.method === 'POST' && req.url === '/trigger') {
+    const chunks: Buffer[] = [];
+    for await (const chunk of req) {
+      chunks.push(typeof chunk === 'string' ? Buffer.from(chunk) : chunk);
     }
+    const payload = JSON.parse(Buffer.concat(chunks).toString('utf8') || '{}');
+    const name =
+      typeof payload?.name === 'string' ? payload.name : 'workflow-user';
+    const run = await start(handleGreeting, [name]);
 
-    if (req.method === 'GET' && req.url === '/healthz') {
-      res.writeHead(200).end('ok');
-      return;
-    }
+    res
+      .writeHead(200, { 'content-type': 'application/json' })
+      .end(JSON.stringify({ runId: run.runId }));
+    return;
+  }
 
-    if (req.method === 'POST' && req.url === '/trigger') {
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of req) {
-        chunks.push(chunk);
-      }
-      const payload = JSON.parse(Buffer.concat(chunks).toString() || '{}');
-      const name =
-        typeof payload?.name === 'string' ? payload.name : 'node-user';
-      const run = await start(handleGreeting, [name]);
-      res
-        .writeHead(200, { 'content-type': 'application/json' })
-        .end(JSON.stringify({ runId: run.runId }));
-      return;
-    }
+  res.writeHead(404).end('Not Found');
+});
 
-    res.writeHead(404).end('Not Found');
-  });
-
-  server.listen(3152, () => {
-    console.log('Server listening on http://127.0.0.1:3152');
-  });
-}
-
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
+server.listen(3152, () => {
+  console.log('Server listening on http://127.0.0.1:3152');
 });
 ```
 
-## API reference
+The fetch handler automatically serves:
 
-### `createWorkflowNodeBuilder(options)`
-Workflow-aware builder that emits `.well-known/workflow/v1` and, when `workflowManifestPath` is provided, writes the workflow manifest JSON. Accepts `watch`, `dirs`, `workingDir`, `target`, and `externalPackages`. Automatically switches to the Vercel Build Output API target inside Vercel environments.
+- `POST /.well-known/workflow/v1/flow`
+- `POST /.well-known/workflow/v1/step`
+- `/.well-known/workflow/v1/webhook/:token` (all HTTP verbs)
 
-### `createWorkflowNodeFetchHandler({ buildDir, logger })`
-Loads the generated handlers from `buildDir` (defaults to `./.well-known/workflow/v1`) and returns an async function that you can plug into any Node `http` server. It inspects the incoming request, handles Workflow routes, and returns `true` when it writes to the response, letting you fall back to your own routing logic for everything else.
+## Runtime Helpers
 
-### `createWorkflowNodeServer({ buildDir, port, hostname, logger, customHandler })`
-Boots a minimal `http.createServer()` that only serves Workflow routes unless you pass a `customHandler`. The helper logs its URL, exposes `.close()`, and uses the same fetch handler under the hood.
+- `createWorkflowNodeFetchHandler({ buildDir, logger })`  
+  Converts `IncomingMessage` / `ServerResponse` into Web standard `Request` / `Response` objects and routes the workflow endpoints. Returns `true` when the request was handled so you can fall back to your own router.
 
-### `annotateWorkflowsFromManifest({ manifestPath, manifest, workingDir, logger })`
-Loads the manifest produced during `workflow build` and writes each `workflowId` onto the exported workflow functions. Call it once during startup when you aren’t already running the Workflow SWC transform so `start()` can locate your workflows deterministically.
+- `createWorkflowNodeServer({ buildDir, port, hostname, logger, customHandler })`  
+  Convenience helper that spins up an `http.createServer()` with the workflow handler pre-wired. Use `customHandler` to attach additional routes.
+
+- `getWorkflow(name, { buildDir })`  
+  Dynamically imports the generated `client.js` bundle and returns the workflow function with its `workflowId`. Pairs with `start()` without needing to manually annotate functions.
+
+## Build-Time Helpers
+
+- `createWorkflowNodeBuilder(options)`  
+  Programmatic builder that mirrors `workflow build`. Configure directories, watch mode, custom output paths, manifests, and target (`local` vs. Vercel Build Output API). Automatically generates the client bundle so `getWorkflow()` works everywhere.
+
+- `annotateWorkflowsFromManifest({ manifestPath, manifest, workingDir, logger })`  
+  Optional escape hatch when you prefer manifests over the generated client bundle (e.g., bundlers that cannot import `.well-known/workflow/v1/client.js` at runtime).
 
 Docs: https://useworkflow.dev/docs/how-it-works/framework-integrations

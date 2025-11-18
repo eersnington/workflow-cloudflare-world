@@ -21,3 +21,8 @@ export {
   type WorkflowNodeServer,
   type WorkflowNodeServerOptions,
 } from './server.js';
+export {
+  getWorkflow,
+  type GeneratedWorkflow,
+  type WorkflowClientOptions,
+} from './workflows.js';
