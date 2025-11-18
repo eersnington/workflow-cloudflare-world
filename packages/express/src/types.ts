@@ -10,3 +10,17 @@ export interface WorkflowRequest extends ExpressRequest {
 export interface WorkflowResponse extends ExpressResponse {
   // Express Response already has everything we need for Web API compatibility
 }
+
+export interface WorkflowOptions {
+  /**
+   * Absolute or relative path where generated bundles live.
+   * Defaults to `.well-known/workflow/v1` from process.cwd().
+   */
+  outputDir?: string;
+
+  /**
+   * Directories to search for workflow source files if ExpressBuilder is used.
+   * Defaults to a curated list of common workflow directories.
+   */
+  dirs?: string[];
+}

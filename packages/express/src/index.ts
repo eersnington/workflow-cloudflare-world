@@ -1,5 +1,7 @@
 import type { RequestHandler } from 'express';
 import { createWorkflowMiddleware } from './middleware.js';
+import type { WorkflowOptions } from './types.js';
+export { ExpressBuilder } from './builder.js';
 
 /**
  * Main workflow middleware for Express
@@ -17,16 +19,9 @@ export default function workflow(
   return middleware;
 }
 
-export interface WorkflowOptions {
-  /**
-   * Directory containing workflow files
-   * @default 'workflows'
-   */
-  workflowsDir?: string;
-}
-
-// Re-export builder for advanced usage
-export { ExpressBuilder } from './builder.js';
-
 // Re-export types for advanced usage
-export type { WorkflowRequest, WorkflowResponse } from './types.js';
+export type {
+  WorkflowOptions,
+  WorkflowRequest,
+  WorkflowResponse,
+} from './types.js';

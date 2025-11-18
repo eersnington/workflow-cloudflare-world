@@ -14,13 +14,16 @@
  * Note: Make sure to run `workflow build` before importing workflow functions.
  */
 
+import { DEFAULT_OUTPUT_DIR } from './constants.js';
+import type { WorkflowOptions } from './types.js';
+
 // Dynamically import from the generated client bundle at runtime
 // This avoids TypeScript compilation issues while still providing workflow metadata
-export async function getWorkflow(name: string) {
+export async function getWorkflow(name: string, options: WorkflowOptions = {}) {
   try {
     // Use a dynamic import that will work at runtime
-    const clientBundlePath =
-      process.cwd() + '/.well-known/workflow/v1/client.js';
+    const outputDir = options.outputDir ?? DEFAULT_OUTPUT_DIR;
+    const clientBundlePath = `${process.cwd()}/${outputDir}/client.js`;
     const clientBundle = await import(clientBundlePath);
     return clientBundle[name];
   } catch (error) {

@@ -1,5 +1,14 @@
-import { BaseBuilder } from '@workflow/builders';
-import type { WorkflowOptions } from './index.js';
+import {
+  BaseBuilder,
+  createBaseBuilderConfig,
+  type WorkflowConfig,
+} from '@workflow/builders';
+import {
+  DEFAULT_OUTPUT_DIR,
+  DEFAULT_WORKFLOW_DIRS,
+  HANDLER_FILENAMES,
+} from './constants.js';
+import type { WorkflowOptions } from './types.js';
 
 /**
  * Express-specific builder that generates ESM format workflow files.
@@ -17,18 +26,27 @@ import type { WorkflowOptions } from './index.js';
  */
 export class ExpressBuilder extends BaseBuilder {
   constructor(options: WorkflowOptions = {}) {
-    const workflowsDir = options.workflowsDir ?? 'workflows';
     const workingDir = process.cwd();
+    const resolvedDirs =
+      options.dirs && options.dirs.length > 0
+        ? Array.from(new Set(options.dirs))
+        : [...DEFAULT_WORKFLOW_DIRS];
 
-    super({
+    const outputDir = options.outputDir ?? DEFAULT_OUTPUT_DIR;
+
+    const config: WorkflowConfig = {
+      ...createBaseBuilderConfig({
+        workingDir,
+        dirs: resolvedDirs,
+      }),
       buildTarget: 'standalone',
-      dirs: [workflowsDir],
-      workingDir,
-      stepsBundlePath: '.well-known/workflow/v1/step.js',
-      workflowsBundlePath: '.well-known/workflow/v1/flow.js',
-      webhookBundlePath: '.well-known/workflow/v1/webhook.js',
-      clientBundlePath: '.well-known/workflow/v1/client.js',
-    });
+      stepsBundlePath: `${outputDir}/${HANDLER_FILENAMES.step}`,
+      workflowsBundlePath: `${outputDir}/${HANDLER_FILENAMES.flow}`,
+      webhookBundlePath: `${outputDir}/${HANDLER_FILENAMES.webhook}`,
+      clientBundlePath: `${outputDir}/${HANDLER_FILENAMES.client}`,
+    };
+
+    super(config);
   }
 
   override async build(): Promise<void> {
@@ -49,7 +67,7 @@ export class ExpressBuilder extends BaseBuilder {
       inputFiles,
       tsBaseUrl: tsConfig.baseUrl,
       tsPaths: tsConfig.paths,
-      outfile: '.well-known/workflow/v1/step.js',
+      outfile: this.config.stepsBundlePath,
       format: 'esm',
     });
 
@@ -57,22 +75,23 @@ export class ExpressBuilder extends BaseBuilder {
       inputFiles,
       tsBaseUrl: tsConfig.baseUrl,
       tsPaths: tsConfig.paths,
-      outfile: '.well-known/workflow/v1/flow.js',
+      outfile: this.config.workflowsBundlePath,
       format: 'esm',
     });
 
     await this.createWebhookBundle({
-      outfile: '.well-known/workflow/v1/webhook.js',
+      outfile: this.config.webhookBundlePath,
     });
 
     await this.createClientLibrary();
 
     console.log('[workflow-express] Build completed successfully!');
     console.log('[workflow-express] Generated files:');
-    console.log('  - .well-known/workflow/v1/step.js');
-    console.log('  - .well-known/workflow/v1/flow.js');
-    console.log('  - .well-known/workflow/v1/webhook.js');
-    console.log('  - .well-known/workflow/v1/client.js');
-    console.log('  - .well-known/workflow/manifest.json');
+    console.log(`  - ${this.config.stepsBundlePath}`);
+    console.log(`  - ${this.config.workflowsBundlePath}`);
+    console.log(`  - ${this.config.webhookBundlePath}`);
+    if (this.config.clientBundlePath) {
+      console.log(`  - ${this.config.clientBundlePath}`);
+    }
   }
 }
