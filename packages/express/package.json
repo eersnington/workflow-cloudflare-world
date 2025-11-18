@@ -1,6 +1,6 @@
 {
   "name": "workflow-express",
-  "version": "4.1.0-beta.1",
+  "version": "4.1.0-beta.2",
   "description": "Community maintained Express middleware for Vercel Workflow DevKit",
   "type": "module",
   "main": "dist/index.js",
