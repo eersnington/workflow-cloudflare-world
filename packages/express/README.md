@@ -8,7 +8,7 @@ npm add workflow workflow-express
 
 ## Quick Start
 
-1. **Create your workflow files:**
+### **Create your workflow files:**
 
 ```ts
 // workflows/user-signup.ts
@@ -44,11 +44,12 @@ async function sendWelcomeEmail(user: { id: string; email: string }) {
 
 async function sendOnboardingEmail(user: { id: string; email: string }, callback: string) {
   'use step';
+  console.log("Callback URL:", callback);
   console.log(`Sending onboarding email to user: ${user.id}`);
 }
 ```
 
-2. **Build your workflows:**
+### **Build your workflows:**
 
 ```bash
 workflow build
@@ -60,14 +61,14 @@ This generates the required handler files in `.well-known/workflow/v1/`:
 - `webhook.js` - Handles webhook delivery
 - `client.js` - Workflow functions with metadata for your app
 
-3. **Add the workflow middleware to your Express app:**
+### **Add the workflow middleware to your Express app:**
 
 ```ts
-// server.ts
+// src/server.ts
 import express from 'express';
 import workflow from 'workflow-express';
 import { start } from 'workflow/api';
-import { handleUserSignup } from 'workflow-express/workflows';
+import { handleUserSignup } from '../workflows/user-signup.ts';
 
 const app = express();
 
@@ -88,7 +89,7 @@ app.listen(3000, () => {
 });
 ```
 
-4. **That's it!** The middleware will:
+### **That's it!** The middleware will:
    - Load pre-built workflow handlers
    - Expose the required workflow HTTP endpoints
    - Handle all the protocol details automatically
@@ -105,7 +106,7 @@ Add to your `package.json`:
 {
   "scripts": {
     "build": "workflow build && tsc",
-    "start": "node dist/server.js"
+    "start": "node dist/src/server.js"
   }
 }
 ```
@@ -139,14 +140,6 @@ app.use(workflow({
 }));
 ```
 
-## Error Handling
-
-The middleware includes helpful error messages:
-
-- **Missing build files** - Clear message to run `workflow build`
-- **Build failures** - Workflow DevKit build errors are logged
-- **Runtime errors** - Proper error propagation to your Express error handlers
-
 ## Advanced Usage
 
 ### Using the Builder Directly
@@ -177,21 +170,8 @@ app.use(workflow({
 // workflow build --workflows-dir src/api/workflows
 ```
 
-## Deployment
-
-The pre-build approach works perfectly with deployment platforms like Vercel:
-
-1. **Local**: `pnpm build && pnpm start`
-2. **Vercel**: Build step runs `workflow build` automatically
-3. **Docker**: Include `workflow build` in your Dockerfile
-
 ## Learn More
 
 - [Workflow DevKit Documentation](https://useworkflow.dev)
 - [Framework Integration Guide](https://useworkflow.dev/docs/how-it-works/framework-integrations)
 - [API Reference](https://useworkflow.dev/docs/api-reference)
-
-## Support
-
-- Create issues on [GitHub](https://github.com/vercel/workflow)
-- Join discussions in [GitHub Discussions](https://github.com/vercel/workflow/discussions)
