@@ -25,13 +25,15 @@ import {
   normalizeProjectName,
 } from '../utils/project.js';
 import {
-  WORLD_OPTIONS,
   type WorldChoice,
-  collectWorldEntries,
+  type WorldSelection,
+  WORLD_SKIP_VALUE,
+  collectWorldEntriesWithSkip,
   detectDefaultEnvFile,
   getWorldLabel,
   isCommunityWorld,
   promptEnvFileLocation,
+  promptWorldChoiceWithSkip,
   writeEnvValues,
 } from '../worlds.js';
 
@@ -158,31 +160,13 @@ const ensureNotCancelled = <T>(value: T | symbol): T => {
   return value;
 };
 
-type WorldSelection = WorldChoice | 'skip';
-const WORLD_SKIP_VALUE = 'skip';
-
-const formatWorldOptions = () =>
-  WORLD_OPTIONS.map((option) => ({
-    value: option.value,
-    label: `${option.label}${option.community ? ' *' : ''}`,
-  }));
-
 const resolveWorldSelection = async (
   autoAccept: boolean
 ): Promise<WorldSelection> => {
-  if (autoAccept) {
-    return 'local';
-  }
-  const options = [
-    ...formatWorldOptions(),
-    { value: WORLD_SKIP_VALUE, label: 'Skip for now' },
-  ];
-  const selected = await select({
-    message:
-      'Which Workflow world do you want to use? (* - Community maintained)',
-    options,
-  });
-  return ensureNotCancelled(selected) as WorldSelection;
+  return promptWorldChoiceWithSkip(
+    autoAccept,
+    'Which Workflow world do you want to use? (* - Community maintained)'
+  );
 };
 
 const isTemplateName = (value: string): value is TemplateName => {
@@ -575,14 +559,14 @@ async function collectWorldConfig({
   projectDir: string;
   skipEnvPrompt: boolean;
 }): Promise<WorldConfig | null> {
-  if (selection === WORLD_SKIP_VALUE) {
+  const entries = await collectWorldEntriesWithSkip(selection);
+  if (!entries) {
     return null;
   }
   const defaultEnvFile = await detectDefaultEnvFile(projectDir);
   const envFileRelative = skipEnvPrompt
     ? defaultEnvFile
     : await promptEnvFileLocation(defaultEnvFile);
-  const entries = await collectWorldEntries(selection);
   return { envFileRelative, entries };
 }
 
@@ -601,29 +585,33 @@ async function applyWorldConfig({
   if (!config) {
     return null;
   }
+
+  // At this point, selection is guaranteed to be a WorldChoice
+  const world = selection as WorldChoice;
+
   const envFilePath = join(projectDir, config.envFileRelative);
   const changed = await writeEnvValues(envFilePath, config.entries);
 
   const summaryLines = [
     `${pc.green('Configured')} ${pc.bold(
       relative(projectDir, envFilePath) || config.envFileRelative
-    )} for ${pc.yellow(getWorldLabel(selection))}.`,
+    )} for ${pc.yellow(getWorldLabel(world))}.`,
     changed ? 'Environment updated.' : 'Environment already up to date.',
   ];
 
-  if (selection === 'postgres') {
+  if (world === 'postgres') {
     summaryLines.push(
       'Remember to run `pnpm exec workflow-postgres-setup` before starting workers.'
     );
   }
 
-  if (selection === 'jazz') {
+  if (world === 'jazz') {
     summaryLines.push(
       'Install the community world with `pnpm add workflow-world-jazz` if needed.'
     );
   }
 
-  if (isCommunityWorld(selection)) {
+  if (isCommunityWorld(world)) {
     summaryLines.push('* Community-maintained world implementation');
   }
 
