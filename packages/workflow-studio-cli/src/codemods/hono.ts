@@ -12,6 +12,8 @@ app.post('/api/signup', async (c) => {
   return c.json({ message: 'User signup workflow started' });
 });
 
+app.get('/', (c) => c.text('Hello Hono + Workflow!'));
+
 export default app;
 `;
 
@@ -113,6 +115,40 @@ const honoTsconfigCodemod: CodemodDefinition = {
   },
 };
 
+const honoPackageDepsCodemod: CodemodDefinition = {
+  globs: ['package.json'],
+  transform(source) {
+    let parsed: any;
+    try {
+      parsed = JSON.parse(source);
+    } catch {
+      return null;
+    }
+
+    parsed.devDependencies ??= {};
+    const devDependencies = parsed.devDependencies as Record<string, string>;
+    let mutated = false;
+
+    // Add workflow and nitro to devDependencies
+    if (!devDependencies.workflow) {
+      devDependencies.workflow = 'latest';
+      mutated = true;
+    }
+
+    if (!devDependencies.nitro) {
+      devDependencies.nitro = 'latest';
+      mutated = true;
+    }
+
+    if (!devDependencies.rollup) {
+      devDependencies.rollup = 'latest';
+      mutated = true;
+    }
+
+    return mutated ? `${JSON.stringify(parsed, null, 2)}\n` : null;
+  },
+};
+
 const honoPackageScriptsCodemod: CodemodDefinition = {
   globs: ['package.json'],
   transform(source) {
@@ -137,6 +173,11 @@ const honoPackageScriptsCodemod: CodemodDefinition = {
       mutated = true;
     }
 
+    if (scripts.start !== 'node .output/server/index.mjs') {
+      scripts.start = 'node .output/server/index.mjs';
+      mutated = true;
+    }
+
     return mutated ? `${JSON.stringify(parsed, null, 2)}\n` : null;
   },
 };
@@ -155,5 +196,6 @@ export const honoCodemods = {
   'hono/index/route': honoRouteCodemod,
   'hono/workflow': honoWorkflowCodemod,
   'hono/tsconfig/plugin': honoTsconfigCodemod,
+  'hono/package/deps': honoPackageDepsCodemod,
   'hono/package/scripts': honoPackageScriptsCodemod,
 } as const satisfies Record<string, CodemodDefinition>;

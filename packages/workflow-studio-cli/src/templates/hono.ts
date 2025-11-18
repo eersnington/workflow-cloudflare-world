@@ -33,6 +33,7 @@ export const honoTemplates: TemplateDefinition = {
         'hono/index/route',
         'hono/workflow',
         'hono/tsconfig/plugin',
+        'hono/package/deps',
         'hono/package/scripts',
       ],
     },
