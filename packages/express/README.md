@@ -68,7 +68,7 @@ This generates the required handler files in `.well-known/workflow/v1/`:
 import express from 'express';
 import workflow from 'workflow-express';
 import { start } from 'workflow/api';
-import { handleUserSignup } from '../workflows/user-signup.ts';
+import { getWorkflow } from 'workflow-express/workflows';
 
 const app = express();
 
@@ -80,6 +80,7 @@ app.use(express.json());
 // Your existing routes
 app.post('/signup', async (req, res) => {
   const { email } = req.body;
+  const handleUserSignup = await getWorkflow('handleUserSignup');
   const run = await start(handleUserSignup, [email]);
   res.json({ runId: run.runId });
 });
