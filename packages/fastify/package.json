@@ -1,0 +1,46 @@
+{
+  "name": "@workflow/fastify",
+  "version": "4.1.0-beta.3",
+  "description": "Fastify plugin for Vercel Workflow DevKit with HMR support and native Web API integration",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "publish-branch": "bun-node-support",
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/eersnington/workflow-cloudflare-world.git",
+    "directory": "packages/fastify"
+  },
+  "exports": {
+    ".": "./dist/index.js",
+    "./workflows": "./dist/workflows.js",
+    "./builder": "./dist/builder.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "tsc --build --clean && rm -rf dist",
+    "test": "vitest run src"
+  },
+  "dependencies": {
+    "@workflow/builders": "workspace:*",
+    "fastify-plugin": "^4.5.1"
+  },
+  "peerDependencies": {
+    "fastify": "^4.24.3 || ^5.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@workflow/tsconfig": "workspace:*",
+    "fastify": "4.28.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
