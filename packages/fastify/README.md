@@ -3,7 +3,7 @@
 A production-ready Fastify plugin for Vercel Workflow DevKit that follows Nitro's build-system-first approach with native Fastify patterns, HMR support, and comprehensive error handling.
 
 ```bash
-npm add workflow @workflow/fastify
+npm add workflow workflow-fastify
 ```
 
 ## Quick Start
@@ -87,21 +87,14 @@ await fastify.register(workflow, {
   hmr: process.env.NODE_ENV === 'development'
 });
 
-// Your existing routes
+// Your existing routes - use standard workflow API
 fastify.post('/signup', async (request, reply) => {
   const { email } = request.body as { email: string };
 
-  // Method 1: Using Fastify decorator
-  const run = await fastify.workflow.execute('handleUserSignup', [email]);
-
-  return { runId: run.runId };
-});
-
-// Alternative method using getWorkflow utility
-fastify.post('/signup-v2', async (request, reply) => {
-  const { email } = request.body as { email: string };
-
+  // Get workflow function using standard utility
   const handleUserSignup = await getWorkflow('handleUserSignup');
+
+  // Start workflow using standard start() function
   const run = await start(handleUserSignup, [email]);
 
   return { runId: run.runId };
@@ -109,7 +102,7 @@ fastify.post('/signup-v2', async (request, reply) => {
 
 // List all available workflows
 fastify.get('/workflows', async (request, reply) => {
-  const workflows = await fastify.workflow.listWorkflows();
+  const workflows = await listWorkflows();
   return { workflows };
 });
 
@@ -186,22 +179,23 @@ interface WorkflowFastifyOptions {
 }
 ```
 
-## Fastify Decorators
+## Standard Workflow API
 
-The plugin adds a `workflow` namespace to your Fastify instance:
+Use the standard Workflow DevKit API with the `start()` function and `getWorkflow()` utility:
 
 ```typescript
-// Execute workflow by name
-const run = await fastify.workflow.execute('workflowName', [arg1, arg2]);
+import { start } from 'workflow/api';
+import { getWorkflow, listWorkflows } from '@workflow/fastify/workflows';
 
-// Get workflow function (for use with start())
-const workflow = await fastify.workflow.getWorkflow('workflowName');
+// Execute workflow by name
+const workflow = await getWorkflow('workflowName');
+const run = await start(workflow, [arg1, arg2]);
 
 // List all available workflows
-const workflows = await fastify.workflow.listWorkflows();
+const workflows = await listWorkflows();
 
-// Get workflow status
-const status = await fastify.workflow.getStatus(runId);
+// Get workflow metadata
+const metadata = await getWorkflowMetadata('workflowName');
 ```
 
 ## Advanced Usage

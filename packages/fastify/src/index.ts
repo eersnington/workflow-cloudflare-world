@@ -33,10 +33,7 @@
  */
 
 import type { FastifyPluginAsync } from 'fastify';
-import type {
-  WorkflowFastifyOptions,
-  FastifyWorkflowDecorator,
-} from './types.js';
+import type { WorkflowFastifyOptions } from './types.js';
 import workflowFastifyPlugin, { enableHMR } from './plugin.js';
 import { FastifyBuilder } from './builder.js';
 
@@ -52,7 +49,6 @@ export type {
   WebhookHandlers,
   WorkflowError,
   WorkflowContext,
-  FastifyWorkflowDecorator,
   WorkflowFastifyPlugin,
 } from './types.js';
 

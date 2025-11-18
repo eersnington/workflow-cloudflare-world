@@ -1,9 +1,6 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type {
-  WorkflowFastifyOptions,
-  FastifyWorkflowDecorator,
-} from './types.js';
+import type { WorkflowFastifyOptions } from './types.js';
 import {
   WORKFLOW_ROUTES,
   FASTIFY_PLUGIN_NAME,
@@ -15,7 +12,6 @@ import {
   handleWebhookRequest,
   clearHandlerCache,
 } from './handlers.js';
-import { start } from 'workflow/api';
 import { DEFAULT_OUTPUT_DIR } from './constants.js';
 
 /**
@@ -24,7 +20,6 @@ import { DEFAULT_OUTPUT_DIR } from './constants.js';
  * This plugin provides:
  * - Native Fastify route registration
  * - Request/response handling with Web API compatibility
- * - Workflow decorators for easy access
  * - Error handling integration with Fastify's error system
  * - Performance optimizations and caching
  * - HMR support in development
@@ -35,12 +30,6 @@ export const workflowFastifyPlugin = fp(
     options: WorkflowFastifyOptions = {}
   ) {
     const mergedOptions = mergeDefaultOptions(options);
-
-    // Add workflow decorators to Fastify instance
-    fastify.decorate(
-      'workflow',
-      createWorkflowDecorator(fastify, mergedOptions)
-    );
 
     // Register workflow routes with Fastify's route system
     await registerWorkflowRoutes(fastify, mergedOptions);
@@ -71,10 +60,6 @@ export const workflowFastifyPlugin = fp(
   {
     name: FASTIFY_PLUGIN_NAME,
     fastify: FASTIFY_PLUGIN_VERSION,
-    decorators: {
-      request: ['workflowContext'],
-      reply: ['workflowSuccess', 'workflowError'],
-    },
   }
 );
 
@@ -111,84 +96,6 @@ function mergeDefaultOptions(
       enabled: true,
       maxHandlers: 100,
       ...options.caching,
-    },
-  };
-}
-
-/**
- * Create workflow decorator for Fastify instance
- */
-function createWorkflowDecorator(
-  fastify: FastifyInstance,
-  options: Required<WorkflowFastifyOptions>
-): FastifyWorkflowDecorator {
-  return {
-    /**
-     * Execute a workflow by name
-     */
-    async execute(name: string, args: any[]): Promise<{ runId: string }> {
-      const workflow = await this.getWorkflow(name);
-      return await start(workflow, args);
-    },
-
-    /**
-     * Get a workflow function by name
-     */
-    async getWorkflow(name: string) {
-      try {
-        const clientBundlePath = `${process.cwd()}/${options.outputDir}/client.js`;
-        const clientBundle = await import(clientBundlePath);
-
-        if (!clientBundle[name]) {
-          throw new Error(`Workflow '${name}' not found in client bundle`);
-        }
-
-        return clientBundle[name];
-      } catch (error) {
-        if (
-          error instanceof Error &&
-          error.message.includes('Cannot find module')
-        ) {
-          throw new Error(
-            `Workflow client bundle not found. Please run 'workflow build' before starting your server.\n` +
-              `Command: workflow build\n` +
-              `See: https://useworkflow.dev/docs/how-it-works/framework-integrations`
-          );
-        }
-        throw error;
-      }
-    },
-
-    /**
-     * List all available workflows
-     */
-    async listWorkflows(): Promise<string[]> {
-      try {
-        const clientBundlePath = `${process.cwd()}/${options.outputDir}/client.js`;
-        const clientBundle = await import(clientBundlePath);
-
-        return Object.keys(clientBundle).filter(
-          (key) =>
-            typeof clientBundle[key] === 'function' &&
-            clientBundle[key].workflowId
-        );
-      } catch (error) {
-        fastify.log.error({ error }, 'Failed to list workflows');
-        return [];
-      }
-    },
-
-    /**
-     * Get workflow status by run ID
-     */
-    async getStatus(runId: string) {
-      // This would integrate with the workflow storage backend
-      // For now, return a placeholder that could be extended
-      return {
-        runId,
-        status: 'unknown',
-        message: 'Status tracking not implemented',
-      };
     },
   };
 }

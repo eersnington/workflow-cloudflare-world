@@ -65,7 +65,7 @@ describe('workflow-fastify plugin', () => {
     expect(routes).toContain('/.well-known/workflow/v1/webhook/:token');
   });
 
-  test('decorates fastify instance with workflow utilities', async () => {
+  test('plugin registration does not add decorators', async () => {
     await fastify.register(workflowPlugin, {
       outputDir: relative(
         process.cwd(),
@@ -73,11 +73,8 @@ describe('workflow-fastify plugin', () => {
       ),
     });
 
-    expect(fastify.workflow).toBeDefined();
-    expect(fastify.workflow.getWorkflow).toBeTypeOf('function');
-    expect(fastify.workflow.execute).toBeTypeOf('function');
-    expect(fastify.workflow.listWorkflows).toBeTypeOf('function');
-    expect(fastify.workflow.getStatus).toBeTypeOf('function');
+    // Should not have workflow decorator - using standard API instead
+    expect(fastify.workflow).toBeUndefined();
   });
 
   test('handles flow requests correctly', async () => {

@@ -118,27 +118,8 @@ export interface WorkflowContext {
   handlers: Map<string, any>;
 }
 
-export interface FastifyWorkflowDecorator {
-  /**
-   * Execute a workflow by name
-   */
-  execute: (name: string, args: any[]) => Promise<{ runId: string }>;
-
-  /**
-   * Get a workflow function by name
-   */
-  getWorkflow: (name: string) => Promise<any>;
-
-  /**
-   * List all available workflows
-   */
-  listWorkflows: () => Promise<string[]>;
-
-  /**
-   * Get workflow status by run ID
-   */
-  getStatus: (runId: string) => Promise<any>;
-}
+// No custom decorator interface needed
+// Use standard workflow API with start() function and getWorkflow() utility
 
 // Fastify plugin type
 export type WorkflowFastifyPlugin = FastifyPluginAsync<WorkflowFastifyOptions>;
