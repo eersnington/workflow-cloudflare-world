@@ -21,49 +21,107 @@ const nextMinimalPageContent = `export default function Page() {
 }
 `;
 
-const nextAiPageContent = `import { Suspense } from 'react';
+const nextAiPageContent = `'use client';
 
-async function loadPlan() {
-  return ['collect data', 'analyze', 'summarize'];
-}
+import { useState } from 'react';
 
-export default async function Page() {
-  const plan = await loadPlan();
+const PATTERNS = [
+  {
+    value: 'sequential',
+    name: 'Sequential Processing',
+    description: 'Marketing copy generation with quality checks',
+  },
+  {
+    value: 'orchestrator',
+    name: 'Orchestrator-Worker',
+    description: 'Feature implementation planning with parallel workers',
+  },
+];
+
+export default function Home() {
+  const [pattern, setPattern] = useState('sequential');
+  const [success, setSuccess] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const onSubmit = async () => {
+    setLoading(true);
+    setSuccess(false);
+
+    try {
+      const response = await fetch('/api/workflows', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ pattern }),
+      });
+
+      if (response.ok) {
+        setSuccess(true);
+      } else {
+        console.error('Workflow trigger failed');
+      }
+    } catch (error) {
+      console.error('Error triggering workflow:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <main className="min-h-screen bg-slate-950 px-8 py-16 text-slate-100">
-      <section className="mx-auto flex max-w-4xl flex-col gap-10 lg:flex-row">
-        <div className="flex-1 space-y-4">
-          <p className="text-sm font-mono uppercase tracking-[0.3em] text-indigo-300">
-            AI Orchestrator
-          </p>
-          <h1 className="text-4xl font-semibold">Reason through each step.</h1>
-          <p className="text-lg text-slate-300">
-            Every list item maps to a workflow step so you can fan-out tasks,
-            observe state, and iterate quickly.
+    <div className="min-h-screen flex items-center justify-center px-6 bg-gray-50">
+      <div className="w-full max-w-2xl text-center">
+        <div className="mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-2">
+            AI Workflow Patterns
+          </h1>
+          <p className="text-sm text-gray-600">
+            AI SDK + Workflow DevKit
           </p>
         </div>
-        <Suspense fallback={<div>Loading plan...</div>}>
-          <ol className="flex-1 space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-lg shadow-black/50">
-            {plan.map((item, index) => (
-              <li
-                key={item}
-                className="flex items-start gap-4 text-lg text-slate-100"
+
+        <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
+          <div className="space-y-4">
+            <div className="text-left">
+              <label htmlFor="pattern-select" className="block text-sm font-medium text-gray-700 mb-2">
+                Choose Workflow Pattern
+              </label>
+              <select
+                id="pattern-select"
+                value={pattern}
+                onChange={(e) => setPattern(e.target.value)}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white text-gray-900"
               >
-                <span className="mt-1 flex h-8 w-8 items-center justify-center rounded-full border border-slate-700 bg-slate-900 font-semibold">
-                  {index + 1}
-                </span>
-                <div>
-                  <p className="font-medium capitalize">{item}</p>
-                  <p className="text-sm text-slate-400">
-                    Output recorded as <code>task-{item}</code>
-                  </p>
-                </div>
-              </li>
-            ))}
-          </ol>
-        </Suspense>
-      </section>
-    </main>
+                {PATTERNS.map((patternOption) => (
+                  <option key={patternOption.value} value={patternOption.value}>
+                    {patternOption.name}
+                  </option>
+                ))}
+              </select>
+              <p className="mt-2 text-sm text-gray-600">
+                {PATTERNS.find(p => p.value === pattern)?.description}
+              </p>
+            </div>
+
+            <button
+              onClick={onSubmit}
+              disabled={loading}
+              className="w-full bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+            >
+              {loading ? 'Starting Workflow...' : 'Run Workflow'}
+            </button>
+          </div>
+        </div>
+
+        {success && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+            <p className="text-sm text-green-800">
+              ✓ Workflow triggered successfully — check server logs for execution details.
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 `;
@@ -114,26 +172,140 @@ async function sendOnboardingEmail(user: { id: string; email: string }) {
 }
 `;
 
-const nextAiWorkflowContent = `import { workflow } from 'workflow';
+const nextSequentialWorkflowContent = `import { generateObject, generateText } from 'ai';
+import { fetch } from 'workflow';
+import { z } from 'zod';
 
-export const example = workflow({
-  name: 'example-ai',
-  run: async ({ step }) => {
-    const plan = await step('plan', async () => {
-      return ['collect data', 'analyze', 'summarize'];
+const MODEL = 'openai/o4-mini';
+
+export async function sequentialWorkflow(input: string) {
+  'use workflow';
+
+  // Uses Workflow's "fetch" step. This allows AI SDK calls
+  // to automatically work as steps
+  globalThis.fetch = fetch;
+
+  // First step: Generate marketing copy
+  const { text: copy } = await generateText({
+    model: MODEL,
+    prompt: \`Write persuasive marketing copy for: \${input}. Focus on benefits and emotional appeal.\`,
+  });
+
+  console.log('[Step 1] Finished', { copy: copy.slice(0, 100) });
+
+  // Perform quality check on copy
+  const { object: qualityMetrics } = await generateObject({
+    model: MODEL,
+    schema: z.object({
+      hasCallToAction: z.boolean(),
+      emotionalAppeal: z.number().min(1).max(10),
+      clarity: z.number().min(1).max(10),
+    }),
+    prompt: \`Evaluate this marketing copy for:
+    1. Presence of call to action (true/false)
+    2. Emotional appeal (1-10)
+    3. Clarity (1-10)
+
+    Copy to evaluate: \${copy}\`,
+  });
+
+  console.log('[Step 2] Finished', { qualityMetrics });
+
+  // If quality check fails, regenerate with more specific instructions
+  if (
+    !qualityMetrics.hasCallToAction ||
+    qualityMetrics.emotionalAppeal < 7 ||
+    qualityMetrics.clarity < 7
+  ) {
+    console.log('Quality check failed, regenerating Step 3...');
+    const { text: improvedCopy } = await generateText({
+      model: MODEL,
+      prompt: \`Rewrite this marketing copy with:
+      \${!qualityMetrics.hasCallToAction ? '- A clear call to action' : ''}
+      \${qualityMetrics.emotionalAppeal < 7 ? '- Stronger emotional appeal' : ''}
+      \${qualityMetrics.clarity < 7 ? '- Improved clarity and directness' : ''}
+
+      Original copy: \${copy}\`,
     });
 
-    const results = [];
-    for (const task of plan) {
-      const result = await step(\`task-\${task}\`, async () => {
-        return \`Completed: \${task}\`;
-      });
-      results.push(result);
-    }
+    console.log('[Step 3] Finished', {
+      copy: improvedCopy.slice(0, 100),
+      qualityMetrics,
+    });
+  }
+}
+`;
 
-    return results;
-  },
-});
+const nextOrchestratorWorkflowContent = `import { generateObject } from 'ai';
+import { fetch } from 'workflow';
+import { z } from 'zod';
+
+const MODEL = 'openai/o4-mini';
+
+export async function orchestratorWorkflow(featureRequest: string) {
+  'use workflow';
+
+  // Uses Workflow's "fetch" step. This allows AI SDK calls
+  // to automatically work as steps
+  globalThis.fetch = fetch;
+
+  // Orchestrator: Plan the implementation
+  const { object: implementationPlan } = await generateObject({
+    model: MODEL,
+    schema: z.object({
+      files: z.array(
+        z.object({
+          purpose: z.string(),
+          filePath: z.string(),
+          changeType: z.enum(['create', 'modify', 'delete']),
+        })
+      ),
+      estimatedComplexity: z.enum(['low', 'medium', 'high']),
+    }),
+    system:
+      'You are a senior software architect planning feature implementations.',
+    prompt: \`Analyze this feature request and create an implementation plan:
+    \${featureRequest}\`,
+  });
+
+  console.log('[Step 1] Finished', { plan: implementationPlan });
+
+  // Workers: Execute the planned changes
+  const fileChanges = await Promise.all(
+    implementationPlan.files.map(async (file) => {
+      // Each worker is specialized for the type of change
+      const workerSystemPrompt = {
+        create:
+          'You are an expert at implementing new files following best practices and project patterns.',
+        modify:
+          'You are an expert at modifying existing code while maintaining consistency and avoiding regressions.',
+        delete:
+          'You are an expert at safely removing code while ensuring no breaking changes.',
+      }[file.changeType];
+
+      await generateObject({
+        model: MODEL,
+        schema: z.object({
+          explanation: z.string(),
+          code: z.string(),
+        }),
+        system: workerSystemPrompt,
+        prompt: \`Implement the changes for \${file.filePath} to support:
+        \${file.purpose}
+
+        Consider the overall feature context:
+        \${featureRequest}\`,
+      });
+
+      console.log('Finished file change step');
+    })
+  );
+
+  console.log('Finished orchestrator workflow', {
+    plan: implementationPlan,
+    changes: fileChanges,
+  });
+}
 `;
 
 const nextMinimalPage: CodemodDefinition = {
@@ -178,13 +350,23 @@ const nextAiPage: CodemodDefinition = {
   },
 };
 
-const nextAiWorkflow: CodemodDefinition = {
-  globs: ['workflows/user-signup.ts'],
+const nextAiSequentialWorkflow: CodemodDefinition = {
+  globs: ['workflows/sequential-workflow.ts'],
   transform(source) {
-    if (!source.includes('__WORKFLOW_NEXT_AI__')) {
+    if (!source.includes('__WORKFLOW_SEQUENTIAL__')) {
       return null;
     }
-    return nextAiWorkflowContent;
+    return nextSequentialWorkflowContent;
+  },
+};
+
+const nextAiOrchestratorWorkflow: CodemodDefinition = {
+  globs: ['workflows/orchestrator-workflow.ts'],
+  transform(source) {
+    if (!source.includes('__WORKFLOW_ORCHESTRATOR__')) {
+      return null;
+    }
+    return nextOrchestratorWorkflowContent;
   },
 };
 
@@ -268,7 +450,8 @@ export const nextCodemods = {
   'next/minimal/page': nextMinimalPage,
   'next/minimal/workflow': nextMinimalWorkflow,
   'next/ai/page': nextAiPage,
-  'next/ai/workflow': nextAiWorkflow,
+  'next/ai/sequential-workflow': nextAiSequentialWorkflow,
+  'next/ai/orchestrator-workflow': nextAiOrchestratorWorkflow,
   'next/config/with-workflow': nextWithWorkflowConfig,
   'next/typescript/plugin': nextTsconfigPlugin,
 } as const satisfies Record<string, CodemodDefinition>;

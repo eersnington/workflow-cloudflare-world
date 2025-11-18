@@ -526,11 +526,15 @@ async function scaffoldWithFrameworkCli({
 async function installWorkflowDeps({
   packageManager,
   projectDir,
+  templateName,
 }: {
   packageManager: PackageManagerName;
   projectDir: string;
+  templateName: string;
 }) {
-  const deps = ['workflow@latest'];
+  const baseDeps = ['workflow@latest'];
+  const aiDeps = ['ai@latest', 'zod@latest'];
+  const deps = templateName === 'ai' ? [...baseDeps, ...aiDeps] : baseDeps;
   const args = PACKAGE_MANAGERS[packageManager].installArgs(deps);
   log.message(
     pc.blue(`\n> ${packageManager} ${args.join(' ')} (${projectDir})`)
@@ -691,6 +695,7 @@ export async function runInitCommand(options: InitOptions) {
   await installWorkflowDeps({
     packageManager,
     projectDir: targetDir,
+    templateName,
   });
 
   const spin = spinner();

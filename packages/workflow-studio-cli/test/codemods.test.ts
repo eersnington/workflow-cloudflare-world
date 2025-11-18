@@ -77,8 +77,10 @@ const svelteDefaultPage = `<h1>Welcome to SvelteKit</h1>
 
 const nextMinimalPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NEXT_MINIMAL__';\n";
-const nextAIPlaceholder =
-  "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NEXT_AI__';\n";
+const nextSequentialPlaceholder =
+  "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';\n";
+const nextOrchestratorPlaceholder =
+  "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';\n";
 const svelteMinimalPlaceholder =
   "export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SVELTE_MINIMAL__';\n";
 const svelteCronPlaceholder =
@@ -159,32 +161,68 @@ test('next ai page codemod transforms default page content', async () => {
 
   expect(
     containsExpectedContent(output['app/page.tsx'], [
-      "import { Suspense } from 'react';",
-      'AI Orchestrator',
-      'Reason through each step',
-      'loadPlan',
-      'Output recorded as <code>task-{item}</code>',
+      "'use client';",
+      "import { useState } from 'react';",
+      'AI Workflow Patterns',
+      'Choose Workflow Pattern',
+      'Sequential Processing',
+      'Orchestrator-Worker',
+      'Run Workflow',
     ])
   ).toBe(true);
 });
 
-test('next ai workflow codemod populates analytics workflow', async () => {
-  const output = await runCodemod('next/ai/workflow', {
-    'workflows/user-signup.ts': nextAIPlaceholder,
+test('next ai sequential workflow codemod populates marketing copy workflow', async () => {
+  const output = await runCodemod('next/ai/sequential-workflow', {
+    'workflows/sequential-workflow.ts': nextSequentialPlaceholder,
   });
 
   expect(
-    containsExpectedContent(output['workflows/user-signup.ts'], [
-      "name: 'example-ai'",
-      "const plan = await step('plan'",
-      "return ['collect data', 'analyze', 'summarize']",
-      'for (const task of plan)',
-      'return results',
+    containsExpectedContent(output['workflows/sequential-workflow.ts'], [
+      "import { generateObject, generateText } from 'ai';",
+      "import { fetch } from 'workflow';",
+      "import { z } from 'zod';",
+      'export async function sequentialWorkflow(input: string)',
+      "'use workflow';",
+      'globalThis.fetch = fetch;',
+      'generateText',
+      'generateObject',
+      'hasCallToAction',
+      'emotionalAppeal',
+      'clarity',
     ])
   ).toBe(true);
 
-  expect(output['workflows/user-signup.ts']).not.toContain(
-    '__WORKFLOW_NEXT_AI__'
+  expect(output['workflows/sequential-workflow.ts']).not.toContain(
+    '__WORKFLOW_SEQUENTIAL__'
+  );
+});
+
+test('next ai orchestrator workflow codemod populates feature planning workflow', async () => {
+  const output = await runCodemod('next/ai/orchestrator-workflow', {
+    'workflows/orchestrator-workflow.ts': nextOrchestratorPlaceholder,
+  });
+
+  expect(
+    containsExpectedContent(output['workflows/orchestrator-workflow.ts'], [
+      "import { generateObject } from 'ai';",
+      "import { fetch } from 'workflow';",
+      "import { z } from 'zod';",
+      'export async function orchestratorWorkflow(featureRequest: string)',
+      "'use workflow';",
+      'globalThis.fetch = fetch;',
+      'implementationPlan',
+      'files',
+      'changeType',
+      'estimatedComplexity',
+      'fileChanges',
+      'Promise.all',
+      'workerSystemPrompt',
+    ])
+  ).toBe(true);
+
+  expect(output['workflows/orchestrator-workflow.ts']).not.toContain(
+    '__WORKFLOW_ORCHESTRATOR__'
   );
 });
 

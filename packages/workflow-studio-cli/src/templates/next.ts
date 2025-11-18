@@ -7,8 +7,11 @@ const nextPlaceholders: TemplateFileFactory = {
 };
 
 const nextAiPlaceholders: TemplateFileFactory = {
-  'workflows/user-signup.ts': () =>
-    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NEXT_AI__';
+  'workflows/sequential-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+  'workflows/orchestrator-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
 `,
 };
 
@@ -40,15 +43,49 @@ export async function POST(request: Request) {
       ],
     },
     ai: {
-      label: 'AI Orchestrator',
+      label: 'AI Workflows',
       description:
-        'Demonstrates chaining steps together to orchestrate reasoning agents.',
+        'Demonstrates sequential marketing copy generation and orchestrator feature planning with AI SDK.',
       placeholders: nextAiPlaceholders,
+      files: {
+        'app/api/workflows/route.ts':
+          () => `import { NextResponse } from 'next/server';
+import { type Run, start } from 'workflow/api';
+import { sequentialWorkflow } from '@/workflows/sequential-workflow';
+import { orchestratorWorkflow } from '@/workflows/orchestrator-workflow';
+
+export async function POST(request: Request) {
+  const { pattern } = await request.json();
+  let run: Run<unknown> | undefined;
+
+  switch (pattern) {
+    case 'sequential':
+      // Marketing Copy Generation
+      run = await start(sequentialWorkflow, [
+        'Vercel Workflow DevKit for building durable workflows that survive restarts',
+      ]);
+      break;
+    case 'orchestrator':
+      // Feature Planning
+      run = await start(orchestratorWorkflow, [
+        'Add a dark mode toggle to the Next.js dashboard, persist the preference per user, and ensure the UI updates without a full reload.',
+      ]);
+      break;
+    default:
+      return NextResponse.json({ error: 'Invalid pattern' }, { status: 400 });
+  }
+
+  const runId = run.runId;
+  return NextResponse.json({ runId });
+}
+`,
+      },
       codemods: [
         'next/config/with-workflow',
         'next/typescript/plugin',
         'next/ai/page',
-        'next/ai/workflow',
+        'next/ai/sequential-workflow',
+        'next/ai/orchestrator-workflow',
       ],
     },
   },
