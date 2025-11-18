@@ -42,14 +42,13 @@ export async function promptEnvFileLocation(
   const input = await text({
     message: 'Where should environment variables be stored?',
     defaultValue: defaultFilename,
-    validate(value) {
-      if (!value || !value.trim()) {
-        return 'Provide a file path';
-      }
+    placeholder: defaultFilename,
+    validate(_value) {
       return undefined;
     },
   });
-  return ensureNotCancelled(input).trim();
+  const trimmed = ensureNotCancelled(input).trim();
+  return trimmed || defaultFilename;
 }
 
 export function getWorldLabel(world: WorldChoice): string {
