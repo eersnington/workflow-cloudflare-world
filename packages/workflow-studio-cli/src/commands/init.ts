@@ -9,8 +9,8 @@ import {
   text,
 } from '@clack/prompts';
 import { spawn } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
-import { basename, join, resolve } from 'node:path';
+import { access, readFile, rename, writeFile } from 'node:fs/promises';
+import { basename, dirname, join, relative, resolve } from 'node:path';
 import pc from 'picocolors';
 import { getCodemodGlobs, type CodemodId } from '../codemods.js';
 import {
@@ -24,6 +24,16 @@ import {
   ensureProjectDirectoryReady,
   normalizeProjectName,
 } from '../utils/project.js';
+import {
+  WORLD_OPTIONS,
+  type WorldChoice,
+  collectWorldEntries,
+  detectDefaultEnvFile,
+  getWorldLabel,
+  isCommunityWorld,
+  promptEnvFileLocation,
+  writeEnvValues,
+} from '../worlds.js';
 
 type InitOptions = {
   projectName?: string;
@@ -85,12 +95,93 @@ const PACKAGE_MANAGERS = {
 
 type PackageManagerName = keyof typeof PACKAGE_MANAGERS;
 
+const WORKSPACE_FILENAME = 'pnpm-workspace.yaml';
+
+const pathExists = async (path: string) => {
+  try {
+    await access(path);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+async function findWorkspaceFile(startDir: string): Promise<string | null> {
+  let current = startDir;
+  while (true) {
+    const candidate = join(current, WORKSPACE_FILENAME);
+    if (await pathExists(candidate)) {
+      return candidate;
+    }
+    const parent = dirname(current);
+    if (parent === current) {
+      break;
+    }
+    current = parent;
+  }
+  return null;
+}
+
+async function withWorkspaceFileHidden<T>(
+  startDir: string,
+  fn: () => Promise<T>
+): Promise<T> {
+  const workspacePath = await findWorkspaceFile(startDir);
+  if (!workspacePath) {
+    return fn();
+  }
+  const backupPath = `${workspacePath}.workflow-studio-backup`;
+  try {
+    await rename(workspacePath, backupPath);
+  } catch {
+    return fn();
+  }
+  try {
+    const result = await fn();
+    await rename(backupPath, workspacePath);
+    return result;
+  } catch (error) {
+    try {
+      await rename(backupPath, workspacePath);
+    } catch {
+      // ignore
+    }
+    throw error;
+  }
+}
+
 const ensureNotCancelled = <T>(value: T | symbol): T => {
   if (isCancel(value)) {
     cancel('Operation cancelled.');
     process.exit(1);
   }
   return value;
+};
+
+type WorldSelection = WorldChoice | 'skip';
+const WORLD_SKIP_VALUE = 'skip';
+
+const formatWorldOptions = () =>
+  WORLD_OPTIONS.map((option) => ({
+    value: option.value,
+    label: `${option.label}${option.community ? ' *' : ''}`,
+  }));
+
+const resolveWorldSelection = async (
+  autoAccept: boolean
+): Promise<WorldSelection> => {
+  if (autoAccept) {
+    return 'local';
+  }
+  const options = [
+    ...formatWorldOptions(),
+    { value: WORLD_SKIP_VALUE, label: 'Skip for now' },
+  ];
+  const selected = await select({
+    message: 'Which Workflow world do you want to use?',
+    options,
+  });
+  return ensureNotCancelled(selected) as WorldSelection;
 };
 
 const isTemplateName = (value: string): value is TemplateName => {
@@ -210,23 +301,58 @@ async function runCommand(
   args: string[],
   {
     cwd,
+    label,
+    successMessage,
+    env,
   }: {
     cwd: string;
+    label?: string;
+    successMessage?: string;
+    env?: NodeJS.ProcessEnv;
   }
 ) {
   await new Promise<void>((resolvePromise, rejectPromise) => {
+    const quiet = Boolean(label);
+    const spin = quiet ? spinner() : null;
+    if (spin && label) {
+      spin.start(label);
+    }
     const child = spawn(resolveCommand(command), args, {
       cwd,
-      stdio: 'inherit',
+      stdio: quiet ? ['ignore', 'pipe', 'pipe'] : 'inherit',
+      env: { ...process.env, ...env },
     });
+    let stdout = '';
+    let stderr = '';
+    if (quiet && child.stdout) {
+      child.stdout.on('data', (chunk) => {
+        stdout += chunk.toString();
+      });
+    }
+    if (quiet && child.stderr) {
+      child.stderr.on('data', (chunk) => {
+        stderr += chunk.toString();
+      });
+    }
     child.on('error', rejectPromise);
     child.on('close', (code) => {
       if (code === 0) {
+        if (spin) {
+          spin.stop(successMessage || label || 'Done');
+        }
         resolvePromise();
         return;
       }
+      if (spin) {
+        spin.stop('Command failed');
+      }
+      const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
       rejectPromise(
-        new Error(`Command "${command} ${args.join(' ')}" exited with ${code}`)
+        new Error(
+          `Command "${command} ${args.join(' ')}" exited with ${code}${
+            output ? `\n${output}` : ''
+          }`
+        )
       );
     });
   });
@@ -296,16 +422,23 @@ async function runWithPackageManagerExecutor({
   cli,
   cliArgs,
   cwd,
+  label,
+  successMessage,
 }: {
   packageManager: PackageManagerName;
   cli: string;
   cliArgs: string[];
   cwd: string;
+  label?: string;
+  successMessage?: string;
 }) {
   const executor = PACKAGE_MANAGERS[packageManager].createExecutor;
   const args = [...executor.args, cli, ...cliArgs];
-  log.message(pc.blue(`\n> ${executor.command} ${args.join(' ')}`));
-  await runCommand(executor.command, args, { cwd });
+  await runCommand(executor.command, args, {
+    cwd,
+    label,
+    successMessage,
+  });
 }
 
 async function scaffoldWithFrameworkCli({
@@ -313,12 +446,16 @@ async function scaffoldWithFrameworkCli({
   projectSpecifier,
   packageManager,
   cwd,
+  frameworkLabel,
 }: {
   template: TemplateName;
   projectSpecifier: string;
   packageManager: PackageManagerName;
   cwd: string;
+  frameworkLabel: string;
 }) {
+  const label = `Scaffolding ${frameworkLabel} project`;
+  const successMessage = `${frameworkLabel} files created`;
   if (template === 'nextjs') {
     const flags = [
       packageManager ? PACKAGE_MANAGERS[packageManager].nextFlag : '',
@@ -333,12 +470,16 @@ async function scaffoldWithFrameworkCli({
       '--yes',
       ...flags,
     ];
-    await runWithPackageManagerExecutor({
-      packageManager,
-      cli: 'create-next-app@latest',
-      cliArgs,
-      cwd,
-    });
+    await withWorkspaceFileHidden(cwd, () =>
+      runWithPackageManagerExecutor({
+        packageManager,
+        cli: 'create-next-app@latest',
+        cliArgs,
+        cwd,
+        label,
+        successMessage,
+      })
+    );
     return;
   }
 
@@ -350,23 +491,31 @@ async function scaffoldWithFrameworkCli({
       '--types=ts',
       '--no-add-ons',
     ];
-    await runWithPackageManagerExecutor({
-      packageManager,
-      cli: 'sv',
-      cliArgs,
-      cwd,
-    });
+    await withWorkspaceFileHidden(cwd, () =>
+      runWithPackageManagerExecutor({
+        packageManager,
+        cli: 'sv',
+        cliArgs,
+        cwd,
+        label,
+        successMessage,
+      })
+    );
     return;
   }
 
   if (template === 'hono') {
     const cliArgs = [projectSpecifier, '--', '--template=nodejs'];
-    await runWithPackageManagerExecutor({
-      packageManager,
-      cli: 'create-hono@latest',
-      cliArgs,
-      cwd,
-    });
+    await withWorkspaceFileHidden(cwd, () =>
+      runWithPackageManagerExecutor({
+        packageManager,
+        cli: 'create-hono@latest',
+        cliArgs,
+        cwd,
+        label,
+        successMessage,
+      })
+    );
     return;
   }
 
@@ -385,7 +534,9 @@ async function installWorkflowDeps({
   log.message(
     pc.blue(`\n> ${packageManager} ${args.join(' ')} (${projectDir})`)
   );
-  await runCommand(packageManager, args, { cwd: projectDir });
+  await withWorkspaceFileHidden(projectDir, () =>
+    runCommand(packageManager, args, { cwd: projectDir })
+  );
 }
 
 async function ensureWorkflowScript(projectDir: string) {
@@ -403,6 +554,52 @@ async function ensureWorkflowScript(projectDir: string) {
     `${JSON.stringify(data, null, 2)}\n`,
     'utf8'
   );
+}
+
+async function configureWorldForProject({
+  selection,
+  projectDir,
+  skipEnvPrompt,
+}: {
+  selection: WorldSelection;
+  projectDir: string;
+  skipEnvPrompt: boolean;
+}): Promise<string[] | null> {
+  if (selection === WORLD_SKIP_VALUE) {
+    return null;
+  }
+  const defaultEnvFile = await detectDefaultEnvFile(projectDir);
+  const envFileRelative = skipEnvPrompt
+    ? defaultEnvFile
+    : await promptEnvFileLocation(defaultEnvFile);
+  const envFilePath = join(projectDir, envFileRelative);
+  const entries = await collectWorldEntries(selection);
+  const changed = await writeEnvValues(envFilePath, entries);
+
+  const summaryLines = [
+    `${pc.green('Configured')} ${pc.bold(relative(projectDir, envFilePath) || envFileRelative)} for ${pc.yellow(
+      getWorldLabel(selection)
+    )}.`,
+    changed ? 'Environment updated.' : 'Environment already up to date.',
+  ];
+
+  if (selection === 'postgres') {
+    summaryLines.push(
+      'Remember to run `pnpm exec workflow-postgres-setup` before starting workers.'
+    );
+  }
+
+  if (selection === 'jazz') {
+    summaryLines.push(
+      'Install the community world with `pnpm add workflow-world-jazz` if needed.'
+    );
+  }
+
+  if (isCommunityWorld(selection)) {
+    summaryLines.push('* Community-maintained world implementation');
+  }
+
+  return summaryLines;
 }
 
 export async function runInitCommand(options: InitOptions) {
@@ -452,12 +649,14 @@ export async function runInitCommand(options: InitOptions) {
 
   const template = templates[templateName];
   const example = template.examples[exampleName];
+  const worldSelection = await resolveWorldSelection(Boolean(options.yes));
 
   await scaffoldWithFrameworkCli({
     template: templateName,
     projectSpecifier,
     packageManager,
     cwd: invocationDir,
+    frameworkLabel: template.label,
   });
 
   await installWorkflowDeps({
@@ -485,6 +684,19 @@ export async function runInitCommand(options: InitOptions) {
   }
   await ensureWorkflowScript(targetDir);
   spin.stop('Project ready');
+
+  const worldSummary = await configureWorldForProject({
+    selection: worldSelection,
+    projectDir: targetDir,
+    skipEnvPrompt: Boolean(options.yes),
+  });
+  if (worldSummary?.length) {
+    log.message('');
+    for (const line of worldSummary) {
+      log.message(line);
+    }
+    log.message('');
+  }
 
   const projectSuccessLabel = usingCurrentDirectory
     ? projectDirName
