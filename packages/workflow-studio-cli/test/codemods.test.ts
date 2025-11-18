@@ -210,18 +210,22 @@ test('svelte minimal page codemod transforms default route', async () => {
 
 test('svelte minimal workflow codemod populates workflow', async () => {
   const output = await runCodemod('svelte/minimal/workflow', {
-    'workflows/example.ts': svelteMinimalPlaceholder,
+    'workflows/user-signup.ts': svelteMinimalPlaceholder,
   });
 
   expect(
-    containsExpectedContent(output['workflows/example.ts'], [
-      "import { workflow } from '@workflow/core';",
-      "name: 'example-minimal'",
-      "return 'Hello from Workflow Studio'",
+    containsExpectedContent(output['workflows/user-signup.ts'], [
+      "import { sleep } from 'workflow';",
+      "import { FatalError } from 'workflow';",
+      'export async function handleUserSignup(email: string)',
+      '"use workflow";',
+      'await sleep',
+      '"use step";',
+      "throw new FatalError('Invalid Email')",
     ])
   ).toBe(true);
 
-  expect(output['workflows/example.ts']).not.toContain(
+  expect(output['workflows/user-signup.ts']).not.toContain(
     '__WORKFLOW_SVELTE_MINIMAL__'
   );
 });
