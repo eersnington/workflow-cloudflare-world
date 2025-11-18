@@ -1,6 +1,7 @@
 import fp from 'fastify-plugin';
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { WorkflowFastifyOptions } from './types.js';
+import { FastifyBuilder } from './builder.js';
 import {
   WORKFLOW_ROUTES,
   FASTIFY_PLUGIN_NAME,
@@ -24,12 +25,62 @@ import { DEFAULT_OUTPUT_DIR } from './constants.js';
  * - Performance optimizations and caching
  * - HMR support in development
  */
+type WorkflowFastifyPluginOptions = WorkflowFastifyOptions & {
+  /**
+   * Automatically run the workflow builder when the plugin registers.
+   * Defaults to `true`.
+   */
+  autoBuild?: boolean;
+
+  /**
+   * Allows providing a custom FastifyBuilder instance (useful for testing).
+   */
+  builder?: FastifyBuilder;
+};
+
 export const workflowFastifyPlugin = fp(
   async function workflowPlugin(
     fastify: FastifyInstance,
-    options: WorkflowFastifyOptions = {}
+    options: WorkflowFastifyPluginOptions = {}
   ) {
     const mergedOptions = mergeDefaultOptions(options);
+    const shouldAutoBuild = options.autoBuild !== false;
+    const builder =
+      options.builder ??
+      (shouldAutoBuild
+        ? new FastifyBuilder({
+            dirs: mergedOptions.dirs,
+            outputDir: mergedOptions.outputDir,
+            hmr: mergedOptions.hmr,
+            workflowManifestPath: mergedOptions.workflowManifestPath,
+          })
+        : undefined);
+
+    if (builder) {
+      fastify.addHook('onClose', async () => {
+        try {
+          await builder.cleanup();
+        } catch (error) {
+          fastify.log.error(
+            {
+              error:
+                error instanceof Error
+                  ? error.message
+                  : 'Unknown cleanup error',
+            },
+            'Failed to cleanup workflow builder'
+          );
+        }
+      });
+
+      if (mergedOptions.hmr) {
+        enableHMR(fastify);
+      }
+
+      if (shouldAutoBuild) {
+        await builder.build();
+      }
+    }
 
     // Register workflow routes with Fastify's route system
     await registerWorkflowRoutes(fastify, mergedOptions);
@@ -63,12 +114,23 @@ export const workflowFastifyPlugin = fp(
   }
 );
 
+type NormalizedWorkflowFastifyOptions = WorkflowFastifyOptions & {
+  dirs: string[];
+  outputDir: string;
+  prefix: string;
+  errorHandler: boolean;
+  logging: NonNullable<WorkflowFastifyOptions['logging']>;
+  caching: NonNullable<WorkflowFastifyOptions['caching']>;
+  validation: boolean;
+  hmr: boolean;
+};
+
 /**
  * Merge user options with sensible defaults
  */
 function mergeDefaultOptions(
-  options: WorkflowFastifyOptions
-): Required<WorkflowFastifyOptions> {
+  options: WorkflowFastifyPluginOptions
+): NormalizedWorkflowFastifyOptions {
   return {
     dirs: ['workflows', 'src/workflows'],
     outputDir: DEFAULT_OUTPUT_DIR,
@@ -96,7 +158,7 @@ function mergeDefaultOptions(
  */
 async function registerWorkflowRoutes(
   fastify: FastifyInstance,
-  options: Required<WorkflowFastifyOptions>
+  options: NormalizedWorkflowFastifyOptions
 ): Promise<void> {
   const routePrefix = options.prefix || WORKFLOW_ROUTES.base;
 
@@ -180,7 +242,7 @@ async function registerWorkflowRoutes(
 /**
  * Create request logger hook for workflow requests
  */
-function createRequestLogger(options: Required<WorkflowFastifyOptions>) {
+function createRequestLogger(options: NormalizedWorkflowFastifyOptions) {
   return async function requestLogger(request: FastifyRequest) {
     // Only log workflow requests
     if (!request.raw.url?.startsWith(options.prefix || WORKFLOW_ROUTES.base)) {
@@ -208,7 +270,7 @@ function createRequestLogger(options: Required<WorkflowFastifyOptions>) {
 /**
  * Create response logger hook for workflow requests
  */
-function createResponseLogger(_options: Required<WorkflowFastifyOptions>) {
+function createResponseLogger(_options: NormalizedWorkflowFastifyOptions) {
   return async function responseLogger(
     request: FastifyRequest,
     reply: FastifyReply
@@ -238,7 +300,7 @@ function createResponseLogger(_options: Required<WorkflowFastifyOptions>) {
 /**
  * Create custom error handler for workflow errors
  */
-function createWorkflowErrorHandler(options: Required<WorkflowFastifyOptions>) {
+function createWorkflowErrorHandler(options: NormalizedWorkflowFastifyOptions) {
   return function workflowErrorHandler(
     error: Error,
     request: FastifyRequest,
@@ -317,3 +379,5 @@ export function enableHMR(fastify: FastifyInstance): void {
 }
 
 export default workflowFastifyPlugin;
+
+export type { WorkflowFastifyPluginOptions };

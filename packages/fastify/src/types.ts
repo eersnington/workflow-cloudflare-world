@@ -76,6 +76,12 @@ export interface WorkflowFastifyOptions {
    * Default: false (enabled automatically in dev mode)
    */
   hmr?: boolean;
+
+  /**
+   * Optional path where the workflow manifest should be written.
+   * This allows downstream tooling to reference workflow metadata.
+   */
+  workflowManifestPath?: string;
 }
 
 export interface WorkflowRequest extends FastifyRequest {

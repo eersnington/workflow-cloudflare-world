@@ -1,6 +1,6 @@
 {
   "name": "workflow-fastify",
-  "version": "4.1.0-beta.3",
+  "version": "4.1.0-beta.10",
   "description": "Community maintained Fastify plugin for Vercel Workflow DevKit with HMR support",
   "type": "module",
   "main": "dist/index.js",

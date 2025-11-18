@@ -9,7 +9,7 @@ import {
   HANDLER_FILENAMES,
 } from './constants.js';
 import type { WorkflowFastifyOptions } from './types.js';
-import { watch } from 'node:fs';
+import { watch, accessSync, constants } from 'node:fs';
 
 /**
  * Fastify-specific builder that generates workflow files with HMR support.
@@ -40,6 +40,7 @@ export class FastifyBuilder extends BaseBuilder {
         dirs: resolvedDirs,
       }),
       buildTarget: 'standalone', // Use standalone target for Fastify
+      workflowManifestPath: options.workflowManifestPath,
       stepsBundlePath: `${outputDir}/${HANDLER_FILENAMES.step}`,
       workflowsBundlePath: `${outputDir}/${HANDLER_FILENAMES.flow}`,
       webhookBundlePath: `${outputDir}/${HANDLER_FILENAMES.webhook}`,
@@ -63,7 +64,6 @@ export class FastifyBuilder extends BaseBuilder {
     }
 
     // Only attempt HMR if workflow directories exist
-    const { accessSync } = require('fs');
     const existingDirs = this.config.dirs.filter((dir) => {
       try {
         accessSync(dir, constants.F_OK);

@@ -1,32 +1,27 @@
 /**
  * @workflow/fastify - Fastify plugin for Vercel Workflow DevKit
  *
- * A production-ready Fastify integration that follows Nitro's build-system-first approach
- * with native Fastify patterns, HMR support, and comprehensive error handling.
+ * Automatically registers the standard workflow HTTP routes, spins up the
+ * FastifyBuilder when the plugin registers, and exposes helpers for listing/loading
+ * workflows exactly like other framework integrations.
  *
  * @example
- * ```typescript
+ * ```ts
  * import Fastify from 'fastify';
  * import workflow from '@workflow/fastify';
+ * import { handleGreeting } from './workflows/example';
+ * import { start } from 'workflow/api';
  *
- * const fastify = Fastify();
+ * const fastify = Fastify({ logger: true });
  *
- * // Register workflow plugin
  * await fastify.register(workflow, {
  *   dirs: ['workflows'],
- *   logging: { enabled: true, level: 'info' }
+ *   workflowManifestPath: '.well-known/workflow/manifest.json',
+ *   hmr: process.env.NODE_ENV !== 'production',
  * });
  *
- * // Start server
- * await fastify.listen({ port: 3000 });
- * ```
- *
- * @example
- * ```typescript
- * // Using workflow decorators
- * fastify.get('/start-workflow', async (request, reply) => {
- *   const workflow = await fastify.workflow.getWorkflow('myWorkflow');
- *   const run = await fastify.workflow.execute('myWorkflow', [request.body.data]);
+ * fastify.post('/greet', async (req) => {
+ *   const run = await start(handleGreeting, [req.body.name]);
  *   return { runId: run.runId };
  * });
  * ```
@@ -34,10 +29,8 @@
 
 import workflowFastifyPlugin, { enableHMR } from './plugin.js';
 
-// Re-export main plugin as default
 export default workflowFastifyPlugin;
 
-// Re-export types for advanced usage
 export type {
   WorkflowFastifyOptions,
   WorkflowRequest,
@@ -48,26 +41,10 @@ export type {
   WorkflowContext,
   WorkflowFastifyPlugin,
 } from './types.js';
+export type { WorkflowFastifyPluginOptions } from './plugin.js';
 
-// Re-export builder for custom build scenarios
 export { FastifyBuilder } from './builder.js';
 
-// Re-export workflow utilities
-export {
-  getWorkflow,
-  listWorkflows,
-  getWorkflowMetadata,
-  clearWorkflowCache,
-  getCacheStats,
-  WorkflowNotFoundError,
-  WorkflowBundleNotFoundError,
-  WorkflowBundleLoadError,
-  WorkflowLoadError,
-  WorkflowInvalidError,
-  isWorkflowError,
-} from './workflows.js';
-
-// Re-export constants for configuration
 export {
   WORKFLOW_ROUTES,
   DEFAULT_WORKFLOW_DIRS,

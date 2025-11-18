@@ -5,6 +5,7 @@ import {
   beforeAll,
   afterAll,
   beforeEach,
+  vi,
 } from 'vitest';
 import Fastify from 'fastify';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
@@ -13,12 +14,28 @@ import { join, relative } from 'node:path';
 import workflowPlugin from './plugin.js';
 import { FastifyBuilder } from './builder.js';
 import { HANDLER_FILENAMES, WORKFLOW_ROUTES } from './constants.js';
+import type { WorkflowFastifyPluginOptions } from './plugin.js';
 
 const tempRoots: string[] = [];
 
 describe('workflow-fastify plugin', () => {
   let fastify: ReturnType<typeof Fastify>;
   let tempDir: string;
+
+  const getOutputDir = () =>
+    relative(process.cwd(), join(tempDir, '.well-known', 'workflow', 'v1'));
+
+  const createPluginOptions = (
+    overrides: Partial<WorkflowFastifyPluginOptions> = {}
+  ): WorkflowFastifyPluginOptions => ({
+    outputDir: getOutputDir(),
+    autoBuild: false,
+    ...overrides,
+  });
+
+  const registerWithPlugin = (
+    overrides?: Partial<WorkflowFastifyPluginOptions>
+  ) => fastify.register(workflowPlugin, createPluginOptions(overrides));
 
   beforeAll(async () => {
     // Create temporary directory for test files
@@ -50,12 +67,7 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('registers workflow routes correctly', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
-    });
+    await registerWithPlugin();
 
     // Test that routes are registered by checking printed routes
     const routes = fastify.printRoutes();
@@ -65,25 +77,16 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('plugin registration does not add decorators', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
-    });
+    await registerWithPlugin();
 
     // Should not have workflow decorator - using standard API instead
     expect(fastify.workflow).toBeUndefined();
   });
 
   test('handles flow requests correctly', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
-      errorHandler: false, // Disable custom error handler for this test
-      validation: false, // Disable schema validation for tests
+    await registerWithPlugin({
+      errorHandler: false,
+      validation: false,
     });
 
     const response = await fastify.inject({
@@ -97,11 +100,7 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('handles step requests correctly', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
+    await registerWithPlugin({
       errorHandler: false,
       validation: false,
     });
@@ -117,11 +116,7 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('handles webhook requests correctly', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
+    await registerWithPlugin({
       errorHandler: false,
       validation: false,
     });
@@ -141,12 +136,8 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('returns 404 for non-workflow routes', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
-      validation: false, // Disable schema validation for tests
+    await registerWithPlugin({
+      validation: false,
     });
 
     const response = await fastify.inject({
@@ -159,11 +150,7 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('handles webhook method not allowed', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
+    await registerWithPlugin({
       errorHandler: false,
       validation: false,
     });
@@ -178,11 +165,7 @@ describe('workflow-fastify plugin', () => {
   });
 
   test('respects custom route prefix', async () => {
-    await fastify.register(workflowPlugin, {
-      outputDir: relative(
-        process.cwd(),
-        join(tempDir, '.well-known', 'workflow', 'v1')
-      ),
+    await registerWithPlugin({
       prefix: '/custom-prefix',
       validation: false,
     });
@@ -194,6 +177,25 @@ describe('workflow-fastify plugin', () => {
     });
 
     expect(response.statusCode).toBe(200);
+  });
+
+  test('auto-build uses provided builder', async () => {
+    const buildSpy = vi.fn(async () => {});
+    const cleanupSpy = vi.fn(async () => {});
+    const stubBuilder = {
+      build: buildSpy,
+      cleanup: cleanupSpy,
+    } as unknown as FastifyBuilder;
+
+    await fastify.register(workflowPlugin, {
+      builder: stubBuilder,
+      validation: false,
+    });
+
+    expect(buildSpy).toHaveBeenCalled();
+
+    await fastify.close();
+    expect(cleanupSpy).toHaveBeenCalled();
   });
 });
 
