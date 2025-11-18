@@ -269,7 +269,7 @@ test('hono route codemod transforms default handler', async () => {
   expect(
     containsExpectedContent(output['src/index.ts'], [
       "import { start } from 'workflow/api';",
-      "import { handleUserSignup } from '../workflows/example.js';",
+      "import { handleUserSignup } from '../workflows/user-signup.js';",
       "app.post('/api/signup'",
     ])
   ).toBe(true);
@@ -277,15 +277,23 @@ test('hono route codemod transforms default handler', async () => {
 
 test('hono workflow codemod populates workflow', async () => {
   const output = await runCodemod('hono/workflow', {
-    'workflows/example.ts': honoPlaceholder,
+    'workflows/user-signup.ts': honoPlaceholder,
   });
 
   expect(
-    containsExpectedContent(output['workflows/example.ts'], [
-      "name: 'example-hono'",
-      "return 'Hello from Workflow Studio'",
+    containsExpectedContent(output['workflows/user-signup.ts'], [
+      "import { FatalError, sleep } from 'workflow';",
+      'export async function handleUserSignup(email: string)',
+      '"use workflow";',
+      'await sleep',
+      '"use step";',
+      "throw new FatalError('Invalid Email')",
     ])
   ).toBe(true);
+
+  expect(output['workflows/user-signup.ts']).not.toContain(
+    '__WORKFLOW_HONO_MINIMAL__'
+  );
 });
 
 test('hono tsconfig codemod adds workflow plugin', async () => {
