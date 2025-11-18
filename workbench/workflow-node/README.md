@@ -3,15 +3,16 @@
 Minimal setup showing how to:
 
 1. Define a workflow (`workflows/example.ts`)
-2. Build handler bundles with `createWorkflowNodeBuilder`
+2. Build handler bundles via `workflow build`
 3. Mount workflow routes inside a regular Node server via `createWorkflowNodeFetchHandler`
+4. Load workflow functions with `getWorkflow` for `start()`
 
 ## Commands
 
 ```bash
 pnpm install
-pnpm run build    # generates .well-known/workflow/v1/*
-pnpm run start    # builds + starts the local server on http://localhost:3152
+pnpm run build    # workflow build + tsc
+pnpm run start    # starts the local server on http://localhost:3152
 ```
 
 While the server is running you can trigger the example workflow with:
