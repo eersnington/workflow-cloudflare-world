@@ -78,18 +78,6 @@ function mergeDefaultOptions(
       enabled: true,
       level: 'info',
       includeExecutionDetails: false,
-    },
-    caching: {
-      enabled: true,
-      maxHandlers: 100,
-    },
-    validation: true,
-    hmr: process.env.NODE_ENV !== 'production',
-    ...options,
-    logging: {
-      enabled: true,
-      level: 'info',
-      includeExecutionDetails: false,
       ...options.logging,
     },
     caching: {
@@ -97,6 +85,9 @@ function mergeDefaultOptions(
       maxHandlers: 100,
       ...options.caching,
     },
+    validation: true,
+    hmr: process.env.NODE_ENV !== 'production',
+    ...options,
   };
 }
 
@@ -116,7 +107,7 @@ async function registerWorkflowRoutes(
     handler: (request, reply) => handleFlowRequest(request, reply, options),
     schema: options.validation
       ? {
-          description: 'Execute workflow orchestration logic',
+          summary: 'Execute workflow orchestration logic',
           tags: ['workflows'],
           body: {
             type: 'object',
@@ -140,7 +131,7 @@ async function registerWorkflowRoutes(
     handler: (request, reply) => handleStepRequest(request, reply, options),
     schema: options.validation
       ? {
-          description: 'Execute individual workflow step',
+          summary: 'Execute individual workflow step',
           tags: ['workflows'],
           body: {
             type: 'object',
@@ -164,7 +155,7 @@ async function registerWorkflowRoutes(
     handler: (request, reply) => handleWebhookRequest(request, reply, options),
     schema: options.validation
       ? {
-          description: 'Deliver webhook data to running workflows',
+          summary: 'Deliver webhook data to running workflows',
           tags: ['workflows'],
           params: {
             type: 'object',
@@ -190,10 +181,7 @@ async function registerWorkflowRoutes(
  * Create request logger hook for workflow requests
  */
 function createRequestLogger(options: Required<WorkflowFastifyOptions>) {
-  return async function requestLogger(
-    request: FastifyRequest,
-    reply: FastifyReply
-  ) {
+  return async function requestLogger(request: FastifyRequest) {
     // Only log workflow requests
     if (!request.raw.url?.startsWith(options.prefix || WORKFLOW_ROUTES.base)) {
       return;
@@ -220,7 +208,7 @@ function createRequestLogger(options: Required<WorkflowFastifyOptions>) {
 /**
  * Create response logger hook for workflow requests
  */
-function createResponseLogger(options: Required<WorkflowFastifyOptions>) {
+function createResponseLogger(_options: Required<WorkflowFastifyOptions>) {
   return async function responseLogger(
     request: FastifyRequest,
     reply: FastifyReply

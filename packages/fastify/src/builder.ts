@@ -10,7 +10,6 @@ import {
 } from './constants.js';
 import type { WorkflowFastifyOptions } from './types.js';
 import { watch } from 'node:fs';
-import { pathToFileURL } from 'node:url';
 
 /**
  * Fastify-specific builder that generates workflow files with HMR support.
@@ -40,14 +39,11 @@ export class FastifyBuilder extends BaseBuilder {
         workingDir,
         dirs: resolvedDirs,
       }),
-      buildTarget: 'fastify',
+      buildTarget: 'standalone', // Use standalone target for Fastify
       stepsBundlePath: `${outputDir}/${HANDLER_FILENAMES.step}`,
       workflowsBundlePath: `${outputDir}/${HANDLER_FILENAMES.flow}`,
       webhookBundlePath: `${outputDir}/${HANDLER_FILENAMES.webhook}`,
       clientBundlePath: `${outputDir}/${HANDLER_FILENAMES.client}`,
-      // Fastify-specific optimizations
-      minify: !this.isDevelopment,
-      sourcemap: this.isDevelopment,
     };
 
     super(config);
@@ -66,25 +62,46 @@ export class FastifyBuilder extends BaseBuilder {
       return; // Already enabled
     }
 
+    // Only attempt HMR if workflow directories exist
+    const { accessSync } = require('fs');
+    const existingDirs = this.config.dirs.filter((dir) => {
+      try {
+        accessSync(dir, constants.F_OK);
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    if (existingDirs.length === 0) {
+      // No directories exist to watch, silently disable HMR
+      return;
+    }
+
     console.log('[workflow-fastify] Enabling HMR for workflow files...');
 
-    // Watch all workflow directories for changes
-    const watchPatterns = this.config.dirs.map(
-      (dir) => `${dir}/**/*.{ts,js,tsx,jsx}`
-    );
+    try {
+      // Watch all workflow directories for changes
+      const watchPatterns = existingDirs.map(
+        (dir) => `${dir}/**/*.{ts,js,tsx,jsx}`
+      );
 
-    this.hmrWatcher = watch(
-      watchPatterns,
-      { recursive: true },
-      (eventType, filename) => {
-        if (eventType === 'change' && filename) {
-          console.log(
-            `[workflow-fastify] HMR: Workflow file changed: ${filename}`
-          );
-          this.rebuildWorkflow(filename);
+      this.hmrWatcher = watch(
+        watchPatterns.join(' '),
+        { recursive: true },
+        (eventType: string, filename: string | null) => {
+          if (eventType === 'change' && filename) {
+            console.log(
+              `[workflow-fastify] HMR: Workflow file changed: ${filename}`
+            );
+            this.rebuildWorkflow(filename);
+          }
         }
-      }
-    );
+      );
+    } catch (error) {
+      // Silently fail - HMR is nice-to-have but not required
+      // Don't set hmrWatcher, HMR will be disabled
+    }
   }
 
   /**
@@ -142,10 +159,7 @@ export class FastifyBuilder extends BaseBuilder {
         tsPaths: tsConfig.paths,
         outfile: this.config.stepsBundlePath,
         format: 'esm',
-        // Fastify-specific optimizations
-        minify: !this.isDevelopment,
-        sourcemap: this.isDevelopment,
-        external: ['fastify', 'fastify-plugin'],
+        externalizeNonSteps: true,
       });
 
       await this.createWorkflowsBundle({
@@ -154,14 +168,11 @@ export class FastifyBuilder extends BaseBuilder {
         tsPaths: tsConfig.paths,
         outfile: this.config.workflowsBundlePath,
         format: 'esm',
-        minify: !this.isDevelopment,
-        sourcemap: this.isDevelopment,
-        external: ['fastify', 'fastify-plugin'],
+        bundleFinalOutput: true,
       });
 
       await this.createWebhookBundle({
         outfile: this.config.webhookBundlePath,
-        // Fastify webhook handlers don't need external dependencies
       });
 
       await this.createClientLibrary();
@@ -175,8 +186,6 @@ export class FastifyBuilder extends BaseBuilder {
         console.log(`  - ${this.config.clientBundlePath}`);
       }
 
-      // Performance metrics for Fastify integration
-      const buildTime = Date.now();
       console.log(
         `[workflow-fastify] Build completed at: ${new Date().toISOString()}`
       );

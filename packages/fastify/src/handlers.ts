@@ -3,11 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { pathToFileURL } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { FastifyRequest, FastifyReply } from 'fastify';
-import type {
-  WorkflowFastifyOptions,
-  WorkflowHandler,
-  WebhookHandlers,
-} from './types.js';
+import type { WorkflowFastifyOptions, WebhookHandlers } from './types.js';
 import { DEFAULT_OUTPUT_DIR, HANDLER_FILENAMES } from './constants.js';
 
 /**

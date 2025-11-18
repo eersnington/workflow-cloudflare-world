@@ -32,10 +32,7 @@
  * ```
  */
 
-import type { FastifyPluginAsync } from 'fastify';
-import type { WorkflowFastifyOptions } from './types.js';
 import workflowFastifyPlugin, { enableHMR } from './plugin.js';
-import { FastifyBuilder } from './builder.js';
 
 // Re-export main plugin as default
 export default workflowFastifyPlugin;
@@ -81,7 +78,7 @@ export {
 } from './constants.js';
 
 // Re-export HMR utilities
-export { enableHMR } from './plugin.js';
+export { enableHMR };
 
 // Export plugin as named export for those who prefer it
 export const workflow = workflowFastifyPlugin;
