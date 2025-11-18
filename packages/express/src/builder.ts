@@ -1,138 +1,78 @@
-import { mkdir } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
-import {
-  BaseBuilder,
-  VercelBuildOutputAPIBuilder,
-  createBaseBuilderConfig,
-  type WorkflowConfig,
-} from '@workflow/builders';
-import { HANDLER_FILENAMES } from './constants.js';
+import { BaseBuilder } from '@workflow/builders';
+import type { WorkflowOptions } from './index.js';
 
-const DEFAULT_WORKFLOW_DIRS = [
-  'workflows',
-  'src/workflows',
-  'app',
-  'src/app',
-  'routes',
-  'src/routes',
-  'api',
-  'src/api',
-];
-
-export type WorkflowExpressBuilderTarget = 'local' | 'vercel';
-
-export interface WorkflowExpressBuilderOptions {
-  workingDir?: string;
-  watch?: boolean;
-  dirs?: string[];
-  outDir?: string;
-  workflowManifestPath?: WorkflowConfig['workflowManifestPath'];
-  externalPackages?: string[];
-  target?: WorkflowExpressBuilderTarget | 'auto';
-}
-
-export class WorkflowExpressLocalBuilder extends BaseBuilder {
-  #outDir: string;
-
-  constructor(options: WorkflowExpressBuilderOptions = {}) {
-    const workingDir = options.workingDir ?? process.cwd();
-    const resolvedOutDir = options.outDir
-      ? resolve(workingDir, options.outDir)
-      : join(workingDir, '.well-known/workflow/v1');
-    const defaultManifestPath = join(
-      '.well-known',
-      'workflow',
-      'manifest.json'
-    );
-    const manifestPath = options.workflowManifestPath ?? defaultManifestPath;
+/**
+ * Express-specific builder that generates ESM format workflow files.
+ *
+ * Follows the framework integration docs pattern:
+ * 1. Extends BaseBuilder (recommended approach)
+ * 2. Generates ESM format files for modern Node.js
+ * 3. Creates manifest and client bundle for workflow metadata
+ * 4. Outputs to .well-known/workflow/v1/ directory
+ *
+ * Usage:
+ * ```bash
+ * workflow build
+ * ```
+ */
+export class ExpressBuilder extends BaseBuilder {
+  constructor(options: WorkflowOptions = {}) {
+    const workflowsDir = options.workflowsDir ?? 'workflows';
+    const workingDir = process.cwd();
 
     super({
-      ...createBaseBuilderConfig({
-        workingDir,
-        watch: options.watch,
-        dirs: resolveWorkflowDirs(options.dirs),
-        externalPackages: options.externalPackages,
-      }),
-      workflowManifestPath: manifestPath,
       buildTarget: 'standalone',
+      dirs: [workflowsDir],
+      workingDir,
+      stepsBundlePath: '.well-known/workflow/v1/step.js',
+      workflowsBundlePath: '.well-known/workflow/v1/flow.js',
+      webhookBundlePath: '.well-known/workflow/v1/webhook.js',
+      clientBundlePath: '.well-known/workflow/v1/client.js',
     });
-
-    this.#outDir = resolvedOutDir;
   }
 
   override async build(): Promise<void> {
     const inputFiles = await this.getInputFiles();
     const tsConfig = await this.getTsConfigOptions();
-    await mkdir(this.#outDir, { recursive: true });
+
+    if (inputFiles.length === 0) {
+      console.log('[workflow-express] No workflow files found');
+      return;
+    }
+
+    console.log(
+      `[workflow-express] Building ${inputFiles.length} workflow(s)...`
+    );
+
+    // Following framework integration docs: specify format: 'esm'
+    await this.createStepsBundle({
+      inputFiles,
+      tsBaseUrl: tsConfig.baseUrl,
+      tsPaths: tsConfig.paths,
+      outfile: '.well-known/workflow/v1/step.js',
+      format: 'esm',
+    });
 
     await this.createWorkflowsBundle({
       inputFiles,
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.flow}.mjs`),
-      format: 'esm',
-      bundleFinalOutput: false,
       tsBaseUrl: tsConfig.baseUrl,
       tsPaths: tsConfig.paths,
-    });
-
-    await this.createStepsBundle({
-      inputFiles,
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.step}.mjs`),
-      externalizeNonSteps: true,
+      outfile: '.well-known/workflow/v1/flow.js',
       format: 'esm',
-      tsBaseUrl: tsConfig.baseUrl,
-      tsPaths: tsConfig.paths,
     });
 
     await this.createWebhookBundle({
-      outfile: join(this.#outDir, `${HANDLER_FILENAMES.webhook}.mjs`),
-      bundle: false,
+      outfile: '.well-known/workflow/v1/webhook.js',
     });
-  }
-}
 
-export class WorkflowExpressVercelBuilder extends VercelBuildOutputAPIBuilder {
-  constructor(options: WorkflowExpressBuilderOptions = {}) {
-    const workingDir = options.workingDir ?? process.cwd();
-    const manifestPath =
-      options.workflowManifestPath ?? '.well-known/workflow/manifest.json';
+    await this.createClientLibrary();
 
-    super({
-      ...createBaseBuilderConfig({
-        workingDir,
-        dirs: resolveWorkflowDirs(options.dirs),
-        watch: false,
-        externalPackages: options.externalPackages,
-      }),
-      workflowManifestPath: manifestPath,
-      buildTarget: 'vercel-build-output-api',
-    });
+    console.log('[workflow-express] Build completed successfully!');
+    console.log('[workflow-express] Generated files:');
+    console.log('  - .well-known/workflow/v1/step.js');
+    console.log('  - .well-known/workflow/v1/flow.js');
+    console.log('  - .well-known/workflow/v1/webhook.js');
+    console.log('  - .well-known/workflow/v1/client.js');
+    console.log('  - .well-known/workflow/manifest.json');
   }
-}
-
-export function createWorkflowExpressBuilder(
-  options: WorkflowExpressBuilderOptions = {}
-): BaseBuilder {
-  const target = resolveBuildTarget(options.target);
-  if (target === 'vercel') {
-    return new WorkflowExpressVercelBuilder(options);
-  }
-  return new WorkflowExpressLocalBuilder(options);
-}
-
-function resolveWorkflowDirs(customDirs?: string[]): string[] {
-  const dirs =
-    customDirs && customDirs.length > 0 ? customDirs : DEFAULT_WORKFLOW_DIRS;
-  return Array.from(new Set(dirs));
-}
-
-function resolveBuildTarget(
-  target: WorkflowExpressBuilderOptions['target']
-): WorkflowExpressBuilderTarget {
-  if (target && target !== 'auto') {
-    return target;
-  }
-  if (process.env.VERCEL === '1' || process.env.VERCEL_DEPLOYMENT_ID) {
-    return 'vercel';
-  }
-  return 'local';
 }
