@@ -490,7 +490,7 @@ async function scaffoldWithFrameworkCli({
   }
 
   if (template === 'hono') {
-    const cliArgs = [projectSpecifier, '--', '--template=nodejs'];
+    const cliArgs = [projectSpecifier, '--template=nodejs'];
     await withWorkspaceFileHidden(cwd, () =>
       runWithPackageManagerExecutor({
         packageManager,
