@@ -2,13 +2,13 @@ import { intro, outro, spinner } from '@clack/prompts';
 import { relative, resolve } from 'node:path';
 import pc from 'picocolors';
 import {
-  collectWorldEntries,
+  collectWorldEntriesWithComments,
   detectDefaultEnvFile,
   getWorldLabel,
   isCommunityWorld,
   promptEnvFileLocation,
   promptWorldChoice,
-  writeEnvValues,
+  writeEnvValuesWithComments,
 } from '../worlds.js';
 
 export async function runWorldCommand() {
@@ -20,19 +20,30 @@ export async function runWorldCommand() {
   const envFilePath = resolve(invocationDir, envFileRelative);
 
   const world = await promptWorldChoice();
-  const entries = await collectWorldEntries(world);
+  const config = await collectWorldEntriesWithComments(world);
 
   const spin = spinner();
   spin.start(
     `Updating ${relative(invocationDir, envFilePath) || envFileRelative}`
   );
-  const changed = await writeEnvValues(envFilePath, entries);
-  spin.stop(changed ? 'Environment updated' : 'Environment already up to date');
+  const changed = await writeEnvValuesWithComments(
+    envFilePath,
+    config.entries,
+    config.comments
+  );
+  spin.stop(
+    changed
+      ? 'Environment updated with comments'
+      : 'Environment already up to date'
+  );
 
   const summaryLines = [
     `${pc.green('Configured')} ${pc.bold(relative(invocationDir, envFilePath) || envFileRelative)} for ${pc.yellow(
       getWorldLabel(world)
     )}.`,
+    changed
+      ? 'Environment updated with helpful comments.'
+      : 'Environment already up to date.',
   ];
 
   if (world === 'postgres') {
@@ -42,9 +53,13 @@ export async function runWorldCommand() {
   }
 
   if (world === 'jazz') {
-    summaryLines.push(
-      'Install the community world with `pnpm add workflow-world-jazz` if you have not already.'
-    );
+    if (config.summary && config.summary.length > 0) {
+      summaryLines.push(...config.summary);
+    } else {
+      summaryLines.push(
+        'Install the community world with `pnpm add workflow-world-jazz` if you have not already.'
+      );
+    }
   }
 
   if (isCommunityWorld(world)) {

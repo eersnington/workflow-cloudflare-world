@@ -1,5 +1,6 @@
 import { cancel, isCancel, select, text } from '@clack/prompts';
 import { readFile, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
 
 export const WORLD_OPTIONS = [
   {
@@ -120,17 +121,38 @@ const escapeRegex = (value: string) =>
 const upsertEnvValue = (
   content: string,
   key: string,
-  value: string
+  value: string,
+  comment?: string
 ): string => {
+  const commentLine = comment ? `# ${comment}\n` : '';
   const line = `${key}=${value}`;
   if (!content.trim()) {
-    return `${line}\n`;
+    return `${commentLine}${line}\n`;
   }
-  const pattern = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
+  const pattern = new RegExp(`#.*\n${escapeRegex(key)}=.*$`, 'm');
+  const linePattern = new RegExp(`^${escapeRegex(key)}=.*$`, 'm');
+
   if (pattern.test(content)) {
-    return content.replace(pattern, line);
+    return content.replace(pattern, `${commentLine}${line}`);
   }
-  return `${content}${content.endsWith('\n') ? '' : '\n'}${line}\n`;
+  if (linePattern.test(content)) {
+    return content.replace(linePattern, `${commentLine}${line}`);
+  }
+  return `${content}${content.endsWith('\n') ? '' : '\n'}${commentLine}${line}\n`;
+};
+
+const openUrl = (url: string) => {
+  const start =
+    process.platform === 'darwin'
+      ? 'open'
+      : process.platform === 'win32'
+        ? 'start'
+        : 'xdg-open';
+
+  spawn(start, [url], {
+    detached: true,
+    stdio: 'ignore',
+  }).unref();
 };
 
 export async function writeEnvValues(
@@ -154,6 +176,38 @@ export async function writeEnvValues(
   let updated = existing;
   for (const [key, value] of Object.entries(entries)) {
     updated = upsertEnvValue(updated, key, value);
+  }
+
+  if (updated !== existing) {
+    await writeFile(filePath, ensureEndsWithNewline(updated), 'utf8');
+    return true;
+  }
+  return false;
+}
+
+export async function writeEnvValuesWithComments(
+  filePath: string,
+  entries: Record<string, string>,
+  comments: Record<string, string>
+): Promise<boolean> {
+  let existing = '';
+  try {
+    existing = await readFile(filePath, 'utf8');
+  } catch (error) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'code' in error &&
+      (error as NodeJS.ErrnoException).code !== 'ENOENT'
+    ) {
+      throw error;
+    }
+  }
+
+  let updated = existing;
+  for (const [key, value] of Object.entries(entries)) {
+    const comment = comments[key];
+    updated = upsertEnvValue(updated, key, value, comment);
   }
 
   if (updated !== existing) {
@@ -248,54 +302,191 @@ const promptJazzMode = async (): Promise<'cloud' | 'self-hosted'> => {
   return ensureNotCancelled(mode) as 'cloud' | 'self-hosted';
 };
 
-const promptJazzConfig = async () => {
+const promptJazzConfig = async (): Promise<{
+  entries: Record<string, string>;
+  comments: Record<string, string>;
+  mode: 'cloud' | 'self-hosted';
+  useDefaults?: boolean;
+}> => {
   const mode = await promptJazzMode();
 
-  const workerAccount = await promptRequiredText({
-    message: 'Jazz worker account',
-  });
-  const workerSecret = await promptRequiredText({
-    message: 'Jazz worker secret',
-  });
-  const webhookRegistryId = await promptRequiredText({
-    message: 'Jazz webhook registry ID',
-  });
-  const webhookEndpoint = await promptOptionalText({
-    message: 'Webhook endpoint (public URL)',
-    defaultValue: 'http://localhost:3000',
+  if (mode === 'cloud') {
+    return await promptJazzCloudConfig();
+  } else {
+    return await promptJazzSelfHostedConfig();
+  }
+};
+
+const promptJazzCloudConfig = async (): Promise<{
+  entries: Record<string, string>;
+  comments: Record<string, string>;
+  mode: 'cloud';
+}> => {
+  console.log('\n🎶 Setting up Jazz Cloud for Workflow Studio');
+  console.log('=====================================');
+
+  const openDashboard = await select({
+    message: 'Open Jazz Cloud Dashboard to create your account?',
+    options: [
+      { value: 'yes', label: 'Yes, open dashboard' },
+      { value: 'no', label: 'No, I already have an account' },
+    ],
   });
 
-  if (mode === 'cloud') {
-    const apiKey = await promptRequiredText({
-      message: 'Jazz API key',
-    });
-    return filterEntries({
-      WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
-      JAZZ_API_KEY: apiKey,
-      JAZZ_WORKER_ACCOUNT: workerAccount,
-      JAZZ_WORKER_SECRET: workerSecret,
-      JAZZ_WEBHOOK_REGISTRY_ID: webhookRegistryId,
-      JAZZ_WEBHOOK_ENDPOINT: webhookEndpoint,
+  if (ensureNotCancelled(openDashboard) === 'yes') {
+    console.log('\nOpening Jazz Cloud Dashboard...');
+    console.log('   1. Create a free account at https://dashboard.jazz.tools');
+    console.log('   2. Create a new app (or use the default one)');
+    console.log('   3. Create a "Workflow Worker" in the dashboard');
+    console.log('   4. Copy the credentials from the worker settings\n');
+
+    openUrl('https://dashboard.jazz.tools');
+
+    await select({
+      message: 'Press Enter when you have your credentials ready...',
+      options: [{ value: 'continue', label: 'Continue' }],
     });
   }
 
+  const apiKey = await promptRequiredText({
+    message: 'Jazz API Key (from dashboard)',
+  });
+  const workerAccount = await promptRequiredText({
+    message: 'Jazz Worker Account (from worker credentials)',
+  });
+  const workerSecret = await promptRequiredText({
+    message: 'Jazz Worker Secret (from worker credentials)',
+  });
+  const webhookRegistryId = await promptRequiredText({
+    message: 'Jazz Webhook Registry ID (from worker settings)',
+  });
+  const webhookEndpoint = await promptOptionalText({
+    message: "Webhook Endpoint (your app's public URL)",
+    defaultValue: 'http://localhost:3000',
+  });
+
+  const entries = {
+    WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
+    JAZZ_API_KEY: apiKey,
+    JAZZ_WORKER_ACCOUNT: workerAccount,
+    JAZZ_WORKER_SECRET: workerSecret,
+    JAZZ_WEBHOOK_REGISTRY_ID: webhookRegistryId,
+    JAZZ_WEBHOOK_ENDPOINT: webhookEndpoint || 'http://localhost:3000',
+  };
+
+  const comments = {
+    WORKFLOW_TARGET_WORLD: 'Use workflow-world-jazz as the backend',
+    JAZZ_API_KEY: 'Get this from https://dashboard.jazz.tools',
+    JAZZ_WORKER_ACCOUNT: 'Worker account from Jazz Cloud dashboard',
+    JAZZ_WORKER_SECRET: 'Worker secret from Jazz Cloud dashboard',
+    JAZZ_WEBHOOK_REGISTRY_ID: 'Webhook registry ID from worker settings',
+    JAZZ_WEBHOOK_ENDPOINT: "Your app's public URL (for production deployments)",
+  };
+
+  return { entries, comments, mode: 'cloud' };
+};
+
+const promptJazzSelfHostedConfig = async (): Promise<{
+  entries: Record<string, string>;
+  comments: Record<string, string>;
+  mode: 'self-hosted';
+  useDefaults?: boolean;
+}> => {
+  console.log('\nSetting up self-hosted Jazz for Workflow Studio');
+  console.log('===============================================');
+
+  const useDefaults = await select({
+    message: 'Use recommended defaults for local development?',
+    options: [
+      {
+        value: 'yes',
+        label: 'Yes (recommended for getting started)',
+      },
+      {
+        value: 'no',
+        label: "No, I'll configure manually",
+      },
+    ],
+  });
+
+  if (ensureNotCancelled(useDefaults) === 'yes') {
+    console.log('\nUsing default configuration for local Jazz setup');
+    console.log('   You can start Jazz services with these commands:');
+    console.log('   # Terminal 1: Start sync server');
+    console.log('   pnpx jazz-run sync');
+    console.log('   # Terminal 2: Create worker account');
+    console.log(
+      '   pnpx jazz-run account create --peer http://localhost:4200 --name "Workflow Worker" >> .env.local'
+    );
+    console.log('   # Terminal 3: Create webhook registry');
+    console.log(
+      '   pnpx env-cmd -f .env.local -x -- pnpx jazz-run webhook create-registry --peer http://localhost:4200 --grant $JAZZ_WORKER_ACCOUNT >> .env.local'
+    );
+    console.log('   # Terminal 4: Run webhook registry');
+    console.log(
+      '   pnpx env-cmd -f .env.local -- pnpx jazz-run webhook run --peer http://localhost:4200\n'
+    );
+
+    const entries = {
+      WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
+      JAZZ_SYNC_SERVER: 'http://localhost:4200',
+      JAZZ_WEBHOOK_ENDPOINT: 'http://localhost:3000',
+    };
+
+    const comments = {
+      WORKFLOW_TARGET_WORLD: 'Use workflow-world-jazz as the backend',
+      JAZZ_SYNC_SERVER:
+        'Local Jazz sync server URL (default: http://localhost:4200)',
+      JAZZ_WEBHOOK_ENDPOINT:
+        'Local development endpoint (default: http://localhost:3000)',
+    };
+
+    return { entries, comments, mode: 'self-hosted', useDefaults: true };
+  }
+
+  // Manual configuration
+  const workerAccount = await promptRequiredText({
+    message: 'Jazz Worker Account',
+  });
+  const workerSecret = await promptRequiredText({
+    message: 'Jazz Worker Secret',
+  });
+  const webhookRegistryId = await promptRequiredText({
+    message: 'Jazz Webhook Registry ID',
+  });
   const syncServer = await promptOptionalText({
-    message: 'Jazz sync server URL',
+    message: 'Jazz Sync Server URL',
     defaultValue: 'http://localhost:4200',
   });
   const registrySecret = await promptOptionalText({
-    message: 'Jazz webhook registry secret (optional)',
+    message: 'Jazz Webhook Registry Secret (optional)',
+  });
+  const webhookEndpoint = await promptOptionalText({
+    message: 'Webhook Endpoint (public URL)',
+    defaultValue: 'http://localhost:3000',
   });
 
-  return filterEntries({
+  const entries = filterEntries({
     WORKFLOW_TARGET_WORLD: 'workflow-world-jazz',
     JAZZ_WORKER_ACCOUNT: workerAccount,
     JAZZ_WORKER_SECRET: workerSecret,
     JAZZ_WEBHOOK_REGISTRY_ID: webhookRegistryId,
-    JAZZ_WEBHOOK_REGISTRY_SECRET: registrySecret,
     JAZZ_SYNC_SERVER: syncServer,
+    JAZZ_WEBHOOK_REGISTRY_SECRET: registrySecret,
     JAZZ_WEBHOOK_ENDPOINT: webhookEndpoint,
   });
+
+  const comments = {
+    WORKFLOW_TARGET_WORLD: 'Use workflow-world-jazz as the backend',
+    JAZZ_WORKER_ACCOUNT: 'Your Jazz worker account identifier',
+    JAZZ_WORKER_SECRET: 'Your Jazz worker secret key',
+    JAZZ_WEBHOOK_REGISTRY_ID: 'Webhook registry CoValue ID',
+    JAZZ_SYNC_SERVER: 'Sync server URL (default: http://localhost:4200)',
+    JAZZ_WEBHOOK_REGISTRY_SECRET: 'Webhook registry secret for self-hosting',
+    JAZZ_WEBHOOK_ENDPOINT: "Your app's public URL or localhost for development",
+  };
+
+  return { entries, comments, mode: 'self-hosted', useDefaults: false };
 };
 
 export async function collectWorldEntries(
@@ -307,7 +498,73 @@ export async function collectWorldEntries(
   if (world === 'postgres') {
     return promptPostgresConfig();
   }
-  return promptJazzConfig();
+  const jazzConfig = await promptJazzConfig();
+  return jazzConfig.entries;
+}
+
+export async function collectWorldEntriesWithComments(
+  world: WorldChoice
+): Promise<{
+  entries: Record<string, string>;
+  comments: Record<string, string>;
+  summary?: string[];
+}> {
+  if (world === 'local') {
+    return {
+      entries: { ...LOCAL_WORLD_ENV },
+      comments: {
+        WORKFLOW_TARGET_WORLD: 'Use local world for development and testing',
+      },
+    };
+  }
+
+  if (world === 'postgres') {
+    const entries = await promptPostgresConfig();
+    return {
+      entries,
+      comments: {
+        WORKFLOW_TARGET_WORLD:
+          'Use @workflow/world-postgres for production deployments',
+        WORKFLOW_POSTGRES_URL: 'PostgreSQL connection string',
+        WORKFLOW_POSTGRES_JOB_PREFIX: 'Prefix for workflow jobs in database',
+        WORKFLOW_POSTGRES_WORKER_CONCURRENCY: 'Number of concurrent workers',
+      },
+    };
+  }
+
+  const jazzConfig = await promptJazzConfig();
+
+  // Generate summary for Jazz setup
+  const summary: string[] = [];
+  if (jazzConfig.mode === 'cloud') {
+    summary.push('✅ Jazz Cloud configured successfully');
+    summary.push('Next steps:');
+    summary.push('   1. Run: npm add workflow-world-jazz');
+    summary.push('   2. Start your app: npm dev');
+    summary.push(
+      '   3. Enable webhooks in Jazz Cloud dashboard for production'
+    );
+  } else {
+    if (jazzConfig.useDefaults) {
+      summary.push('✅ Self-hosted Jazz configured with defaults');
+      summary.push('Next steps:');
+      summary.push('   1. Run: npm add workflow-world-jazz');
+      summary.push('   2. Start Jazz services (see commands above)');
+      summary.push('   3. Start your app: npm dev');
+    } else {
+      summary.push('✅ Self-hosted Jazz configured manually');
+      summary.push('Next steps:');
+      summary.push('   1. Run: npm add workflow-world-jazz');
+      summary.push('   2. Start your sync server and webhook registry');
+      summary.push('   3. Start your app: npm dev');
+    }
+  }
+
+  return {
+    entries: jazzConfig.entries,
+    comments: jazzConfig.comments,
+    summary,
+  };
 }
 
 export async function collectWorldEntriesWithSkip(

@@ -28,13 +28,13 @@ import {
   type WorldChoice,
   type WorldSelection,
   WORLD_SKIP_VALUE,
-  collectWorldEntriesWithSkip,
+  collectWorldEntriesWithComments,
   detectDefaultEnvFile,
   getWorldLabel,
   isCommunityWorld,
   promptEnvFileLocation,
   promptWorldChoiceWithSkip,
-  writeEnvValues,
+  writeEnvValuesWithComments,
 } from '../worlds.js';
 
 type InitOptions = {
@@ -548,6 +548,8 @@ async function ensureWorkflowScript(projectDir: string) {
 type WorldConfig = {
   envFileRelative: string;
   entries: Record<string, string>;
+  comments?: Record<string, string>;
+  summary?: string[];
 };
 
 async function collectWorldConfig({
@@ -559,15 +561,24 @@ async function collectWorldConfig({
   projectDir: string;
   skipEnvPrompt: boolean;
 }): Promise<WorldConfig | null> {
-  const entries = await collectWorldEntriesWithSkip(selection);
-  if (!entries) {
+  if (selection === WORLD_SKIP_VALUE) {
     return null;
   }
+
+  const config = await collectWorldEntriesWithComments(
+    selection as WorldChoice
+  );
   const defaultEnvFile = await detectDefaultEnvFile(projectDir);
   const envFileRelative = skipEnvPrompt
     ? defaultEnvFile
     : await promptEnvFileLocation(defaultEnvFile);
-  return { envFileRelative, entries };
+
+  return {
+    envFileRelative,
+    entries: config.entries,
+    comments: config.comments,
+    summary: config.summary,
+  };
 }
 
 async function applyWorldConfig({
@@ -590,13 +601,19 @@ async function applyWorldConfig({
   const world = selection as WorldChoice;
 
   const envFilePath = join(projectDir, config.envFileRelative);
-  const changed = await writeEnvValues(envFilePath, config.entries);
+  const changed = await writeEnvValuesWithComments(
+    envFilePath,
+    config.entries,
+    config.comments || {}
+  );
 
   const summaryLines = [
     `${pc.green('Configured')} ${pc.bold(
       relative(projectDir, envFilePath) || config.envFileRelative
     )} for ${pc.yellow(getWorldLabel(world))}.`,
-    changed ? 'Environment updated.' : 'Environment already up to date.',
+    changed
+      ? 'Environment updated with helpful comments.'
+      : 'Environment already up to date.',
   ];
 
   if (world === 'postgres') {
@@ -606,9 +623,13 @@ async function applyWorldConfig({
   }
 
   if (world === 'jazz') {
-    summaryLines.push(
-      'Install the community world with `pnpm add workflow-world-jazz` if needed.'
-    );
+    if (config.summary && config.summary.length > 0) {
+      summaryLines.push(...config.summary);
+    } else {
+      summaryLines.push(
+        'Install the community world with `pnpm add workflow-world-jazz` if needed.'
+      );
+    }
   }
 
   if (isCommunityWorld(world)) {
