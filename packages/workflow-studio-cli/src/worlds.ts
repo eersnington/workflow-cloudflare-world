@@ -20,6 +20,9 @@ export const WORLD_OPTIONS = [
 ] as const;
 
 export type WorldChoice = (typeof WORLD_OPTIONS)[number]['value'];
+export type WorldSelection = WorldChoice | 'skip';
+
+export const WORLD_SKIP_VALUE = 'skip' as const;
 
 const DEFAULT_ENV_FILES = ['.env.local', '.env'];
 
@@ -55,6 +58,13 @@ export function getWorldLabel(world: WorldChoice): string {
   return WORLD_OPTIONS.find((option) => option.value === world)?.label ?? world;
 }
 
+export function getWorldLabelWithSkip(world: WorldSelection): string {
+  if (world === WORLD_SKIP_VALUE) {
+    return 'Skip';
+  }
+  return getWorldLabel(world);
+}
+
 export function isCommunityWorld(world: WorldChoice): boolean {
   return WORLD_OPTIONS.some(
     (option) => option.value === world && option.community
@@ -63,13 +73,38 @@ export function isCommunityWorld(world: WorldChoice): boolean {
 
 export async function promptWorldChoice(): Promise<WorldChoice> {
   const selected = await select({
-    message: 'Select a Workflow world',
+    message: 'Select a Workflow world (* - Community maintained)',
     options: WORLD_OPTIONS.map((option) => ({
       value: option.value,
       label: `${option.label}${option.community ? ' *' : ''}`,
     })),
   });
   return ensureNotCancelled(selected) as WorldChoice;
+}
+
+export async function promptWorldChoiceWithSkip(
+  autoAccept: boolean,
+  message?: string
+): Promise<WorldSelection> {
+  if (autoAccept) {
+    return 'local';
+  }
+
+  const options = [
+    ...WORLD_OPTIONS.map((option) => ({
+      value: option.value,
+      label: `${option.label}${option.community ? ' *' : ''}`,
+    })),
+    { value: WORLD_SKIP_VALUE, label: 'Skip for now' },
+  ];
+
+  const selected = await select({
+    message:
+      message ||
+      'Which Workflow world do you want to use? (* - Community maintained)',
+    options,
+  });
+  return ensureNotCancelled(selected) as WorldSelection;
 }
 
 const LOCAL_WORLD_ENV = {
@@ -273,4 +308,13 @@ export async function collectWorldEntries(
     return promptPostgresConfig();
   }
   return promptJazzConfig();
+}
+
+export async function collectWorldEntriesWithSkip(
+  selection: WorldSelection
+): Promise<Record<string, string> | null> {
+  if (selection === WORLD_SKIP_VALUE) {
+    return null;
+  }
+  return collectWorldEntries(selection);
 }
