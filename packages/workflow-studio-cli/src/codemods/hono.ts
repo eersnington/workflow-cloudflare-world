@@ -115,40 +115,6 @@ const honoTsconfigCodemod: CodemodDefinition = {
   },
 };
 
-const honoPackageDepsCodemod: CodemodDefinition = {
-  globs: ['package.json'],
-  transform(source) {
-    let parsed: any;
-    try {
-      parsed = JSON.parse(source);
-    } catch {
-      return null;
-    }
-
-    parsed.devDependencies ??= {};
-    const devDependencies = parsed.devDependencies as Record<string, string>;
-    let mutated = false;
-
-    // Add workflow and nitro to devDependencies
-    if (!devDependencies.workflow) {
-      devDependencies.workflow = 'latest';
-      mutated = true;
-    }
-
-    if (!devDependencies.nitro) {
-      devDependencies.nitro = 'latest';
-      mutated = true;
-    }
-
-    if (!devDependencies.rollup) {
-      devDependencies.rollup = 'latest';
-      mutated = true;
-    }
-
-    return mutated ? `${JSON.stringify(parsed, null, 2)}\n` : null;
-  },
-};
-
 const honoPackageScriptsCodemod: CodemodDefinition = {
   globs: ['package.json'],
   transform(source) {
@@ -196,6 +162,5 @@ export const honoCodemods = {
   'hono/index/route': honoRouteCodemod,
   'hono/workflow': honoWorkflowCodemod,
   'hono/tsconfig/plugin': honoTsconfigCodemod,
-  'hono/package/deps': honoPackageDepsCodemod,
   'hono/package/scripts': honoPackageScriptsCodemod,
 } as const satisfies Record<string, CodemodDefinition>;

@@ -526,14 +526,29 @@ async function installWorkflowDeps({
   packageManager,
   projectDir,
   templateName,
+  exampleName,
 }: {
   packageManager: PackageManagerName;
   projectDir: string;
-  templateName: string;
+  templateName: TemplateName;
+  exampleName: string;
 }) {
   const baseDeps = ['workflow@latest'];
   const aiDeps = ['ai@latest', 'zod@latest'];
-  const deps = templateName === 'ai' ? [...baseDeps, ...aiDeps] : baseDeps;
+  const honoDeps = ['nitro@latest', 'rollup@latest'];
+
+  let deps: string[] = [...baseDeps];
+
+  // Add template-specific dependencies
+  if (templateName === 'hono') {
+    deps.push(...honoDeps);
+  }
+
+  // Add example-specific dependencies
+  if (exampleName === 'ai') {
+    deps.push(...aiDeps);
+  }
+
   const args = PACKAGE_MANAGERS[packageManager].installArgs(deps);
   log.message(
     pc.blue(`\n> ${packageManager} ${args.join(' ')} (${projectDir})`)
@@ -720,6 +735,7 @@ export async function runInitCommand(options: InitOptions) {
     packageManager,
     projectDir: targetDir,
     templateName,
+    exampleName,
   });
 
   const spin = spinner();
