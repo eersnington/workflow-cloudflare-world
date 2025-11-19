@@ -1,6 +1,6 @@
 # workflow-express
 
-Simple Express middleware for Vercel Workflow DevKit. Add workflows to any Express application with zero configuration.
+Simple Express middleware for Vercel Workflow DevKit. Add workflows to any Express application with minimal configuration.
 
 ```bash
 npm add workflow workflow-express
