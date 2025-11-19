@@ -19,7 +19,9 @@ export const getWorkflowConfig = (
     workflowsBundlePath: './.well-known/workflow/v1/flow.js',
     webhookBundlePath: './.well-known/workflow/v1/webhook.js',
     workflowManifestPath: workflowManifest,
-    clientBundlePath: './.well-known/workflow/v1/client.js',
+
+    // WIP: generate a client library to easily execute workflows/steps
+    clientBundlePath: './lib/generated/workflows.js',
   };
   return config;
 };
