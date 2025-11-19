@@ -60,7 +60,6 @@ Fastify will also run the builder automatically when the plugin registers, but r
 import Fastify from 'fastify';
 import workflow from '@workflow/fastify';
 import { start } from 'workflow/api';
-import { getWorkflow } from '@workflow/fastify/workflows';
 
 const app = Fastify({ logger: true });
 
@@ -72,8 +71,7 @@ await app.register(workflow, {
 
 app.post('/signup', async (req, reply) => {
   const { email } = req.body as { email: string };
-  const handler = await getWorkflow('handleUserSignup');
-  const run = await start(handler, [email]);
+  const run = await start(handleUserSignup, [email]);
   return { runId: run.runId };
 });
 
@@ -87,5 +85,3 @@ await app.listen({ port: 3000 });
 - `prefix`: Change the HTTP prefix under which Fastify serves `flow`, `step`, and `webhook` routes.
 - `logging`, `caching`, `validation`: Mirror Fastify behaviors.
 - `hmr`: Enables workflow rebuilds during development.
-
-The plugin exposes the workflow decorators described in `@workflow/fastify/workflows` so you can call `start()` the same way you would with any other Workflow DevKit integration.
