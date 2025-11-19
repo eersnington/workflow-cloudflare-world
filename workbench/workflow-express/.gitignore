@@ -7,7 +7,13 @@ node_modules
 .wrangler
 /.svelte-kit
 /build
-.well-known/
+.well-known/*
+!.well-known/workflow/
+.well-known/workflow/*
+!.well-known/workflow/v1/
+.well-known/workflow/v1/*
+!.well-known/workflow/v1/client.js
+!.well-known/workflow/v1/client.d.ts
 dist
 
 # OS
