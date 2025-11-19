@@ -23,4 +23,11 @@ export interface WorkflowOptions {
    * Defaults to a curated list of common workflow directories.
    */
   dirs?: string[];
+
+  /**
+   * Enable development mode.
+   * If true, the workflow builder will run in watch mode within the middleware.
+   * Defaults to process.env.NODE_ENV !== 'production'
+   */
+  dev?: boolean;
 }

@@ -1,7 +1,7 @@
 import express from 'express';
 import { start } from 'workflow/api';
 import workflow from 'workflow-express';
-import { getWorkflow } from 'workflow-express/workflows';
+import { handleGreeting } from '#client';
 
 const app = express();
 
@@ -16,7 +16,6 @@ app.post('/trigger', async (req, res, next) => {
   try {
     const name =
       typeof req.body?.name === 'string' ? req.body.name : 'workflow-user';
-    const handleGreeting = await getWorkflow('handleGreeting');
     const run = await start(handleGreeting, [name]);
     res.json({ runId: run.runId });
   } catch (error) {

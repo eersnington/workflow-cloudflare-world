@@ -8,171 +8,145 @@ npm add workflow workflow-express
 
 ## Quick Start
 
-### **Create your workflow files:**
+### 1. Create a workflow
+Create a file in `workflows/` (e.g. `workflows/user-signup.ts`):
 
 ```ts
-// workflows/user-signup.ts
-import { sleep, createWebhook } from 'workflow';
+import { sleep } from 'workflow';
 
 export async function handleUserSignup(email: string) {
-  'use workflow';
+  'use workflow'; // Required: Marks this as a workflow
 
-  const user = await createUser(email);
-  await sendWelcomeEmail(user);
-
-  await sleep('5s');
-
-  const webhook = createWebhook();
-  await sendOnboardingEmail(user, webhook.url);
-
-  await webhook;
-  console.log('Webhook Resolved');
-
-  return { userId: user.id, status: 'onboarded' };
+  await sendWelcomeEmail(email);
+  await sleep('1m');
+  await sendFollowUpEmail(email);
 }
 
-async function createUser(email: string) {
-  'use step';
-  console.log(`Creating a new user with email: ${email}`);
-  return { id: crypto.randomUUID(), email };
+async function sendWelcomeEmail(email: string) {
+  'use step'; // Required: Marks this as a step
+  console.log(`Sent welcome to ${email}`);
 }
 
-async function sendWelcomeEmail(user: { id: string; email: string }) {
+async function sendFollowUpEmail(email: string) {
   'use step';
-  console.log(`Sending welcome email to user: ${user.id}`);
-}
-
-async function sendOnboardingEmail(user: { id: string; email: string }, callback: string) {
-  'use step';
-  console.log("Callback URL:", callback);
-  console.log(`Sending onboarding email to user: ${user.id}`);
+  console.log(`Sent follow-up to ${email}`);
 }
 ```
 
-### **Build your workflows:**
-
-```bash
-workflow build
-```
-
-This generates the required handler files in `.well-known/workflow/v1/`:
-- `step.js` - Handles step execution
-- `flow.js` - Handles workflow execution
-- `webhook.js` - Handles webhook delivery
-- `client.js` - Workflow functions with metadata for your app
-
-### **Add the workflow middleware to your Express app:**
+### 2. Add middleware to your server
 
 ```ts
 // src/server.ts
 import express from 'express';
 import workflow from 'workflow-express';
 import { start } from 'workflow/api';
-import { getWorkflow } from 'workflow-express/workflows';
+
+// Import directly from the generated bundle for full type safety
+// Note: Run 'workflow build' once to generate this file initially
+import { handleUserSignup } from '../.well-known/workflow/v1/client';
 
 const app = express();
 
-// Add workflow middleware - it's that simple!
+// 1. Add middleware
 app.use(workflow());
-
 app.use(express.json());
 
-// Your existing routes
+// 2. Trigger workflows from your routes
 app.post('/signup', async (req, res) => {
   const { email } = req.body;
-  const handleUserSignup = await getWorkflow('handleUserSignup');
+  
+  // Fully typed execution!
   const run = await start(handleUserSignup, [email]);
+  
   res.json({ runId: run.runId });
 });
 
-app.listen(3000, () => {
-  console.log('Server listening on http://localhost:3000');
-});
+app.listen(3000);
 ```
 
-### **That's it!** The middleware will:
-   - Load pre-built workflow handlers
-   - Expose the required workflow HTTP endpoints
-   - Handle all the protocol details automatically
+### 3. Run it
 
-## Build Process
+**Development:**
+The middleware automatically watches and rebuilds your workflows in development.
+```bash
+# Just start your server normally
+# (Ensure your server restarts on file changes, e.g. using nodemon or node --watch)
+node --watch dist/server.js
+```
 
-Express doesn't have a built-in build system like Next.js or Vite, so you need to build workflows manually:
+**Production:**
+Build workflows once before starting your server.
+```bash
+# 1. Build workflows
+npx workflow build
 
-### One-time setup
+# 2. Start server
+node dist/server.js
+```
 
-Add to your `package.json`:
+---
 
+## API Reference
+
+### `workflow(options?)`
+
+Creates the Express middleware.
+
+```ts
+import workflow from 'workflow-express';
+
+app.use(workflow({
+  // options
+}));
+```
+
+| Option | Type | Default | Description |
+| :--- | :--- | :--- | :--- |
+| `dirs` | `string[]` | `['workflows']` | Directories to scan for workflow files. |
+| `dev` | `boolean` | `process.env.NODE_ENV !== 'production'` | Enable watch mode. If `true`, the middleware starts a background builder that watches `dirs` and regenerates the client bundle on change. |
+| `outputDir` | `string` | `.well-known/workflow/v1` | Directory where generated files are written. |
+
+### Generated Client Bundle
+
+The build process generates a type-safe client library at `.well-known/workflow/v1/client.js`.
+
+**Recommended:** Use [Subpath Imports](https://nodejs.org/api/packages.html#subpath-imports) for cleaner imports.
+
+**package.json:**
 ```json
 {
-  "scripts": {
-    "build": "workflow build && tsc",
-    "start": "node dist/src/server.js"
+  "imports": {
+    "#client": "./.well-known/workflow/v1/client.js"
   }
 }
 ```
 
-### Development workflow
-
-```bash
-pnpm install
-pnpm build    # Build workflows + compile TypeScript
-pnpm start    # Start your server
+**tsconfig.json:**
+```json
+{
+  "compilerOptions": {
+    "paths": {
+      "#client": ["./.well-known/workflow/v1/client.js"]
+    }
+  }
+}
 ```
 
-## How It Works
-
-Following the [framework integration guide](https://useworkflow.dev/docs/how-it-works/framework-integrations), this middleware:
-
-1. **Builds** workflow handler files using the Workflow DevKit builder
-2. **Loads** pre-generated handlers at runtime (no lazy building)
-3. **Routes** the three required endpoints to appropriate handlers
-4. **Handles** conversion between Express requests and Web API requests
-
-## Configuration Options
-
-The middleware supports basic configuration:
-
+**Usage:**
 ```ts
-import workflow from 'workflow-express';
-
-app.use(workflow({
-  workflowsDir: 'src/workflows' // Default: 'workflows'
-}));
+import { myWorkflow } from '#client';
 ```
 
-## Advanced Usage
+## Deployment
 
-### Using the Builder Directly
+Deploying to Vercel, Docker, or any Node.js host is simple. Ensure `workflow build` runs during your build phase.
 
-For more control, you can use the Express builder directly:
-
-```ts
-import { ExpressBuilder } from 'workflow-express/builder';
-
-const builder = new ExpressBuilder({
-  workflowsDir: 'my-workflows'
-});
-
-await builder.build();
+**package.json:**
+```json
+{
+  "scripts": {
+    "build": "workflow build && tsc",
+    "start": "node dist/server.js"
+  }
+}
 ```
-
-### Custom Workflow Directory
-
-```ts
-// server.ts
-import workflow from 'workflow-express';
-
-app.use(workflow({
-  workflowsDir: 'src/api/workflows'
-}));
-
-// Don't forget to update your build too:
-// workflow build --workflows-dir src/api/workflows
-```
-
-## Learn More
-
-- [Workflow DevKit Documentation](https://useworkflow.dev)
-- [Framework Integration Guide](https://useworkflow.dev/docs/how-it-works/framework-integrations)
-- [API Reference](https://useworkflow.dev/docs/api-reference)

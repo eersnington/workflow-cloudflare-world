@@ -616,7 +616,7 @@ export const POST = workflowEntrypoint(workflowCode);`;
    * The client library allows importing and calling workflows from application code.
    * Only generated if clientBundlePath is specified in config.
    */
-  protected async createClientLibrary(): Promise<void> {
+  protected async createClientLibrary(): Promise<esbuild.BuildContext | void> {
     if (!this.config.clientBundlePath) {
       // Silently exit since no client bundle was requested
       return;
@@ -638,8 +638,68 @@ export const POST = workflowEntrypoint(workflowCode);`;
       .map((file) => `export * from '${file}';`)
       .join('\n');
 
+    const dtsPlugin: esbuild.Plugin = {
+      name: 'client-dts-generator',
+      setup: (build) => {
+        build.onEnd(async (result) => {
+          if (result.errors.length > 0) return;
+
+          // Generate .d.ts file for the client bundle
+          try {
+            // ! is safe because of the check at the start of the function
+            const dtsPath = this.config.clientBundlePath!.replace(
+              /\.js$/,
+              '.d.ts'
+            );
+            const outputDir = dirname(this.config.clientBundlePath!);
+
+            const dtsContent = inputFiles
+              .map((file) => {
+                const normalizedFile = file.replace(/\\/g, '/');
+                const normalizedOutputDir = resolve(
+                  this.config.workingDir,
+                  outputDir
+                ).replace(/\\/g, '/');
+                let relativePath = relative(
+                  normalizedOutputDir,
+                  normalizedFile
+                ).replace(/\\/g, '/');
+
+                // Remove extension for import path
+                relativePath = relativePath.replace(
+                  /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/,
+                  ''
+                );
+
+                if (!relativePath.startsWith('.')) {
+                  relativePath = `./${relativePath}`;
+                }
+
+                // For Node16/NodeNext module resolution, we need to append .js extension
+                // to relative imports, even if the source file is .ts
+                const ext = file.split('.').pop();
+                if (['ts', 'tsx', 'mts', 'cts'].includes(ext || '')) {
+                  relativePath += '.js';
+                }
+
+                return `export * from '${relativePath}';`;
+              })
+              .join('\n');
+
+            await writeFile(dtsPath, dtsContent);
+            console.log('Created client library types');
+          } catch (error) {
+            console.warn('Failed to generate client library types:', error);
+          }
+
+          // Create .gitignore in .swc directory (ensure it exists on rebuilds)
+          await this.createSwcGitignore();
+        });
+      },
+    };
+
     // Bundle with esbuild and our custom SWC plugin
-    const clientResult = await esbuild.build({
+    const ctx = await esbuild.context({
       banner: {
         js: '// biome-ignore-all lint: generated file\n/* eslint-disable */\n',
       },
@@ -656,15 +716,20 @@ export const POST = workflowEntrypoint(workflowCode);`;
       target: 'es2022',
       write: true,
       treeShaking: true,
+      sourcemap: this.config.watch ? 'inline' : true,
       external: ['@workflow/core'],
       resolveExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
-      plugins: [createSwcPlugin({ mode: 'client' })],
+      plugins: [createSwcPlugin({ mode: 'client' }), dtsPlugin],
     });
 
-    this.logEsbuildMessages(clientResult, 'client library bundle');
+    if (this.config.watch) {
+      await ctx.watch();
+      return ctx;
+    }
 
-    // Create .gitignore in .swc directory
-    await this.createSwcGitignore();
+    const clientResult = await ctx.rebuild();
+    this.logEsbuildMessages(clientResult, 'client library bundle');
+    await ctx.dispose();
   }
 
   /**

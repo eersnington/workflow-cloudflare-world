@@ -4,8 +4,11 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "paths": {
+      "#client": ["./.well-known/workflow/v1/client.d.ts"]
+    }
   },
-  "include": ["workflows", "server.ts"],
+  "include": ["workflows", "server.ts", "./.well-known/workflow/v1/client.js"],
   "exclude": ["dist", "node_modules"]
 }

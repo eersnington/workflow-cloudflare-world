@@ -38,6 +38,7 @@ export class ExpressBuilder extends BaseBuilder {
       ...createBaseBuilderConfig({
         workingDir,
         dirs: resolvedDirs,
+        watch: options.dev,
       }),
       buildTarget: 'standalone',
       stepsBundlePath: `${outputDir}/${HANDLER_FILENAMES.step}`,

@@ -9,6 +9,8 @@ import {
 import type { WorkflowOptions } from './types.js';
 import { handleFlow, handleStep, handleWebhook } from './handlers.js';
 
+import { ExpressBuilder } from './builder.js';
+
 /**
  * Creates Express middleware for handling workflow requests
  * Assumes workflow files have been pre-built with `workflow build`
@@ -18,6 +20,15 @@ export function createWorkflowMiddleware(
 ): RequestHandler {
   const outputDir = options.outputDir ?? DEFAULT_OUTPUT_DIR;
   const buildDir = resolve(process.cwd(), outputDir);
+  const isDev = options.dev ?? process.env.NODE_ENV !== 'production';
+
+  if (isDev) {
+    const builder = new ExpressBuilder({ ...options, dev: true });
+    // Start the builder in the background
+    builder.build().catch((err) => {
+      console.error('[workflow-express] Failed to start dev builder:', err);
+    });
+  }
 
   let handlersChecked = false;
   async function ensureHandlersExist() {

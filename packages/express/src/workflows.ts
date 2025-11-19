@@ -19,6 +19,14 @@ import type { WorkflowOptions } from './types.js';
 
 // Dynamically import from the generated client bundle at runtime
 // This avoids TypeScript compilation issues while still providing workflow metadata
+/**
+ * @deprecated Use the generated client bundle directly for type safety.
+ *
+ * Example:
+ * ```ts
+ * import { myWorkflow } from './.well-known/workflow/v1/client';
+ * ```
+ */
 export async function getWorkflow(name: string, options: WorkflowOptions = {}) {
   try {
     // Use a dynamic import that will work at runtime
