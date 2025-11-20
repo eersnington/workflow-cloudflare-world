@@ -1,0 +1,22 @@
+{
+  "name": "@workbench/fastify-vite",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server.ts --dev",
+    "build": "vite build",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@fastify/vite": "^8.2.0",
+    "@workflow/fastify": "workspace:*",
+    "fastify": "^5.6.2",
+    "workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "^4.19.2",
+    "typescript": "catalog:",
+    "vite": "^7.1.7"
+  }
+}
