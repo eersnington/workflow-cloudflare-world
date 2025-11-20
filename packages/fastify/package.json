@@ -1,0 +1,38 @@
+{
+  "name": "@workflow/fastify",
+  "version": "0.0.0",
+  "description": "Fastify integration for Workflow DevKit",
+  "type": "module",
+  "main": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js",
+    "./server": "./dist/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@swc/core": "1.11.24",
+    "@workflow/builders": "workspace:*",
+    "@workflow/swc-plugin": "workspace:*",
+    "fastify-plugin": "5.1.0",
+    "fs-extra": "^11.3.2",
+    "exsolve": "^1.0.7",
+    "pathe": "^2.0.3"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@workflow/tsconfig": "workspace:*",
+    "fastify": "5.6.2",
+    "typescript": "catalog:",
+    "vite": "7.1.11"
+  },
+  "peerDependencies": {
+    "fastify": ">=5.0.0"
+  }
+}
