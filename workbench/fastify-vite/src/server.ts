@@ -13,7 +13,6 @@ await server.register(FastifyVite, {
   root: resolve(import.meta.dirname, '..'),
   distDir: resolve(import.meta.dirname, '../dist'),
   dev: process.argv.includes('--dev'),
-  spa: true,
 });
 
 await server.vite.ready();
