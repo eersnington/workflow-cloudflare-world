@@ -1,0 +1,72 @@
+<html>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Workflow DevKit + Fastify Example</title>
+  <style>
+    textarea {
+      width: 100%;
+      height: calc(100vh - 140px);
+      max-height: calc(100vh - 140px);
+      box-sizing: border-box;
+      padding: 8px;
+      font-family: monospace;
+      font-size: 14px;
+      resize: none;
+      overflow: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>Workflow DevKit + Fastify Example</h1>
+  <textarea id="output" readonly placeholder="Output..."></textarea>
+
+<script type="module">
+  const out = document.getElementById("output");
+
+  log("Starting workflow demo request...");
+  const result = await fetchJSON("/signup", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: "test@example.com" })
+  });
+
+  if (result && result.runId) {
+    log("Workflow started with runId:", result.runId);
+    // Optionally trigger a follow-up status fetch here
+  } else {
+    log("No runId returned.");
+  }
+
+  // Helpers
+  function log(...msg) {
+    out.value += msg.map(x => format(x)).join(" ") + "\n";
+  }
+
+  async function fetchJSON(url, init) {
+    try {
+      log(`[${init?.method || 'GET'}] ${url}`);
+      const res = await fetch(url, init);
+      const text = await res.text();
+
+      if (res.ok) {
+        log("Response:", text);
+        return JSON.parse(text);
+      } else {
+        log("Error", res.status, res.statusText, text);
+      }
+    } catch (err) {
+      log("Fetch error:", err.toString());
+    }
+    return null;
+  }
+
+  function format(value) {
+    if (typeof value === "string") return value;
+    try { return JSON.stringify(value, null, 2); }
+    catch { return String(value); }
+  }
+</script>
+</body>
+</html>
