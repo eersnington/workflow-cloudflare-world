@@ -10,8 +10,9 @@ const server = Fastify({
 });
 
 await server.register(FastifyVite, {
-  root: resolve(import.meta.dirname, 'client'),
-  distDir: resolve(import.meta.dirname, '../dist/client'),
+  // Point Fastify Vite at the project root so it can find vite.config.ts
+  root: resolve(import.meta.dirname, '..'),
+  distDir: resolve(import.meta.dirname, '..', 'dist'), // Must match build.outDir in Vite config
   dev: process.argv.includes('--dev'),
 });
 

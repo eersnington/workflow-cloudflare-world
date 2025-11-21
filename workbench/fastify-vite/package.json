@@ -8,13 +8,15 @@
     "start": "node dist/server.js"
   },
   "dependencies": {
-    "@fastify/vite": "^8.2.0",
+    "@fastify/react": "1.1.0",
+    "@fastify/vite": "8.2.1",
     "@workflow/fastify": "workspace:*",
     "fastify": "^5.6.2",
     "workflow": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "catalog:",
+    "@vitejs/plugin-react": "4.3.4",
     "tsx": "^4.19.2",
     "typescript": "catalog:",
     "vite": "^7.1.7"
