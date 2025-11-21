@@ -7,10 +7,6 @@ const server = Fastify({
   logger: true,
 });
 
-// Register workflow plugin
-// disabled for now
-// await server.register(workflowFastify);
-
 console.log('Fastify Server created!');
 
 // Trigger route
