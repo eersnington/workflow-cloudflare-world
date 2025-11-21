@@ -1,6 +1,6 @@
 import Fastify from 'fastify';
-import { toFetchHandler } from 'srvx/node';
 import { start } from 'workflow/api';
+import { fromNodeHandler } from 'nitro/h3';
 import { handleSignupWorkflow } from '../workflows/example.js';
 
 const server = Fastify({
@@ -27,4 +27,10 @@ server.post('/signup', async (req: any, reply) => {
 });
 
 await server.ready();
-export default toFetchHandler(server.routing);
+
+export default fromNodeHandler((req, res) => {
+  return new Promise((resolve) => {
+    res.on('finish', resolve);
+    server.server.emit('request', req, res);
+  });
+});
