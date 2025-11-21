@@ -11,7 +11,6 @@ import * as workflow_6_batching from './workflows/6_batching';
 import * as workflow_7_full from './workflows/7_full';
 import * as workflow_98_duplicate_case from './workflows/98_duplicate_case';
 import * as workflow_99_e2e from './workflows/99_e2e';
-import * as workflow_example from './workflows/example';
 
 export const allWorkflows = {
   'workflows/0_demo.ts': workflow_0_demo,
@@ -24,5 +23,4 @@ export const allWorkflows = {
   'workflows/7_full.ts': workflow_7_full,
   'workflows/98_duplicate_case.ts': workflow_98_duplicate_case,
   'workflows/99_e2e.ts': workflow_99_e2e,
-  'workflows/example.ts': workflow_example,
 } as const;
