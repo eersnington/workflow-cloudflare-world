@@ -10,8 +10,8 @@ const server = Fastify({
 });
 
 await server.register(FastifyVite, {
-  root: resolve(import.meta.dirname, '..'),
-  distDir: resolve(import.meta.dirname, '../dist'),
+  root: resolve(import.meta.dirname, 'client'),
+  distDir: resolve(import.meta.dirname, '../dist/client'),
   dev: process.argv.includes('--dev'),
 });
 

@@ -1,9 +1,11 @@
-import viteFastify from '@fastify/vite/plugin';
 import workflowPlugin from '@workflow/fastify';
+import { resolve } from 'node:path';
 
 export default {
-  plugins: [
-    viteFastify({ useRelativePaths: true, api: true }),
-    workflowPlugin(),
-  ],
+  root: resolve(__dirname, 'src/client'),
+  build: {
+    outDir: resolve(__dirname, 'dist/client'),
+    emptyOutDir: true,
+  },
+  plugins: [workflowPlugin()],
 };
