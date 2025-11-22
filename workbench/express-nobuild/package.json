@@ -1,0 +1,20 @@
+{
+  "name": "express-nobuild-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "workflow build && tsc -p tsconfig.json",
+    "start": "node ./dist/server.js",
+    "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/server.js\""
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "workflow": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.5",
+    "@types/node": "catalog:",
+    "concurrently": "9.2.1",
+    "typescript": "catalog:"
+  }
+}
