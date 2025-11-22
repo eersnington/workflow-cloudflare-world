@@ -658,13 +658,71 @@ export const POST = workflowEntrypoint(workflowCode);`;
       treeShaking: true,
       external: ['@workflow/core'],
       resolveExtensions: ['.ts', '.tsx', '.js', '.jsx', '.mjs', '.cjs'],
-      plugins: [createSwcPlugin({ mode: 'client' })],
+      plugins: [
+        createSwcPlugin({ mode: 'client' }),
+        {
+          name: 'client-dts-generator',
+          setup: (build) => {
+            build.onEnd(async (result) => {
+              if (result.errors.length > 0) return;
+
+              // Generate .d.ts file for the client bundle
+              try {
+                // ! is safe because of the check at the start of the function
+                const dtsPath = this.config.clientBundlePath!.replace(
+                  /\.js$/,
+                  '.d.ts'
+                );
+                const outputDir = dirname(this.config.clientBundlePath!);
+
+                const dtsContent = inputFiles
+                  .map((file) => {
+                    const normalizedFile = file.replace(/\\\\/g, '/');
+                    const normalizedOutputDir = resolve(
+                      this.config.workingDir,
+                      outputDir
+                    ).replace(/\\\\/g, '/');
+                    let relativePath = relative(
+                      normalizedOutputDir,
+                      normalizedFile
+                    ).replace(/\\\\/g, '/');
+
+                    // Remove extension for import path
+                    relativePath = relativePath.replace(
+                      /\.(ts|tsx|mts|cts|js|jsx|mjs|cjs)$/,
+                      ''
+                    );
+
+                    if (!relativePath.startsWith('.')) {
+                      relativePath = `./${relativePath}`;
+                    }
+
+                    // For Node16/NodeNext module resolution, we need to append .js extension
+                    // to relative imports, even if the source file is .ts
+                    const ext = file.split('.').pop();
+                    if (['ts', 'tsx', 'mts', 'cts'].includes(ext || '')) {
+                      relativePath += '.js';
+                    }
+
+                    return `export * from '${relativePath}';`;
+                  })
+                  .join('\\n');
+
+                await writeFile(dtsPath, dtsContent);
+                console.log('Created client library types');
+              } catch (error) {
+                console.warn('Failed to generate client library types:', error);
+              }
+
+              // Create .gitignore in .swc directory (ensure it exists on rebuilds)
+              await this.createSwcGitignore();
+            });
+          },
+        },
+      ],
     });
 
     this.logEsbuildMessages(clientResult, 'client library bundle');
-
-    // Create .gitignore in .swc directory
-    await this.createSwcGitignore();
   }
 
   /**
