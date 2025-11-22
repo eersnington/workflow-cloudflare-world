@@ -21,7 +21,7 @@ export const getWorkflowConfig = (
     workflowManifestPath: workflowManifest,
 
     // WIP: generate a client library to easily execute workflows/steps
-    // clientBundlePath: './lib/generated/workflows.js',
+    clientBundlePath: './lib/generated/workflows.js',
   };
   return config;
 };
