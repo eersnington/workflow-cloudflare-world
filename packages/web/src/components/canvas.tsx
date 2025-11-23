@@ -1,13 +1,11 @@
 'use client';
 
+import type { Edge, Node, PanelPosition } from '@xyflow/react';
 import { useMemo } from 'react';
-import type { Node, Edge } from '@xyflow/react';
-import { PanelPosition } from '@xyflow/react';
-import { Edge as EdgeComponent } from '@/components/ai-elements/edge';
 import { Canvas as FlowCanvas } from '@/components/ai-elements/canvas';
 import { Connection } from '@/components/ai-elements/connection';
 import { Controls } from '@/components/ai-elements/controls';
-import { Panel } from '@/components/ai-elements/panel';
+import { Edge as EdgeComponent } from '@/components/ai-elements/edge';
 import {
   Node as WorkflowNode,
   NodeContent,
@@ -16,6 +14,7 @@ import {
   NodeHeader,
   NodeTitle,
 } from '@/components/ai-elements/node';
+import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
 import { Badge } from '@/components/ui/badge';
 import type { WorkflowListItem } from '@/lib/use-workflows';
@@ -111,7 +110,7 @@ export function Canvas({ workflow }: CanvasProps) {
         connectionLineComponent={Connection}
         proOptions={{ hideAttribution: true }}
       >
-        <Panel position={PanelPosition.TopRight}>
+        <Panel position={'top-right' satisfies PanelPosition}>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {workflow ? (
               <>
