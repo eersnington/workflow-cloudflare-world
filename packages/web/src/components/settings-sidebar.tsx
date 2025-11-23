@@ -235,6 +235,7 @@ export function SettingsSidebar() {
                     <AlertDescription>
                       <ul className="list-disc list-inside space-y-1">
                         {errors.map((error, idx) => (
+                          // biome-ignore lint/suspicious/noArrayIndexKey: Error list order is stable for this render
                           <li key={`error-${idx}`}>
                             {error.field !== 'general' && (
                               <strong>{error.field}:</strong>
