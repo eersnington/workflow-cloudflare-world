@@ -22,7 +22,7 @@ function ObservabilityView({
   selectedHookId?: string;
 }) {
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full">
       <ErrorBoundary
         title="Runs Error"
         description="Failed to load workflow runs. Please try refreshing the page."
@@ -80,7 +80,7 @@ export default function Home() {
   return (
     <ReactFlowProvider>
       {viewMode === 'observability' ? (
-        <div className="h-full overflow-auto">
+        <div className="h-full w-full overflow-auto">
           <SidebarTrigger />
           <ObservabilityView
             config={config}
@@ -90,7 +90,7 @@ export default function Home() {
           />
         </div>
       ) : (
-        <div className="h-full">
+        <div className="h-full w-full">
           <SidebarTrigger />
           <Canvas workflow={selectedWorkflow} />
         </div>

@@ -105,7 +105,7 @@ function LayoutContent({ children }: LayoutClientProps) {
       disableTransitionOnChange
     >
       <SidebarProvider>
-        <div className="flex min-h-screen bg-background">
+        <div className="flex min-h-screen w-full bg-background">
           <AppSidebar config={config} />
           <SidebarInset className="p-6">
             <TooltipProvider delayDuration={0}>
