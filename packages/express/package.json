@@ -17,8 +17,12 @@
     "directory": "packages/express"
   },
   "exports": {
-    ".": "./dist/index.js"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
   },
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
