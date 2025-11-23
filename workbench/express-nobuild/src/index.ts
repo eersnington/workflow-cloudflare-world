@@ -2,7 +2,7 @@ import workflow from '@workflow/express';
 import express, { type Express } from 'express';
 import { getHookByToken, getRun, resumeHook, start } from 'workflow/api';
 import { hydrateWorkflowArguments } from 'workflow/internal/serialization';
-import { allWorkflows } from '../_workflows.js';
+import { allWorkflows } from '../lib/generated/workflows.js';
 import {
   WorkflowRunFailedError,
   WorkflowRunNotCompletedError,
