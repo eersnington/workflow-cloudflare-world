@@ -1,6 +1,7 @@
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseWorkflowName } from '@workflow/core/parse-name';
+import { createWorld } from '@workflow/core/runtime';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
@@ -116,6 +117,46 @@ export async function GET() {
   const located = await findManifest();
 
   if (!located) {
+    // Fallback: try to fetch workflows from the backend (World)
+    try {
+      const world = createWorld();
+      // Fetch recent runs to discover workflows
+      const { data: runs } = await world.runs.list({
+        limit: 100, // Fetch enough runs to likely cover active workflows
+        resolveData: 'none',
+      });
+
+      const uniqueWorkflows = new Set<string>();
+      for (const run of runs) {
+        if (run.workflowName) {
+          uniqueWorkflows.add(run.workflowName);
+        }
+      }
+
+      const workflows: WorkflowListItem[] = Array.from(uniqueWorkflows).map(
+        (name) => {
+          const parsed = parseWorkflowName(name);
+          return {
+            id: name,
+            name: parsed?.shortName ?? name,
+            file: parsed?.fileName ?? '', // We might not have the file path
+          };
+        }
+      );
+
+      if (workflows.length > 0) {
+        return NextResponse.json(
+          {
+            workflows,
+            manifestPath: null,
+          },
+          { status: 200 }
+        );
+      }
+    } catch (e) {
+      console.error('Failed to fetch workflows from backend:', e);
+    }
+
     return NextResponse.json(
       {
         workflows: [],
