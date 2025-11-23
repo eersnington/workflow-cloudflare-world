@@ -6,6 +6,7 @@
     "@biomejs/biome": "catalog:",
     "@changesets/cli": "^2.29.5",
     "@vitest/coverage-v8": "catalog:",
+    "workflow-studio": "workspace:*",
     "esbuild": "catalog:",
     "husky": "^9.1.7",
     "lint-staged": "^16.1.0",
