@@ -4,7 +4,6 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"],
     "allowJs": true
   },
   "include": ["**/*.ts", "**/*.tsx", "**/*.js"],
