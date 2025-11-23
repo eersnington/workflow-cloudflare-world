@@ -1,9 +1,9 @@
-import express from 'express';
-import { start } from 'workflow/api';
 import workflow from '@workflow/express';
+import express, { type Express } from 'express';
+import { start } from 'workflow/api';
 import { handleGreeting } from '../lib/generated/workflows.js';
 
-const app = express();
+const app: Express = express();
 
 app.use(workflow());
 app.use(express.json());
@@ -25,7 +25,12 @@ app.post('/trigger', async (req, res, next) => {
 
 const port = Number.parseInt(process.env.PORT ?? '3154', 10);
 
-app.listen(port, () => {
-  console.log(`Workflow Express example running at http://127.0.0.1:${port}`);
-  console.log('Try posting to /trigger with: {"name": "your-name"}');
-});
+// Local dev entrypoint; Vercel serverless will import the handler instead of listening
+if (!process.env.VERCEL) {
+  app.listen(port, () => {
+    console.log(`Workflow Express example running at http://127.0.0.1:${port}`);
+    console.log('Try posting to /trigger with: {"name": "your-name"}');
+  });
+}
+
+export default app;
