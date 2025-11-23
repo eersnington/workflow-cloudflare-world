@@ -1,0 +1,40 @@
+{
+  "name": "@workflow/express",
+  "version": "4.0.1-beta.19",
+  "description": "Express integration for Workflow DevKit",
+  "type": "commonjs",
+  "main": "dist/index.js",
+  "files": [
+    "dist"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vercel/workflow.git",
+    "directory": "packages/express"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "clean": "tsc --build --clean && rm -rf dist"
+  },
+  "dependencies": {
+    "@workflow/builders": "workspace:*",
+    "@workflow/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@workflow/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/express": "^5.0.0",
+    "express": "^5.0.1"
+  },
+  "peerDependencies": {
+    "express": ">=5"
+  }
+}
