@@ -28,6 +28,7 @@ export function StreamDetailView({ env, streamId }: StreamDetailViewProps) {
   const abortControllerRef = useRef<AbortController | null>(null);
   const chunkIdRef = useRef(0);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: required for auto-scrolling
   useEffect(() => {
     // Auto-scroll to bottom when new content arrives
     if (scrollRef.current) {
@@ -142,13 +143,9 @@ export function StreamDetailView({ env, streamId }: StreamDetailViewProps) {
                 {isLive ? 'Waiting for stream data...' : 'Stream is empty'}
               </div>
             ) : (
-              <>
-                {chunks.map((chunk) => (
-                  <span key={`${streamId}-chunk-${chunk.id}`}>
-                    {chunk.text}
-                  </span>
-                ))}
-              </>
+              chunks.map((chunk) => (
+                <span key={`${streamId}-chunk-${chunk.id}`}>{chunk.text}</span>
+              ))
             )}
           </div>
         </CardContent>
