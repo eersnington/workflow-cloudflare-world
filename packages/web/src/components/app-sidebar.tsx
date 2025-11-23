@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { SettingsDialog } from '@/components/settings-dialog';
 import {
   Sidebar,
+  SidebarContext,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
@@ -19,11 +20,15 @@ import {
   SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/icons/logo';
-import { ConnectionStatus } from './display-utils/connection-status';
+import type { WorldConfig } from '@/lib/config-world';
 import { useNavigation } from './navigation-context';
-import { useQueryParamConfig } from '@/lib/config';
+import { ConnectionStatus } from './display-utils/connection-status';
 
-export function AppSidebar() {
+interface AppSidebarProps {
+  config: WorldConfig;
+}
+
+export function AppSidebar({ config }: AppSidebarProps) {
   const {
     workflows,
     loading,
@@ -34,7 +39,6 @@ export function AppSidebar() {
     setSelectedWorkflowId,
     manifestPath,
   } = useNavigation();
-  const config = useQueryParamConfig();
 
   return (
     <Sidebar collapsible="icon">
@@ -105,25 +109,41 @@ export function AppSidebar() {
                     </SidebarMenuItem>
                   ))
               ) : (
-                <div className="px-2 text-xs text-muted-foreground">
-                  No workflows found. Run `workflow build` or execute a workflow
-                  to generate a manifest.
-                  {manifestPath && (
-                    <div className="text-[11px] text-muted-foreground/80">
-                      Looking in: {manifestPath}
-                    </div>
-                  )}
-                  {error && (
-                    <div className="text-[11px] text-destructive">{error}</div>
-                  )}
-                </div>
+                <SidebarMenuItem className="group-data-[collapsible=icon]:hidden">
+                  <SidebarMenuButton className="flex-col items-start gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      No workflows found.
+                    </span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Run `workflow build` or execute a workflow.
+                    </span>
+                    {manifestPath && (
+                      <span className="text-[10px] text-muted-foreground/80">
+                        Looking in: {manifestPath}
+                      </span>
+                    )}
+                    {error && (
+                      <span className="text-[10px] text-destructive">
+                        {error}
+                      </span>
+                    )}
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
               )}
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <ConnectionStatus config={config} />
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild className="px-2 py-1.5">
+              <div className="flex items-center gap-2">
+                <ConnectionStatus config={config} />
+              </div>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
         <SettingsDialog
           trigger={
             <SidebarMenu>
