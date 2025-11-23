@@ -43,28 +43,21 @@ export default function Sidebar({
   return (
     <>
       {isOpen && (
-        <Button
-          tabIndex={0}
-          className="fixed inset-0 z-30 bg-black/50 lg:hidden"
+        <button
+          type="button"
+          className="fixed inset-0 z-30 lg:hidden"
           onClick={() => setIsOpen(false)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              setIsOpen(false);
-            }
-          }}
           aria-label="Close sidebar overlay"
         />
       )}
 
       <div
-        className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r border-sidebar-border bg-sidebar transition-all duration-300 ${
+        className={`fixed left-0 top-0 z-40 flex h-screen flex-col border-r bg-background transition-all duration-300 ${
           isOpen ? 'w-64' : 'w-0'
         } lg:relative lg:w-64`}
       >
-        <div className="flex items-center justify-between border-b border-sidebar-border p-4">
-          <h2 className="truncate font-semibold text-sidebar-foreground">
-            Workflows
-          </h2>
+        <div className="flex items-center justify-between border-b p-4">
+          <h2 className="truncate text-base font-semibold">Workflows</h2>
           <Button
             variant="ghost"
             size="icon"
@@ -75,17 +68,17 @@ export default function Sidebar({
           </Button>
         </div>
 
-        <div className="space-y-2 border-b border-sidebar-border p-3">
+        <div className="space-y-2 border-b p-3">
           <Button
-            variant={viewMode === 'canvas' ? 'default' : 'outline'}
-            className="w-full justify-start text-sm bg-transparent"
+            variant={viewMode === 'canvas' ? 'secondary' : 'ghost'}
+            className="w-full justify-start text-sm"
             onClick={() => onViewModeChange('canvas')}
           >
             Canvas Viewer
           </Button>
           <Button
-            variant={viewMode === 'observability' ? 'default' : 'outline'}
-            className="w-full justify-start text-sm bg-transparent"
+            variant={viewMode === 'observability' ? 'secondary' : 'ghost'}
+            className="w-full justify-start text-sm"
             onClick={() => onViewModeChange('observability')}
           >
             Observability
@@ -104,13 +97,11 @@ export default function Sidebar({
                   onClick={() => onSelectWorkflow(workflow.id)}
                   className={`flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm transition-colors ${
                     selectedWorkflowId === workflow.id
-                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                      ? 'bg-accent text-foreground'
+                      : 'hover:bg-muted'
                   }`}
                 >
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-sidebar-accent text-xs font-semibold text-sidebar-foreground">
-                    {workflow.name.charAt(0).toUpperCase()}
-                  </span>
+                  <span className="text-muted-foreground">•</span>
                   <span className="truncate">{workflow.name}</span>
                 </button>
               ))
@@ -134,11 +125,8 @@ export default function Sidebar({
           </div>
         </ScrollArea>
 
-        <div className="border-t border-sidebar-border p-3">
-          <Button
-            variant="ghost"
-            className="w-full justify-start text-sm text-sidebar-foreground hover:bg-sidebar-accent"
-          >
+        <div className="border-t p-3">
+          <Button variant="ghost" className="w-full justify-start text-sm">
             <Settings className="mr-2 h-4 w-4" />
             Settings
           </Button>
