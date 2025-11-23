@@ -1,7 +1,7 @@
 import express from 'express';
 import { start } from 'workflow/api';
 import workflow from '@workflow/express';
-import { handleGreeting } from '../lib/generated/workflows';
+import { handleGreeting } from '../lib/generated/workflows.js';
 
 const app = express();
 
