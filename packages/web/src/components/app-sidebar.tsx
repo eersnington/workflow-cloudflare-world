@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { SettingsDialog } from '@/components/settings-dialog';
 import {
   Sidebar,
-  SidebarContext,
   SidebarContent,
   SidebarFooter,
   SidebarGroup,
@@ -17,7 +16,6 @@ import {
   SidebarMenuItem,
   SidebarMenuSkeleton,
   SidebarSeparator,
-  SidebarTrigger,
 } from '@/components/ui/sidebar';
 import { Logo } from '@/icons/logo';
 import type { WorldConfig } from '@/lib/config-world';
@@ -32,28 +30,23 @@ export function AppSidebar({ config }: AppSidebarProps) {
   const {
     workflows,
     loading,
-    error,
     viewMode,
     setViewMode,
     selectedWorkflowId,
     setSelectedWorkflowId,
-    manifestPath,
   } = useNavigation();
 
   return (
-    <Sidebar collapsible="icon">
-      <SidebarHeader className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <SidebarTrigger />
-          <Link href="https://useworkflow.dev" target="_blank">
-            <h1
-              className="flex items-center gap-2"
-              title="Workflow Observability"
-            >
-              <Logo />
-            </h1>
-          </Link>
-        </div>
+    <Sidebar>
+      <SidebarHeader className="flex items-center gap-3 my-2">
+        <Link href="https://useworkflow.dev" target="_blank">
+          <h1
+            className="flex items-center gap-2"
+            title="Workflow Observability"
+          >
+            <Logo />
+          </h1>
+        </Link>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
@@ -114,19 +107,6 @@ export function AppSidebar({ config }: AppSidebarProps) {
                     <span className="text-xs text-muted-foreground">
                       No workflows found.
                     </span>
-                    <span className="text-[11px] text-muted-foreground">
-                      Run `workflow build` or execute a workflow.
-                    </span>
-                    {manifestPath && (
-                      <span className="text-[10px] text-muted-foreground/80">
-                        Looking in: {manifestPath}
-                      </span>
-                    )}
-                    {error && (
-                      <span className="text-[10px] text-destructive">
-                        {error}
-                      </span>
-                    )}
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               )}

@@ -8,6 +8,7 @@ import { RunsTable } from '@/components/runs-table';
 import { Canvas } from '@/components/canvas';
 import { useNavigation } from '@/components/navigation-context';
 import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 
 function ObservabilityView({
   config,
@@ -79,7 +80,8 @@ export default function Home() {
   return (
     <ReactFlowProvider>
       {viewMode === 'observability' ? (
-        <div className="h-full overflow-auto p-6">
+        <div className="h-full overflow-auto">
+          <SidebarTrigger />
           <ObservabilityView
             config={config}
             onRunClick={handleRunClick}
@@ -88,7 +90,8 @@ export default function Home() {
           />
         </div>
       ) : (
-        <div className="h-full p-6">
+        <div className="h-full">
+          <SidebarTrigger />
           <Canvas workflow={selectedWorkflow} />
         </div>
       )}
