@@ -22,6 +22,7 @@
   "devDependencies": {
     "@types/express": "^5.0.5",
     "ai": "catalog:",
+    "concurrently": "9.2.1",
     "lodash.chunk": "^4.2.0",
     "openai": "^6.1.0",
     "workflow": "workspace:*",
