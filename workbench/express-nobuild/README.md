@@ -7,12 +7,12 @@ A minimal Express app using `workflow-express`.
 ### 1. Install & Run
 ```bash
 pnpm install
-pnpm run dev   # Starts server + watch mode (http://localhost:3154)
+pnpm run dev   # Starts server + watch mode (http://localhost:3000)
 ```
 
 ### 2. Trigger Workflow
 ```bash
-curl -X POST http://127.0.0.1:3154/trigger \
+curl -X POST http://localhost:3000/trigger \
   -H 'content-type: application/json' \
   --data '{"name":"Ada"}'
 ```
