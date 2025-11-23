@@ -18,6 +18,7 @@ export function TableSkeleton({
         <Skeleton className="h-[40px] p-1 w-full" />
         <div className="border-b border-gray-alpha-400 w-full"></div>
         {Array.from({ length: rows }, (_, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: Skeleton rows are static placeholders
           <div key={`skeleton-row-${i}`} className="flex gap-4 py-3">
             <Skeleton className="h-4 w-1/4" />
             <Skeleton className="h-4 w-1/4" />
