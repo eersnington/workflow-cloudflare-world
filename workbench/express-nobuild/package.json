@@ -1,21 +1,30 @@
 {
   "name": "express-nobuild-example",
+  "version": "0.0.0",
   "private": true,
+  "description": "",
   "type": "module",
+  "main": "index.js",
   "scripts": {
-    "build": "workflow build && tsc -p tsconfig.json",
+    "generate:workflows": "node ../scripts/generate-workflows-registry.js",
+    "predev": "pnpm generate:workflows",
+    "prebuild": "pnpm generate:workflows",
+    "build": "tsc -p tsconfig.json",
     "start": "node ./dist/src/index.js",
-    "dev": "workflow build && concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/src/index.js\""
+    "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/src/index.js\""
   },
   "dependencies": {
     "@workflow/express": "workspace:*",
     "express": "^5.1.0",
-    "workflow": "workspace:*"
+    "nitro": "catalog:",
+    "srvx": "^0.9.2"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
-    "@types/node": "catalog:",
-    "concurrently": "9.2.1",
-    "typescript": "catalog:"
+    "ai": "catalog:",
+    "lodash.chunk": "^4.2.0",
+    "openai": "^6.1.0",
+    "workflow": "workspace:*",
+    "zod": "catalog:"
   }
 }
