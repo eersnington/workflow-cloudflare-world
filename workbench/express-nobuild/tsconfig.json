@@ -4,8 +4,9 @@
   "compilerOptions": {
     "outDir": "dist",
     "rootDir": ".",
-    "types": ["node"]
+    "types": ["node"],
+    "allowJs": true
   },
-  "include": ["**/*.ts", "**/*.tsx", "*.js"],
+  "include": ["**/*.ts", "**/*.tsx", "**/*.js"],
   "exclude": ["dist", "node_modules"]
 }

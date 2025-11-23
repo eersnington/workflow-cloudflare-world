@@ -5,7 +5,7 @@
   "scripts": {
     "build": "workflow build && tsc -p tsconfig.json",
     "start": "node ./dist/src/index.js",
-    "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/src/index.js\""
+    "dev": "workflow build && concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/src/index.js\""
   },
   "dependencies": {
     "@workflow/express": "workspace:*",
