@@ -6,7 +6,7 @@ import { ErrorBoundary } from '@/components/error-boundary';
 import { HooksTable } from '@/components/hooks-table';
 import { RunsTable } from '@/components/runs-table';
 import { Canvas } from '@/components/canvas';
-import { useSidebarState } from '@/components/sidebar-context';
+import { useNavigation } from '@/components/navigation-context';
 import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
 
 function ObservabilityView({
@@ -47,7 +47,7 @@ export default function Home() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const config = useQueryParamConfig();
-  const { viewMode, selectedWorkflow } = useSidebarState();
+  const { viewMode, selectedWorkflow } = useNavigation();
 
   const sidebar = searchParams.get('sidebar');
   const hookId = searchParams.get('hookId') || searchParams.get('hook');

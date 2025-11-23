@@ -1,17 +1,14 @@
 'use client';
 
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import { useEffect } from 'react';
-import { ConnectionStatus } from '@/components/display-utils/connection-status';
-import Sidebar from '@/components/sidebar';
-import { SidebarProvider, useSidebarState } from '@/components/sidebar-context';
-import { SettingsDialog } from '@/components/settings-dialog';
+import { AppSidebar } from '@/components/app-sidebar';
+import { NavigationProvider } from '@/components/navigation-context';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
 import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
-import { Logo } from '../icons/logo';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -21,27 +18,12 @@ function LayoutContent({ children }: LayoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const config = useQueryParamConfig();
-  const sidebarState = useSidebarState();
-
   const id = searchParams.get('id');
   const runId = searchParams.get('runId');
   const stepId = searchParams.get('stepId');
   const hookId = searchParams.get('hookId');
   const resource = searchParams.get('resource');
   const theme = searchParams.get('theme') || 'system';
-
-  // Apply theme class to document
-  useEffect(() => {
-    const html = document.documentElement;
-
-    // Remove existing theme classes
-    html.classList.remove('light', 'dark');
-
-    // Apply theme class (system will use CSS media query)
-    if (theme === 'light' || theme === 'dark') {
-      html.classList.add(theme);
-    }
-  }, [theme]);
 
   // If initialized with a resource/id or direct ID params, we navigate to the appropriate page
   useEffect(() => {
@@ -122,53 +104,25 @@ function LayoutContent({ children }: LayoutClientProps) {
       enableSystem
       disableTransitionOnChange
     >
-      <div className="flex min-h-screen bg-background">
-        <Sidebar
-          isOpen={sidebarState.sidebarOpen}
-          setIsOpen={sidebarState.setSidebarOpen}
-          workflows={sidebarState.workflows}
-          selectedWorkflowId={sidebarState.selectedWorkflowId}
-          onSelectWorkflow={sidebarState.setSelectedWorkflowId}
-          viewMode={sidebarState.viewMode}
-          onViewModeChange={sidebarState.setViewMode}
-          loading={sidebarState.loading}
-          error={sidebarState.error}
-          manifestPath={sidebarState.manifestPath}
-        />
-        <div className="flex-1 px-8 pt-8">
-          <TooltipProvider delayDuration={0}>
-            <div className="max-w-7xl mx-auto">
-              <div className="flex items-start justify-between">
-                <div className="mb-8 flex w-full items-center justify-between">
-                  <Link href="https://useworkflow.dev" target="_blank">
-                    <h1
-                      className="mb-2 flex items-center gap-2"
-                      title="Workflow Observability"
-                    >
-                      <Logo />
-                    </h1>
-                  </Link>
-                  <div className="ml-auto flex items-center gap-2">
-                    <ConnectionStatus config={config} />
-                    <SettingsDialog />
-                  </div>
-                </div>
-              </div>
-
-              {children}
-            </div>
-          </TooltipProvider>
-          <Toaster />
+      <SidebarProvider>
+        <div className="flex min-h-screen bg-background">
+          <AppSidebar />
+          <SidebarInset className="px-8 pt-8">
+            <TooltipProvider delayDuration={0}>
+              <div className="w-full flex flex-col">{children}</div>
+            </TooltipProvider>
+            <Toaster />
+          </SidebarInset>
         </div>
-      </div>
+      </SidebarProvider>
     </ThemeProvider>
   );
 }
 
 export function LayoutClient({ children }: LayoutClientProps) {
   return (
-    <SidebarProvider>
+    <NavigationProvider>
       <LayoutContent>{children}</LayoutContent>
-    </SidebarProvider>
+    </NavigationProvider>
   );
 }

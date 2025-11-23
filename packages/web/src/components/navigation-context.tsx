@@ -6,9 +6,7 @@ import { useWorkflows } from '@/lib/use-workflows';
 
 type ViewMode = 'canvas' | 'observability';
 
-type SidebarContextValue = {
-  sidebarOpen: boolean;
-  setSidebarOpen: (open: boolean) => void;
+type NavigationContextValue = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   selectedWorkflowId: string | null;
@@ -20,13 +18,16 @@ type SidebarContextValue = {
   manifestPath?: string;
 };
 
-const SidebarContext = createContext<SidebarContextValue | undefined>(
+const NavigationContext = createContext<NavigationContextValue | undefined>(
   undefined
 );
 
-export function SidebarProvider({ children }: { children: React.ReactNode }) {
+export function NavigationProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const { data, loading, error } = useWorkflows();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
     null
@@ -47,9 +48,7 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
     );
   }, [data?.workflows, selectedWorkflowId]);
 
-  const value: SidebarContextValue = {
-    sidebarOpen,
-    setSidebarOpen,
+  const value: NavigationContextValue = {
     viewMode,
     setViewMode,
     selectedWorkflowId,
@@ -62,14 +61,16 @@ export function SidebarProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <SidebarContext.Provider value={value}>{children}</SidebarContext.Provider>
+    <NavigationContext.Provider value={value}>
+      {children}
+    </NavigationContext.Provider>
   );
 }
 
-export function useSidebarState() {
-  const ctx = useContext(SidebarContext);
+export function useNavigation() {
+  const ctx = useContext(NavigationContext);
   if (!ctx) {
-    throw new Error('useSidebarState must be used within SidebarProvider');
+    throw new Error('useNavigation must be used within NavigationProvider');
   }
   return ctx;
 }
