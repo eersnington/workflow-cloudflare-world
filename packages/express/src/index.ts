@@ -89,9 +89,11 @@ export function workflows(
     }
   }
 
-  const loadFlowHandler = () => loadWebHandler<WorkflowHandler>(bundles.flow);
-  const loadStepHandler = () => loadWebHandler<WorkflowHandler>(bundles.step);
-  const loadWebhookHandlers = () =>
+  const loadFlowHandler = async () =>
+    loadWebHandler<WorkflowHandler>(bundles.flow, 'POST');
+  const loadStepHandler = async () =>
+    loadWebHandler<WorkflowHandler>(bundles.step, 'POST');
+  const loadWebhookHandlers = async () =>
     loadWebHandler<Record<string, WorkflowHandler>>(bundles.webhook);
 
   return async function workflowMiddleware(req, res, next) {
@@ -244,9 +246,12 @@ async function sendWebResponse(res: ExpressResponse, webResponse: Response) {
   res.send(buffer);
 }
 
-async function loadWebHandler<T>(bundlePath: string): Promise<T> {
+async function loadWebHandler<T>(bundlePath: string, key?: string): Promise<T> {
   const url = pathToFileURL(bundlePath).href;
   const mod = await import(`${url}?update=${Date.now()}`);
+  if (key && key in mod) {
+    return mod[key] as T;
+  }
   return (mod.default ?? mod) as T;
 }
 
