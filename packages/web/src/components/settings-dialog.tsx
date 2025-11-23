@@ -1,12 +1,14 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Settings, X } from 'lucide-react';
+import { AlertCircle, Settings } from 'lucide-react';
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogFooter,
   DialogHeader,
+  DialogDescription,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
@@ -105,14 +107,17 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
         )}
       </DialogTrigger>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
-        <DialogHeader className="flex flex-row items-center justify-between gap-4">
+        <DialogHeader>
           <DialogTitle className="text-xl font-semibold">
             Configuration
           </DialogTitle>
+          <DialogDescription className="text-sm text-muted-foreground">
+            Update backend, project, and data settings for this session.
+          </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-4">
-          <div className="space-y-2">
+        <div className="grid gap-4">
+          <div className="grid gap-2">
             <Label htmlFor="backend">Backend</Label>
             <Select
               value={localConfig.backend || 'embedded'}
@@ -130,7 +135,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
 
           {isEmbedded && (
             <>
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="port">Port</Label>
                 <Input
                   id="port"
@@ -146,7 +151,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
                 )}
               </div>
 
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="dataDir">Data Directory</Label>
                 <Input
                   id="dataDir"
@@ -172,7 +177,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
 
           {!isEmbedded && (
             <>
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="env">Environment</Label>
                 <Input
                   id="env"
@@ -182,7 +187,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="authToken">Auth Token</Label>
                 <Input
                   id="authToken"
@@ -195,7 +200,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="project">Project</Label>
                 <Input
                   id="project"
@@ -205,7 +210,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
                 />
               </div>
 
-              <div className="space-y-2">
+              <div className="grid gap-2">
                 <Label htmlFor="team">Team</Label>
                 <Input
                   id="team"
@@ -222,7 +227,7 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
               <AlertCircle className="h-4 w-4" />
               <AlertTitle>Validation errors</AlertTitle>
               <AlertDescription>
-                <ul className="list-disc list-inside space-y-1">
+                <ul className="list-disc list-inside grid gap-1">
                   {errors.map((error, idx) => (
                     // biome-ignore lint/suspicious/noArrayIndexKey: Error list order is stable for this render
                     <li key={`error-${idx}`}>
@@ -239,17 +244,18 @@ export function SettingsDialog({ trigger }: SettingsDialogProps) {
         </div>
 
         <DialogFooter className="flex items-center justify-between gap-2 sm:flex-row">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setIsOpen(false);
-              setLocalConfig(config);
-              setErrors([]);
-            }}
-          >
-            Cancel
-          </Button>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setLocalConfig(config);
+                setErrors([]);
+              }}
+            >
+              Cancel
+            </Button>
+          </DialogClose>
           <Button
             type="button"
             onClick={handleValidateAndApply}
