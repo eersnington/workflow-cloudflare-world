@@ -21,7 +21,9 @@
       "!**/.env",
       "!target",
       "!**/tests/fixture",
-      "!**/tests/errors"
+      "!**/tests/errors",
+      "!**/components/ai-elements",
+      "!**/components/ui"
     ],
     "ignoreUnknown": true
   },
