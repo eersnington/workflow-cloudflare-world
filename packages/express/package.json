@@ -2,8 +2,9 @@
   "name": "@workflow/express",
   "version": "4.0.1-beta.19",
   "description": "Express middleware integration for Workflow DevKit",
-  "type": "commonjs",
+  "type": "module",
   "main": "dist/index.js",
+  "types": "dist/index.d.ts",
   "files": [
     "dist"
   ],
@@ -17,12 +18,9 @@
     "directory": "packages/express"
   },
   "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    }
+    ".": "./dist/index.js",
+    "./builder": "./dist/builder.js"
   },
-  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
