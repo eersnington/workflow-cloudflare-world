@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WorkflowListItem } from '@/lib/use-workflows';
+import { SettingsDialog } from './settings-dialog';
 
 type ViewMode = 'canvas' | 'observability';
 
@@ -126,10 +127,14 @@ export default function Sidebar({
         </ScrollArea>
 
         <div className="border-t p-3">
-          <Button variant="ghost" className="w-full justify-start text-sm">
-            <Settings className="mr-2 h-4 w-4" />
-            Settings
-          </Button>
+          <SettingsDialog
+            trigger={
+              <Button variant="ghost" className="w-full justify-start text-sm">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Button>
+            }
+          />
         </div>
       </div>
     </>
