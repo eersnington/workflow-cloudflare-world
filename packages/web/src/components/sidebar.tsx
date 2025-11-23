@@ -1,7 +1,7 @@
 'use client';
 
-import { useMemo } from 'react';
 import { ChevronLeft, Settings } from 'lucide-react';
+import { useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { WorkflowListItem } from '@/lib/use-workflows';
@@ -43,10 +43,16 @@ export default function Sidebar({
   return (
     <>
       {isOpen && (
-        <div
+        <Button
+          tabIndex={0}
           className="fixed inset-0 z-30 bg-black/50 lg:hidden"
           onClick={() => setIsOpen(false)}
-          onKeyPress={() => {}}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              setIsOpen(false);
+            }
+          }}
+          aria-label="Close sidebar overlay"
         />
       )}
 
