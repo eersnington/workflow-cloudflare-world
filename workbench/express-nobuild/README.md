@@ -1,4 +1,4 @@
-# Workflow Express Example
+# Workflow Express (No Build System) Example
 
 A minimal Express app using `workflow-express`.
 
@@ -51,4 +51,18 @@ async function sayHello(name: string) {
 ```bash
 pnpm run build   # Generates bundles + compiles TS
 pnpm run start   # Runs pre-built server
+```
+
+## Deploy to Vercel (prebuilt)
+
+This package depends on monorepo workspaces (not published). Deploy the prebuilt output:
+
+1) Build locally (generates `.vercel/output`):
+```bash
+VERCEL_FORCE_PNPM=1 vercel build --prod --cwd .
+```
+
+2) Deploy the prebuilt build:
+```bash
+VERCEL_FORCE_PNPM=1 vercel deploy --prebuilt --prod --cwd .
 ```
