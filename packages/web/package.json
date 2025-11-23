@@ -26,6 +26,7 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@xyflow/react": "12.9.3",
     "next": "15.5.4"
   },
   "devDependencies": {
@@ -41,8 +42,8 @@
     "@types/react": "19",
     "@types/react-dom": "19",
     "@workflow/core": "workspace:*",
-    "@workflow/world": "workspace:*",
     "@workflow/web-shared": "workspace:*",
+    "@workflow/world": "workspace:*",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "date-fns": "4.1.0",
