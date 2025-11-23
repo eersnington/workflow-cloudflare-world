@@ -24,9 +24,9 @@ Automatically rebuilds workflows in dev mode via middleware.
 ```ts
 import workflow from 'workflow-express';
 import { start } from 'workflow/api';
-import { handleGreeting } from '#client'; // Typed import!
+import { handleGreeting } from '../lib/generated/workflows.js';
 
-app.use(workflow()); // Handles build & routing
+app.use(workflow());
 
 app.post('/trigger', async (req, res) => {
   await start(handleGreeting, [req.body.name]);
@@ -59,10 +59,10 @@ This package depends on monorepo workspaces (not published). Deploy the prebuilt
 
 1) Build locally (generates `.vercel/output`):
 ```bash
-VERCEL_FORCE_PNPM=1 vercel build --prod --cwd .
+vercel build --prod --cwd .
 ```
 
 2) Deploy the prebuilt build:
 ```bash
-VERCEL_FORCE_PNPM=1 vercel deploy --prebuilt --prod --cwd .
+vercel deploy --prebuilt --prod --cwd .
 ```
