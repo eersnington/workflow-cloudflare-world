@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
-import { type WorkflowListItem } from '@/lib/use-workflows';
+import type { WorkflowListItem } from '@/lib/use-workflows';
 import { formatDuration } from '@/lib/utils';
 
 type CanvasProps = {
@@ -250,7 +250,7 @@ export function Canvas({ workflow, config }: CanvasProps) {
   }, [workflow, latestRun, steps]);
 
   return (
-    <div className="h-full w-full pb-4">
+    <div className="h-full w-full pb-8">
       <FlowCanvas
         className="h-full rounded-lg"
         nodes={nodes}
@@ -260,22 +260,12 @@ export function Canvas({ workflow, config }: CanvasProps) {
         connectionLineComponent={Connection}
         proOptions={{ hideAttribution: true }}
       >
-        <Panel position={'top-left' satisfies PanelPosition}>
-          <Button size="sm" variant="secondary">
-            Export
-          </Button>
-        </Panel>
         <Panel position={'top-right' satisfies PanelPosition}>
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground px-2 py-1">
             {workflow ? (
-              <>
-                <span className="font-medium text-foreground">
-                  {workflow.name}
-                </span>
-                <span className="text-xs text-muted-foreground">
-                  {workflow.file}
-                </span>
-              </>
+              <span className="font-medium text-foreground">
+                {workflow.name}
+              </span>
             ) : (
               <span className="text-xs">Select a workflow to visualize</span>
             )}

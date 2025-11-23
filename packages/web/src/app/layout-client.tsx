@@ -107,7 +107,7 @@ function LayoutContent({ children }: LayoutClientProps) {
       <SidebarProvider>
         <div className="flex min-h-screen w-full bg-background">
           <AppSidebar config={config} />
-          <SidebarInset className="p-6">
+          <SidebarInset className="px-6 py-2">
             <TooltipProvider delayDuration={0}>
               <div className="w-full h-full flex flex-col">{children}</div>
             </TooltipProvider>
