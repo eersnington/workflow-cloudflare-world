@@ -1,7 +1,7 @@
 {
   "name": "@workflow/express",
   "version": "4.0.1-beta.19",
-  "description": "Express integration for Workflow DevKit",
+  "description": "Express middleware integration for Workflow DevKit",
   "type": "commonjs",
   "main": "dist/index.js",
   "files": [
