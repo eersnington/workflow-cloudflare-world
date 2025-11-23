@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  useWorkflowRuns,
+  useWorkflowTraceViewerData,
+} from '@workflow/web-shared';
 import type { Edge, Node, PanelPosition } from '@xyflow/react';
 import { useMemo } from 'react';
 import { Canvas as FlowCanvas } from '@/components/ai-elements/canvas';
@@ -18,10 +22,14 @@ import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import type { WorkflowListItem } from '@/lib/use-workflows';
+import { worldConfigToEnvMap } from '@/lib/config';
+import type { WorldConfig } from '@/lib/config-world';
+import { type WorkflowListItem } from '@/lib/use-workflows';
+import { formatDuration } from '@/lib/utils';
 
 type CanvasProps = {
   workflow?: WorkflowListItem | null;
+  config: WorldConfig;
 };
 
 const nodeTypes = {
@@ -56,6 +64,51 @@ const nodeTypes = {
       </Toolbar>
     </WorkflowNode>
   ),
+  step: ({
+    data,
+  }: {
+    data: {
+      title: string;
+      id: string;
+      status: string;
+      duration?: string | null;
+      isLast: boolean;
+    };
+  }) => (
+    <WorkflowNode handles={{ target: true, source: !data.isLast }}>
+      <NodeHeader>
+        <NodeTitle className="text-base">{data.title}</NodeTitle>
+        <NodeDescription className="text-xs text-muted-foreground">
+          {data.id}
+        </NodeDescription>
+      </NodeHeader>
+      <NodeContent>
+        <div className="flex flex-col gap-1">
+          <div className="text-sm text-muted-foreground">Step Execution</div>
+        </div>
+      </NodeContent>
+      <NodeFooter>
+        <div className="flex items-center justify-between w-full">
+          <Badge
+            variant={
+              data.status === 'completed'
+                ? 'default'
+                : data.status === 'failed'
+                  ? 'destructive'
+                  : 'secondary'
+            }
+          >
+            {data.status}
+          </Badge>
+          {data.duration && (
+            <span className="text-xs text-muted-foreground">
+              {data.duration}
+            </span>
+          )}
+        </div>
+      </NodeFooter>
+    </WorkflowNode>
+  ),
   start: ({ data }: { data: { title: string; description?: string } }) => (
     <WorkflowNode handles={{ target: false, source: true }}>
       <NodeHeader>
@@ -75,42 +128,126 @@ const edgeTypes = {
   temporary: EdgeComponent.Temporary,
 };
 
-export function Canvas({ workflow }: CanvasProps) {
+export function Canvas({ workflow, config }: CanvasProps) {
+  const env = useMemo(() => worldConfigToEnvMap(config), [config]);
+
+  // Fetch latest run for the selected workflow
+  const { data: runsData } = useWorkflowRuns(env, {
+    workflowName: workflow?.id,
+    limit: 1,
+  });
+
+  const latestRun = runsData?.data?.[0];
+
+  // Fetch steps for the latest run
+  const { steps } = useWorkflowTraceViewerData(env, latestRun?.runId ?? '', {
+    live: false,
+  });
+
   const { nodes, edges } = useMemo(() => {
     if (!workflow) {
       return { nodes: [] as Node[], edges: [] as Edge[] };
     }
 
+    const nodes: Node[] = [];
+    const edges: Edge[] = [];
     const baseY = 120;
+    let currentX = 0;
+    const nodeGap = 400;
+
+    // Start Node
     const startNode: Node = {
       id: 'start',
       type: 'start',
-      position: { x: 0, y: baseY },
-      data: { title: 'Workflow Entry' },
-    };
-
-    const workflowNode: Node = {
-      id: workflow.id,
-      type: 'workflow',
-      position: { x: 320, y: baseY },
+      position: { x: currentX, y: baseY },
       data: {
-        title: workflow.name,
-        file: workflow.file,
-        id: workflow.id,
+        title: 'Start',
+        description: latestRun
+          ? `Run: ${latestRun.runId}`
+          : 'Waiting for run...',
       },
     };
+    nodes.push(startNode);
+    currentX += nodeGap;
 
-    const edge: Edge = {
-      id: `${startNode.id}-${workflow.id}`,
-      source: startNode.id,
-      target: workflow.id,
-      type: 'animated',
-      animated: true,
-      style: { stroke: 'var(--ring)' },
-    };
+    if (latestRun && steps.length > 0) {
+      // Sort steps by start time
+      const sortedSteps = [...steps].sort((a, b) => {
+        const timeA = a.startedAt ? new Date(a.startedAt).getTime() : 0;
+        const timeB = b.startedAt ? new Date(b.startedAt).getTime() : 0;
+        return timeA - timeB;
+      });
 
-    return { nodes: [startNode, workflowNode], edges: [edge] };
-  }, [workflow]);
+      // Connect Start to First Step
+      edges.push({
+        id: `edge-start-${sortedSteps[0].stepId}`,
+        source: startNode.id,
+        target: sortedSteps[0].stepId,
+        type: 'animated',
+        animated: true,
+        style: { stroke: 'var(--ring)' },
+      });
+
+      // Generate nodes for steps
+      sortedSteps.forEach((step, index) => {
+        const duration = formatDuration(step.startedAt, step.completedAt);
+        const isLast = index === sortedSteps.length - 1;
+
+        const stepNode: Node = {
+          id: step.stepId,
+          type: 'step',
+          position: { x: currentX, y: baseY },
+          data: {
+            title: step.stepName,
+            id: step.stepId,
+            status: step.status,
+            duration,
+            isLast,
+          },
+        };
+
+        nodes.push(stepNode);
+
+        // Connect to previous step (if not first)
+        if (index > 0) {
+          edges.push({
+            id: `edge-${sortedSteps[index - 1].stepId}-${step.stepId}`,
+            source: sortedSteps[index - 1].stepId,
+            target: step.stepId,
+            type: 'animated',
+            animated: true,
+            style: { stroke: 'var(--ring)' },
+          });
+        }
+
+        currentX += nodeGap;
+      });
+    } else {
+      // Fallback: Workflow Placeholder Node
+      const workflowNode: Node = {
+        id: workflow.id,
+        type: 'workflow',
+        position: { x: currentX, y: baseY },
+        data: {
+          title: workflow.name,
+          file: workflow.file,
+          id: workflow.id,
+        },
+      };
+      nodes.push(workflowNode);
+
+      edges.push({
+        id: `${startNode.id}-${workflow.id}`,
+        source: startNode.id,
+        target: workflow.id,
+        type: 'animated',
+        animated: true,
+        style: { stroke: 'var(--ring)' },
+      });
+    }
+
+    return { nodes, edges };
+  }, [workflow, latestRun, steps]);
 
   return (
     <div className="h-full w-full pb-4">
