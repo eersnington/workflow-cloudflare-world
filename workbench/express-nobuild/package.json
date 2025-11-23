@@ -4,10 +4,11 @@
   "type": "module",
   "scripts": {
     "build": "workflow build && tsc -p tsconfig.json",
-    "start": "node ./dist/server.js",
-    "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/server.js\""
+    "start": "node ./dist/src/index.js",
+    "dev": "concurrently \"tsc -p tsconfig.json --watch\" \"node --watch ./dist/src/index.js\""
   },
   "dependencies": {
+    "@workflow/express": "workspace:*",
     "express": "^5.1.0",
     "workflow": "workspace:*"
   },

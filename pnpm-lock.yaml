@@ -546,6 +546,28 @@ importers:
         specifier: workspace:*
         version: link:../world
 
+  packages/express:
+    dependencies:
+      '@workflow/builders':
+        specifier: workspace:*
+        version: link:../builders
+      '@workflow/core':
+        specifier: workspace:*
+        version: link:../core
+    devDependencies:
+      '@types/express':
+        specifier: ^5.0.0
+        version: 5.0.5
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.19.0
+      '@workflow/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      express:
+        specifier: ^5.0.1
+        version: 5.1.0
+
   packages/next:
     dependencies:
       '@swc/core':
@@ -1161,6 +1183,9 @@ importers:
 
   workbench/express-nobuild:
     dependencies:
+      '@workflow/express':
+        specifier: workspace:*
+        version: link:../../packages/express
       express:
         specifier: ^5.1.0
         version: 5.1.0
