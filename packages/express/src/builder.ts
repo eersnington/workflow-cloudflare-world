@@ -4,6 +4,7 @@ import { BaseBuilder, createBaseBuilderConfig } from '@workflow/builders';
 
 export const DEFAULT_WORKFLOW_DIRS = ['workflows', 'src/workflows'];
 export const DEFAULT_OUTPUT_DIR = '.well-known/workflow/v1';
+const BUNDLE_FORMAT = 'cjs' as const;
 export const HANDLER_FILENAMES = {
   flow: 'flow.js',
   step: 'step.js',
@@ -85,7 +86,7 @@ export class ExpressBuilder extends BaseBuilder {
       tsBaseUrl: tsConfig.baseUrl,
       tsPaths: tsConfig.paths,
       outfile: this.config.stepsBundlePath,
-      format: 'esm',
+      format: BUNDLE_FORMAT,
       externalizeNonSteps: true,
     });
 
@@ -94,12 +95,13 @@ export class ExpressBuilder extends BaseBuilder {
       tsBaseUrl: tsConfig.baseUrl,
       tsPaths: tsConfig.paths,
       outfile: this.config.workflowsBundlePath,
-      format: 'esm',
+      format: BUNDLE_FORMAT,
       bundleFinalOutput: true,
     });
 
     await this.createWebhookBundle({
       outfile: this.config.webhookBundlePath,
+      bundle: true,
     });
   }
 }
