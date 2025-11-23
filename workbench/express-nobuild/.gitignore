@@ -4,5 +4,7 @@ manifest.js
 .output
 .data
 .vercel
+dist/
 _workflows.ts
 lib/generated/
+
