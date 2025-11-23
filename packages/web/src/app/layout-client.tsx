@@ -109,7 +109,7 @@ function LayoutContent({ children }: LayoutClientProps) {
           <AppSidebar config={config} />
           <SidebarInset className="p-6">
             <TooltipProvider delayDuration={0}>
-              <div className="w-full flex flex-col">{children}</div>
+              <div className="w-full h-full flex flex-col">{children}</div>
             </TooltipProvider>
             <Toaster />
           </SidebarInset>

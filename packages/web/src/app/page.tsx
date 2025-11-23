@@ -92,7 +92,7 @@ export default function Home() {
       ) : (
         <div className="h-full w-full">
           <SidebarTrigger />
-          <Canvas workflow={selectedWorkflow} />
+          <Canvas workflow={selectedWorkflow} config={config} />
         </div>
       )}
     </ReactFlowProvider>

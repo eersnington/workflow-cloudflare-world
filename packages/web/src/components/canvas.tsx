@@ -17,6 +17,7 @@ import {
 import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import type { WorkflowListItem } from '@/lib/use-workflows';
 
 type CanvasProps = {
@@ -37,11 +38,22 @@ const nodeTypes = {
         </NodeDescription>
       </NodeHeader>
       <NodeContent>
-        <div className="text-sm text-muted-foreground">{data.file}</div>
+        <p className="text-sm text-muted-foreground">{data.file}</p>
       </NodeContent>
       <NodeFooter>
-        <Badge variant="secondary">Workflow</Badge>
+        <div className="flex items-center justify-between w-full">
+          <Badge variant="secondary">Workflow</Badge>
+          <span className="text-xs text-muted-foreground">Status: Ready</span>
+        </div>
       </NodeFooter>
+      <Toolbar>
+        <Button size="sm" variant="ghost">
+          Edit
+        </Button>
+        <Button size="sm" variant="ghost">
+          Delete
+        </Button>
+      </Toolbar>
     </WorkflowNode>
   ),
   start: ({ data }: { data: { title: string; description?: string } }) => (
@@ -101,8 +113,9 @@ export function Canvas({ workflow }: CanvasProps) {
   }, [workflow]);
 
   return (
-    <div className="h-full w-full">
+    <div className="h-full w-full pb-4">
       <FlowCanvas
+        className="h-full rounded-lg"
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
@@ -110,6 +123,11 @@ export function Canvas({ workflow }: CanvasProps) {
         connectionLineComponent={Connection}
         proOptions={{ hideAttribution: true }}
       >
+        <Panel position={'top-left' satisfies PanelPosition}>
+          <Button size="sm" variant="secondary">
+            Export
+          </Button>
+        </Panel>
         <Panel position={'top-right' satisfies PanelPosition}>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
             {workflow ? (
@@ -126,7 +144,6 @@ export function Canvas({ workflow }: CanvasProps) {
             )}
           </div>
         </Panel>
-        <Toolbar />
         <Controls />
       </FlowCanvas>
     </div>
