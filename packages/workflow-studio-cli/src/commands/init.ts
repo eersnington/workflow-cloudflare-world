@@ -12,7 +12,7 @@ import { spawn } from 'node:child_process';
 import { access, readFile, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, join, relative, resolve } from 'node:path';
 import pc from 'picocolors';
-import { getCodemodGlobs, type CodemodId } from '../codemods.js';
+import { getCodemodGlobs, type CodemodId } from '../codemods';
 import {
   renderTemplate,
   type RenderTemplateContext,
