@@ -1,7 +1,7 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
-import { join, extname } from 'node:path';
-import { describe, expect, test } from 'vitest';
 import Handlebars from 'handlebars';
+import { readdir, readFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
+import { describe, expect, test } from 'vitest';
 
 async function listHbsFiles(dir: string): Promise<string[]> {
   const entries = await readdir(dir, { withFileTypes: true });

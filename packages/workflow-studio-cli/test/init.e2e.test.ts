@@ -1,9 +1,8 @@
-import { mkdtemp } from 'node:fs/promises';
+import { execa } from 'execa';
+import { mkdtemp, readFile, stat } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { execa } from 'execa';
-import { expect, describe, test } from 'vitest';
-import { readFile, stat } from 'node:fs/promises';
+import { describe, expect, test } from 'vitest';
 
 type InitOptions = {
   template: string;
@@ -85,21 +84,80 @@ describe('init e2e (install skipped)', () => {
       // Basic existence checks per template
       if (template === 'nextjs') {
         expect(await fileExists(cwd, 'app/api')).toBe(true);
+        if (example === 'ai') {
+          const page = await readFile(join(cwd, 'app/page.tsx'), 'utf8');
+          expect(page).toContain('AI Workflow Patterns');
+          const route = await readFile(
+            join(cwd, 'app/api/workflows/route.ts'),
+            'utf8'
+          );
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
       if (template === 'sveltekit') {
         expect(await fileExists(cwd, 'src/routes')).toBe(true);
+        if (example === 'ai') {
+          const page = await readFile(
+            join(cwd, 'src/routes/+page.svelte'),
+            'utf8'
+          );
+          expect(page).toContain('AI Workflow Patterns');
+          const route = await readFile(
+            join(cwd, 'src/routes/api/workflows/+server.ts'),
+            'utf8'
+          );
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
       if (template === 'nitro') {
         expect(await fileExists(cwd, 'server')).toBe(true);
+        if (example === 'ai') {
+          const page = await readFile(join(cwd, 'index.html'), 'utf8');
+          expect(page).toContain('AI Workflow Patterns');
+          const route = await readFile(
+            join(cwd, 'server/api/workflows.post.ts'),
+            'utf8'
+          );
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
       if (template === 'hono' || template === 'express') {
         expect(await fileExists(cwd, 'workflows')).toBe(true);
+        expect(await fileExists(cwd, 'src/index.ts')).toBe(true);
+        if (example === 'ai') {
+          const route = await readFile(join(cwd, 'src/index.ts'), 'utf8');
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
       if (template === 'nuxt') {
         expect(await fileExists(cwd, 'server/api')).toBe(true);
+        if (example === 'ai') {
+          const page = await readFile(join(cwd, 'app/app.vue'), 'utf8');
+          expect(page).toContain('AI Workflow Patterns');
+          const route = await readFile(
+            join(cwd, 'server/api/workflows.post.ts'),
+            'utf8'
+          );
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
       if (template === 'vite') {
         expect(await fileExists(cwd, 'api')).toBe(true);
+        if (example === 'ai') {
+          const page = await readFile(join(cwd, 'src/App.tsx'), 'utf8');
+          expect(page).toContain('AI Workflow Patterns');
+          const route = await readFile(
+            join(cwd, 'api/workflows.post.ts'),
+            'utf8'
+          );
+          expect(route).toContain('sequentialWorkflow');
+          expect(route).toContain('orchestratorWorkflow');
+        }
       }
     }
   );
