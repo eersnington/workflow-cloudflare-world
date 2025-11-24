@@ -19,6 +19,6 @@ export type TemplateExample = {
 
 export type TemplateDefinition = {
   label: string;
-  description: string;
+  handlebars?: string;
   examples: Record<string, TemplateExample>;
 };

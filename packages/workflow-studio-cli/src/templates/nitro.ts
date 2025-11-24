@@ -30,7 +30,7 @@ export default defineEventHandler(async (event) => {
 
 export const nitroTemplates: TemplateDefinition = {
   label: 'Nitro',
-  description: 'Universal web server framework with built-in Workflow support.',
+  handlebars: 'nitro',
   examples: {
     minimal: {
       label: 'Minimal workflow starter',

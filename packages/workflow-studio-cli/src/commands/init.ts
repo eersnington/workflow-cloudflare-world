@@ -179,7 +179,7 @@ const resolveTemplateSelection = async (
 ): Promise<TemplateName> => {
   const templateEntries = Object.entries(templates).map(([value, meta]) => ({
     value,
-    label: `${meta.label} — ${meta.description}`,
+    label: `${meta.label}`,
   }));
 
   if (templateFlag) {

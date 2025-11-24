@@ -14,7 +14,7 @@ const svelteCronPlaceholders: TemplateFileFactory = {
 
 export const svelteTemplates: TemplateDefinition = {
   label: 'SvelteKit',
-  description: 'Progressive web app template powered by SvelteKit.',
+  handlebars: 'svelte',
   examples: {
     minimal: {
       label: 'Minimal workflow starter',

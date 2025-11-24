@@ -22,7 +22,7 @@ const honoFiles: TemplateFileFactory = {
 
 export const honoTemplates: TemplateDefinition = {
   label: 'Hono',
-  description: 'Fast edge-ready APIs powered by Hono + Nitro.',
+  handlebars: 'hono',
   examples: {
     minimal: {
       label: 'Minimal workflow starter',

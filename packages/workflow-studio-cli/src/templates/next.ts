@@ -17,7 +17,7 @@ const nextAiPlaceholders: TemplateFileFactory = {
 
 export const nextTemplates: TemplateDefinition = {
   label: 'Next.js',
-  description: 'Full-stack template using Next.js App Router.',
+  handlebars: 'next',
   examples: {
     minimal: {
       label: 'Minimal workflow starter',
