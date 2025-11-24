@@ -5,10 +5,13 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import { useEffect } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
-import { NavigationProvider } from '@/components/navigation-context';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { Toaster } from '@/components/ui/sonner';
-import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
+import {
+  buildUrlWithConfig,
+  useQueryParamConfig,
+  useSyncConfig,
+} from '@/lib/config';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -18,6 +21,7 @@ function LayoutContent({ children }: LayoutClientProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const config = useQueryParamConfig();
+  useSyncConfig(config);
   const id = searchParams.get('id');
   const runId = searchParams.get('runId');
   const stepId = searchParams.get('stepId');
@@ -120,9 +124,5 @@ function LayoutContent({ children }: LayoutClientProps) {
 }
 
 export function LayoutClient({ children }: LayoutClientProps) {
-  return (
-    <NavigationProvider>
-      <LayoutContent>{children}</LayoutContent>
-    </NavigationProvider>
-  );
+  return <LayoutContent>{children}</LayoutContent>;
 }

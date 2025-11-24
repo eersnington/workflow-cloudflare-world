@@ -1,18 +1,5 @@
 'use client';
 
-import { parseWorkflowName } from '@workflow/core/parse-name';
-import { getErrorMessage, useWorkflowRuns } from '@workflow/web-shared';
-import type { WorkflowRunStatus } from '@workflow/world';
-import {
-  AlertCircle,
-  ArrowDownAZ,
-  ArrowUpAZ,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-} from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DocsLink } from '@/components/ui/docs-link';
@@ -23,6 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import {
   Table,
   TableBody,
@@ -38,6 +26,19 @@ import {
 } from '@/components/ui/tooltip';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
+import { parseWorkflowName } from '@workflow/core/parse-name';
+import { getErrorMessage, useWorkflowRuns } from '@workflow/web-shared';
+import type { WorkflowRunStatus } from '@workflow/world';
+import {
+  AlertCircle,
+  ArrowDownAZ,
+  ArrowUpAZ,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { RelativeTime } from './display-utils/relative-time';
 import { StatusBadge } from './display-utils/status-badge';
 import { TableSkeleton } from './display-utils/table-skeleton';
@@ -143,6 +144,7 @@ export function RunsTable({ config, onRunClick }: RunsTableProps) {
     <div>
       <div className="flex items-center justify-between my-4">
         <h2 className="text-2xl my-2 font-semibold leading-none tracking-tight flex gap-4 items-end">
+          <SidebarTrigger className="flex items-center gap-2" />
           <span className="flex items-center gap-2">Runs</span>
           {lastRefreshTime && (
             <RelativeTime

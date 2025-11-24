@@ -1,14 +1,13 @@
 'use client';
 
-import { ReactFlowProvider } from '@xyflow/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { Canvas } from '@/components/canvas';
 import { ErrorBoundary } from '@/components/error-boundary';
 import { HooksTable } from '@/components/hooks-table';
+import { useNavigation } from '@/components/navigation-store';
 import { RunsTable } from '@/components/runs-table';
-import { Canvas } from '@/components/canvas';
-import { useNavigation } from '@/components/navigation-context';
 import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
-import { SidebarTrigger } from '@/components/ui/sidebar';
+import { ReactFlowProvider } from '@xyflow/react';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 function ObservabilityView({
   config,
@@ -81,7 +80,6 @@ export default function Home() {
     <ReactFlowProvider>
       {viewMode === 'observability' ? (
         <div className="h-full w-full overflow-auto">
-          <SidebarTrigger />
           <ObservabilityView
             config={config}
             onRunClick={handleRunClick}
@@ -91,7 +89,6 @@ export default function Home() {
         </div>
       ) : (
         <div className="h-full w-full">
-          <SidebarTrigger />
           <Canvas workflow={selectedWorkflow} config={config} />
         </div>
       )}

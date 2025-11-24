@@ -19,7 +19,7 @@ import {
 } from '@/components/ui/sidebar';
 import { Logo } from '@/icons/logo';
 import type { WorldConfig } from '@/lib/config-world';
-import { useNavigation } from './navigation-context';
+import { useNavigation } from './navigation-store';
 import { ConnectionStatus } from './display-utils/connection-status';
 
 interface AppSidebarProps {

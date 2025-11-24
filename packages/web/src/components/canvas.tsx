@@ -20,7 +20,7 @@ import {
 } from '@/components/ai-elements/node';
 import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
-import { useNavigation } from '@/components/navigation-context';
+import { useNavigation } from '@/components/navigation-store';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { worldConfigToEnvMap } from '@/lib/config';

@@ -1,18 +1,18 @@
 'use client';
 
-import { Atom, useAtom, useAtomValue } from '@effect-atom/atom-react';
-import { createContext, useContext, useEffect, useMemo } from 'react';
-import type { WorkflowListItem } from '@/lib/use-workflows';
 import {
-  configAtom,
-  getConfigParams,
-  useQueryParamConfig,
-  useSyncConfig,
-} from '@/lib/config';
+  Atom,
+  useAtom,
+  useAtomSet,
+  useAtomValue,
+} from '@effect-atom/atom-react';
+import { useEffect, useMemo } from 'react';
+import type { WorkflowListItem } from '@/lib/use-workflows';
+import { configAtom, getConfigParams } from '@/lib/config';
 
 type ViewMode = 'canvas' | 'observability';
 
-type NavigationContextValue = {
+type NavigationState = {
   viewMode: ViewMode;
   setViewMode: (mode: ViewMode) => void;
   selectedWorkflowId: string | null;
@@ -23,10 +23,6 @@ type NavigationContextValue = {
   error: string | null;
   manifestPath?: string;
 };
-
-const NavigationContext = createContext<NavigationContextValue | undefined>(
-  undefined
-);
 
 type WorkflowsState = {
   workflows: WorkflowListItem[];
@@ -98,40 +94,29 @@ const selectedWorkflowAtom = Atom.make<WorkflowListItem | null>((get) => {
   return workflows.find((wf) => wf.id === selectedId) ?? workflows[0] ?? null;
 }).pipe(Atom.keepAlive);
 
-export function NavigationProvider({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
-  const urlConfig = useQueryParamConfig();
-  useSyncConfig(urlConfig);
-
+export function useNavigation(): NavigationState {
   const [viewMode, setViewMode] = useAtom(viewModeAtom);
-  const [selectedWorkflowId, setSelectedWorkflowId] = useAtom(
-    selectedWorkflowIdAtom
-  );
+  const selectedWorkflowId = useAtomValue(selectedWorkflowIdAtom);
+  const setSelectedWorkflowId = useAtomSet(selectedWorkflowIdAtom);
   const { workflows, loading, error, manifestPath } =
     useAtomValue(workflowsAtom);
   const selectedWorkflow = useAtomValue(selectedWorkflowAtom);
 
+  // Keep selection valid when the workflow list changes.
   useEffect(() => {
     if (!workflows.length) {
       setSelectedWorkflowId(null);
       return;
     }
-
-    if (!selectedWorkflowId) {
-      setSelectedWorkflowId(workflows[0].id);
-      return;
-    }
-
-    const exists = workflows.some((wf) => wf.id === selectedWorkflowId);
-    if (!exists) {
+    if (
+      !selectedWorkflowId ||
+      !workflows.some((wf) => wf.id === selectedWorkflowId)
+    ) {
       setSelectedWorkflowId(workflows[0].id);
     }
   }, [workflows, selectedWorkflowId, setSelectedWorkflowId]);
 
-  const value: NavigationContextValue = useMemo(
+  return useMemo(
     () => ({
       viewMode,
       setViewMode,
@@ -145,28 +130,14 @@ export function NavigationProvider({
     }),
     [
       viewMode,
+      setViewMode,
       selectedWorkflowId,
+      setSelectedWorkflowId,
       selectedWorkflow,
       workflows,
       loading,
       error,
       manifestPath,
-      setViewMode,
-      setSelectedWorkflowId,
     ]
   );
-
-  return (
-    <NavigationContext.Provider value={value}>
-      {children}
-    </NavigationContext.Provider>
-  );
-}
-
-export function useNavigation() {
-  const ctx = useContext(NavigationContext);
-  if (!ctx) {
-    throw new Error('useNavigation must be used within NavigationProvider');
-  }
-  return ctx;
 }

@@ -1,15 +1,5 @@
 'use client';
 
-import { getErrorMessage, useWorkflowHooks } from '@workflow/web-shared';
-import { fetchEventsByCorrelationId } from '@workflow/web-shared/server';
-import type { Event, Hook } from '@workflow/world';
-import {
-  AlertCircle,
-  ChevronLeft,
-  ChevronRight,
-  RefreshCw,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { DocsLink } from '@/components/ui/docs-link';
@@ -28,6 +18,16 @@ import {
 } from '@/components/ui/tooltip';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
+import { getErrorMessage, useWorkflowHooks } from '@workflow/web-shared';
+import { fetchEventsByCorrelationId } from '@workflow/web-shared/server';
+import type { Event, Hook } from '@workflow/world';
+import {
+  AlertCircle,
+  ChevronLeft,
+  ChevronRight,
+  RefreshCw,
+} from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 import { RelativeTime } from './display-utils/relative-time';
 import { TableSkeleton } from './display-utils/table-skeleton';
 
