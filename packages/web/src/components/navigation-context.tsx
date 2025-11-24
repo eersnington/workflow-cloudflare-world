@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { WorkflowListItem } from '@/lib/use-workflows';
 import { useWorkflows } from '@/lib/use-workflows';
+import { useQueryParamConfig } from '@/lib/config';
 
 type ViewMode = 'canvas' | 'observability';
 
@@ -27,7 +28,8 @@ export function NavigationProvider({
 }: {
   children: React.ReactNode;
 }) {
-  const { data, loading, error } = useWorkflows();
+  const config = useQueryParamConfig();
+  const { data, loading, error } = useWorkflows(config);
   const [viewMode, setViewMode] = useState<ViewMode>('canvas');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(
     null

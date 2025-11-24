@@ -20,12 +20,12 @@ import {
 } from '@/components/ai-elements/node';
 import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
+import { useNavigation } from '@/components/navigation-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
 import type { WorkflowListItem } from '@/lib/use-workflows';
-import { formatDuration } from '@/lib/utils';
 
 type CanvasProps = {
   workflow?: WorkflowListItem | null;
@@ -38,87 +38,48 @@ const nodeTypes = {
   }: {
     data: { title: string; file: string; id: string };
   }) => (
-    <WorkflowNode handles={{ target: true, source: true }}>
-      <NodeHeader>
-        <NodeTitle className="text-base">{data.title}</NodeTitle>
-        <NodeDescription className="text-xs text-muted-foreground">
+    <WorkflowNode handles={{ target: false, source: true }}>
+      <NodeHeader className="bg-primary/10 border-b-primary/20">
+        <NodeTitle className="text-base font-mono">{data.title}</NodeTitle>
+        <NodeDescription className="text-xs text-muted-foreground font-mono truncate">
           {data.id}
         </NodeDescription>
       </NodeHeader>
       <NodeContent>
-        <p className="text-sm text-muted-foreground">{data.file}</p>
+        <div className="flex flex-col gap-2">
+          <Badge variant="default" className="w-fit">
+            use workflow
+          </Badge>
+          <p className="text-xs text-muted-foreground break-all">{data.file}</p>
+        </div>
       </NodeContent>
-      <NodeFooter>
+      <NodeFooter className="bg-primary/5 border-t-primary/20">
         <div className="flex items-center justify-between w-full">
-          <Badge variant="secondary">Workflow</Badge>
-          <span className="text-xs text-muted-foreground">Status: Ready</span>
+          <span className="text-xs text-muted-foreground">Entry Point</span>
         </div>
       </NodeFooter>
       <Toolbar>
         <Button size="sm" variant="ghost">
-          Edit
-        </Button>
-        <Button size="sm" variant="ghost">
-          Delete
+          View Code
         </Button>
       </Toolbar>
     </WorkflowNode>
   ),
-  step: ({
-    data,
-  }: {
-    data: {
-      title: string;
-      id: string;
-      status: string;
-      duration?: string | null;
-      isLast: boolean;
-    };
-  }) => (
-    <WorkflowNode handles={{ target: true, source: !data.isLast }}>
+  step: ({ data }: { data: { title: string; file: string; id: string } }) => (
+    <WorkflowNode handles={{ target: true, source: true }}>
       <NodeHeader>
-        <NodeTitle className="text-base">{data.title}</NodeTitle>
-        <NodeDescription className="text-xs text-muted-foreground">
+        <NodeTitle className="text-base font-mono">{data.title}</NodeTitle>
+        <NodeDescription className="text-xs text-muted-foreground font-mono truncate">
           {data.id}
         </NodeDescription>
       </NodeHeader>
       <NodeContent>
-        <div className="flex flex-col gap-1">
-          <div className="text-sm text-muted-foreground">Step Execution</div>
+        <div className="flex flex-col gap-2">
+          <Badge variant="secondary" className="w-fit">
+            use step
+          </Badge>
         </div>
       </NodeContent>
-      <NodeFooter>
-        <div className="flex items-center justify-between w-full">
-          <Badge
-            variant={
-              data.status === 'completed'
-                ? 'default'
-                : data.status === 'failed'
-                  ? 'destructive'
-                  : 'secondary'
-            }
-          >
-            {data.status}
-          </Badge>
-          {data.duration && (
-            <span className="text-xs text-muted-foreground">
-              {data.duration}
-            </span>
-          )}
-        </div>
-      </NodeFooter>
-    </WorkflowNode>
-  ),
-  start: ({ data }: { data: { title: string; description?: string } }) => (
-    <WorkflowNode handles={{ target: false, source: true }}>
-      <NodeHeader>
-        <NodeTitle className="text-base">{data.title}</NodeTitle>
-        {data.description && (
-          <NodeDescription className="text-xs text-muted-foreground">
-            {data.description}
-          </NodeDescription>
-        )}
-      </NodeHeader>
     </WorkflowNode>
   ),
 };
@@ -129,20 +90,35 @@ const edgeTypes = {
 };
 
 export function Canvas({ workflow, config }: CanvasProps) {
+  const { workflows: allFunctions } = useNavigation();
   const env = useMemo(() => worldConfigToEnvMap(config), [config]);
 
-  // Fetch latest run for the selected workflow
+  // Static discovery
+  const { staticWorkflowNodes, staticStepNodes } = useMemo(() => {
+    if (!workflow) return { staticWorkflowNodes: [], staticStepNodes: [] };
+
+    const fileFunctions = allFunctions.filter((f) => f.file === workflow.file);
+    return {
+      staticWorkflowNodes: fileFunctions.filter((f) => f.type === 'workflow'),
+      staticStepNodes: fileFunctions.filter((f) => f.type === 'step'),
+    };
+  }, [workflow, allFunctions]);
+
+  const hasStaticSteps = staticStepNodes.length > 0;
+
+  // Dynamic discovery (Fallback)
   const { data: runsData } = useWorkflowRuns(env, {
     workflowName: workflow?.id,
     limit: 1,
   });
-
   const latestRun = runsData?.data?.[0];
-
-  // Fetch steps for the latest run
-  const { steps } = useWorkflowTraceViewerData(env, latestRun?.runId ?? '', {
-    live: false,
-  });
+  const { steps: runSteps } = useWorkflowTraceViewerData(
+    env,
+    latestRun?.runId ?? '',
+    {
+      live: false,
+    }
+  );
 
   const { nodes, edges } = useMemo(() => {
     if (!workflow) {
@@ -151,103 +127,114 @@ export function Canvas({ workflow, config }: CanvasProps) {
 
     const nodes: Node[] = [];
     const edges: Edge[] = [];
-    const baseY = 120;
-    let currentX = 0;
-    const nodeGap = 400;
 
-    // Start Node
-    const startNode: Node = {
-      id: 'start',
-      type: 'start',
-      position: { x: currentX, y: baseY },
-      data: {
-        title: 'Start',
-        description: latestRun
-          ? `Run: ${latestRun.runId}`
-          : 'Waiting for run...',
-      },
-    };
-    nodes.push(startNode);
-    currentX += nodeGap;
+    // Layout constants
+    const startY = 50;
+    const stepStartY = 300;
+    const itemGapX = 400;
+    const centerX = 400;
 
-    if (latestRun && steps.length > 0) {
-      // Sort steps by start time
-      const sortedSteps = [...steps].sort((a, b) => {
-        const timeA = a.startedAt ? new Date(a.startedAt).getTime() : 0;
-        const timeB = b.startedAt ? new Date(b.startedAt).getTime() : 0;
-        return timeA - timeB;
+    // 1. Workflow Nodes
+    // Use static workflow nodes if available, otherwise assume the selected workflow is the only one
+    const workflowNodes =
+      staticWorkflowNodes.length > 0 ? staticWorkflowNodes : [workflow];
+
+    workflowNodes.forEach((wf, index) => {
+      nodes.push({
+        id: wf.id,
+        type: 'workflow',
+        position: {
+          x: centerX + (index - (workflowNodes.length - 1) / 2) * itemGapX,
+          y: startY,
+        },
+        data: {
+          title: wf.name,
+          file: wf.file,
+          id: wf.id,
+        },
       });
+    });
 
-      // Connect Start to First Step
-      edges.push({
-        id: `edge-start-${sortedSteps[0].stepId}`,
-        source: startNode.id,
-        target: sortedSteps[0].stepId,
-        type: 'animated',
-        animated: true,
-        style: { stroke: 'var(--ring)' },
-      });
+    // 2. Step Nodes
+    let stepNodesToRender: { id: string; name: string; file: string }[] = [];
 
-      // Generate nodes for steps
-      sortedSteps.forEach((step, index) => {
-        const duration = formatDuration(step.startedAt, step.completedAt);
-        const isLast = index === sortedSteps.length - 1;
-
-        const stepNode: Node = {
-          id: step.stepId,
-          type: 'step',
-          position: { x: currentX, y: baseY },
-          data: {
-            title: step.stepName,
-            id: step.stepId,
-            status: step.status,
-            duration,
-            isLast,
-          },
-        };
-
-        nodes.push(stepNode);
-
-        // Connect to previous step (if not first)
-        if (index > 0) {
-          edges.push({
-            id: `edge-${sortedSteps[index - 1].stepId}-${step.stepId}`,
-            source: sortedSteps[index - 1].stepId,
-            target: step.stepId,
-            type: 'animated',
-            animated: true,
-            style: { stroke: 'var(--ring)' },
-          });
+    if (hasStaticSteps) {
+      stepNodesToRender = staticStepNodes;
+    } else if (latestRun && runSteps.length > 0) {
+      // Infer steps from execution trace
+      const uniqueSteps = new Map<string, { id: string; name: string }>();
+      runSteps.forEach((s) => {
+        // Clean up step name if it contains ID junk, or just use as is
+        // Assuming stepId is stable or we use stepName
+        if (!uniqueSteps.has(s.stepName)) {
+          uniqueSteps.set(s.stepName, { id: s.stepName, name: s.stepName });
         }
+      });
+      stepNodesToRender = Array.from(uniqueSteps.values()).map((s) => ({
+        id: s.id,
+        name: s.name,
+        file: 'Inferred from trace', // Visual indicator
+      }));
+    }
 
-        currentX += nodeGap;
+    if (stepNodesToRender.length === 0) {
+      // Fallback visual if absolutely no steps found
+      nodes.push({
+        id: 'no-steps-info',
+        type: 'step',
+        position: { x: centerX, y: stepStartY },
+        data: {
+          title: 'No Steps Discovered',
+          file: 'Run `workflow build` or execute workflow',
+          id: 'info-no-steps',
+        } as any,
+      });
+
+      workflowNodes.forEach((wf) => {
+        edges.push({
+          id: `${wf.id}-no-steps`,
+          source: wf.id,
+          target: 'no-steps-info',
+          type: 'temporary',
+          style: { stroke: 'var(--border)', strokeDasharray: '5, 5' },
+        });
       });
     } else {
-      // Fallback: Workflow Placeholder Node
-      const workflowNode: Node = {
-        id: workflow.id,
-        type: 'workflow',
-        position: { x: currentX, y: baseY },
-        data: {
-          title: workflow.name,
-          file: workflow.file,
-          id: workflow.id,
-        },
-      };
-      nodes.push(workflowNode);
+      stepNodesToRender.forEach((step, index) => {
+        const xPos =
+          centerX + (index - (stepNodesToRender.length - 1) / 2) * itemGapX;
+        nodes.push({
+          id: step.id,
+          type: 'step',
+          position: { x: xPos, y: stepStartY },
+          data: {
+            title: step.name,
+            file: step.file,
+            id: step.id,
+          },
+        });
 
-      edges.push({
-        id: `${startNode.id}-${workflow.id}`,
-        source: startNode.id,
-        target: workflow.id,
-        type: 'animated',
-        animated: true,
-        style: { stroke: 'var(--ring)' },
+        workflowNodes.forEach((wf) => {
+          edges.push({
+            id: `${wf.id}-${step.id}`,
+            source: wf.id,
+            target: step.id,
+            type: 'temporary',
+            style: { stroke: 'var(--border)' },
+          });
+        });
       });
     }
 
     return { nodes, edges };
-  }, [workflow, latestRun, steps]);
+  }, [
+    workflow,
+    staticWorkflowNodes,
+    staticStepNodes,
+    hasStaticSteps,
+    latestRun,
+    runSteps,
+  ]);
 
   return (
     <div className="h-full w-full pb-8">
@@ -264,7 +251,7 @@ export function Canvas({ workflow, config }: CanvasProps) {
           <div className="flex items-center gap-2 text-sm text-muted-foreground px-2 py-1">
             {workflow ? (
               <span className="font-medium text-foreground">
-                {workflow.name}
+                {workflow.file}
               </span>
             ) : (
               <span className="text-xs">Select a workflow to visualize</span>

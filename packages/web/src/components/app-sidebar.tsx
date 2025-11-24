@@ -89,6 +89,7 @@ export function AppSidebar({ config }: AppSidebarProps) {
                 ))
               ) : workflows.length ? (
                 workflows
+                  .filter((w) => w.type === 'workflow')
                   .slice()
                   .sort((a, b) => a.name.localeCompare(b.name))
                   .map((workflow) => (

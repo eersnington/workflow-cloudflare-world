@@ -1,23 +1,25 @@
 import { access, readFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
-import { parseWorkflowName } from '@workflow/core/parse-name';
-import { createWorld } from '@workflow/core/runtime';
+import { parseStepName, parseWorkflowName } from '@workflow/core/parse-name';
 import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
 
+type ManifestFileEntry = Record<
+  string,
+  { workflowId?: string; stepId?: string }
+>;
+
 type WorkflowManifest = {
-  [relativeFileName: string]: {
-    [functionName: string]: {
-      workflowId: string;
-    };
-  };
+  workflows?: Record<string, ManifestFileEntry>;
+  steps?: Record<string, ManifestFileEntry>;
 };
 
-type WorkflowListItem = {
+export type WorkflowListItem = {
   id: string;
   name: string;
   file: string;
+  type: 'workflow' | 'step';
 };
 
 const MANIFEST_DIR = '.well-known/workflow/v1';
@@ -37,7 +39,7 @@ async function fileExists(path: string) {
   }
 }
 
-function deriveRootsFromEnv(): string[] {
+function deriveRootsFromEnv(paramDataDir?: string | null): string[] {
   const roots = new Set<string>();
 
   const manifestPath = process.env.WORKFLOW_MANIFEST_PATH;
@@ -50,16 +52,21 @@ function deriveRootsFromEnv(): string[] {
     roots.add(resolve(projectRoot));
   }
 
-  const dataDir = process.env.WORKFLOW_EMBEDDED_DATA_DIR;
+  const dataDir = paramDataDir || process.env.WORKFLOW_EMBEDDED_DATA_DIR;
   if (dataDir) {
     const resolved = resolve(dataDir);
     roots.add(dirname(resolved));
+    // If dataDir is like .next/workflow-data, parent is .next, grandparent is root
     roots.add(resolve(resolved, '..', '..'));
 
     for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
       const idx = resolved.lastIndexOf(suffix);
       if (idx !== -1) {
-        roots.add(resolve(resolved.slice(0, idx)));
+        const root = resolve(resolved.slice(0, idx));
+        roots.add(root);
+        // Check Next.js app dir pattern
+        roots.add(join(root, 'app'));
+        roots.add(join(root, 'src/app'));
       }
     }
   }
@@ -69,15 +76,16 @@ function deriveRootsFromEnv(): string[] {
   return Array.from(roots);
 }
 
-async function findManifest(): Promise<{
+async function findManifest(dataDir?: string | null): Promise<{
   path: string;
   manifest: WorkflowManifest;
 } | null> {
-  const roots = deriveRootsFromEnv();
+  const roots = deriveRootsFromEnv(dataDir);
 
   for (const root of roots) {
     for (const file of MANIFEST_FILES) {
       const fullPath = join(root, MANIFEST_DIR, file);
+      console.log(`Checking manifest path: ${fullPath}`);
       if (!(await fileExists(fullPath))) {
         continue;
       }
@@ -96,72 +104,59 @@ async function findManifest(): Promise<{
 }
 
 function normalizeManifest(manifest: WorkflowManifest): WorkflowListItem[] {
-  const workflows: WorkflowListItem[] = [];
+  const items: WorkflowListItem[] = [];
 
-  for (const [relativeFile, functions] of Object.entries(manifest)) {
-    for (const [, entry] of Object.entries(functions)) {
-      if (!entry?.workflowId) continue;
-      const parsed = parseWorkflowName(entry.workflowId);
-      workflows.push({
-        id: entry.workflowId,
-        name: parsed?.shortName ?? entry.workflowId,
-        file: relativeFile,
-      });
+  // Process Workflows
+  if (manifest.workflows) {
+    for (const [relativeFile, functions] of Object.entries(
+      manifest.workflows
+    )) {
+      for (const [, entry] of Object.entries(functions)) {
+        if (!entry?.workflowId) continue;
+
+        const parsed = parseWorkflowName(entry.workflowId);
+        items.push({
+          id: entry.workflowId,
+          name: parsed?.shortName ?? entry.workflowId,
+          file: relativeFile,
+          type: 'workflow',
+        });
+      }
     }
   }
 
-  return workflows;
+  // Process Steps
+  if (manifest.steps) {
+    for (const [relativeFile, functions] of Object.entries(manifest.steps)) {
+      for (const [, entry] of Object.entries(functions)) {
+        if (!entry?.stepId) continue;
+
+        const parsed = parseStepName(entry.stepId);
+        items.push({
+          id: entry.stepId,
+          name: parsed?.shortName ?? entry.stepId,
+          file: relativeFile,
+          type: 'step',
+        });
+      }
+    }
+  }
+
+  return items;
 }
 
-export async function GET() {
-  const located = await findManifest();
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const dataDir = searchParams.get('dataDir');
+
+  const located = await findManifest(dataDir);
 
   if (!located) {
-    // Fallback: try to fetch workflows from the backend (World)
-    try {
-      const world = createWorld();
-      // Fetch recent runs to discover workflows
-      const { data: runs } = await world.runs.list({
-        limit: 100, // Fetch enough runs to likely cover active workflows
-        resolveData: 'none',
-      });
-
-      const uniqueWorkflows = new Set<string>();
-      for (const run of runs) {
-        if (run.workflowName) {
-          uniqueWorkflows.add(run.workflowName);
-        }
-      }
-
-      const workflows: WorkflowListItem[] = Array.from(uniqueWorkflows).map(
-        (name) => {
-          const parsed = parseWorkflowName(name);
-          return {
-            id: name,
-            name: parsed?.shortName ?? name,
-            file: parsed?.fileName ?? '', // We might not have the file path
-          };
-        }
-      );
-
-      if (workflows.length > 0) {
-        return NextResponse.json(
-          {
-            workflows,
-            manifestPath: null,
-          },
-          { status: 200 }
-        );
-      }
-    } catch (e) {
-      console.error('Failed to fetch workflows from backend:', e);
-    }
-
     return NextResponse.json(
       {
         workflows: [],
         error:
-          'No workflow manifest found. Run `workflow build` or execute a workflow to generate `.well-known/workflow/v1/manifest.json`.',
+          'No workflow manifest found. Run `workflow build` to generate `.well-known/workflow/v1/manifest.json`.',
       },
       { status: 200 }
     );
