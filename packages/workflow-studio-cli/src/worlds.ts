@@ -1,6 +1,6 @@
 import { cancel, isCancel, select, text } from '@clack/prompts';
-import { readFile, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { readFile, writeFile } from 'node:fs/promises';
 
 export const WORLD_OPTIONS = [
   {
@@ -88,7 +88,7 @@ export async function promptWorldChoiceWithSkip(
   message?: string
 ): Promise<WorldSelection> {
   if (autoAccept) {
-    return 'local';
+    return 'embedded';
   }
 
   const options = [
