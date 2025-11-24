@@ -6,6 +6,19 @@ const nitroPlaceholders: TemplateFileFactory = {
 `,
 };
 
+const nitroAiPlaceholders: TemplateFileFactory = {
+  'workflows/sequential-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+  'workflows/orchestrator-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+  'server/api/workflows.post.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NITRO_AI_ROUTE__';
+`,
+  'index.html': () => `<!-- __WORKFLOW_NITRO_AI_PAGE__ -->\n`,
+};
+
 const nitroConfig = `import { defineConfig } from 'nitro';
 
 export default defineConfig({
@@ -38,6 +51,18 @@ export const nitroTemplates: TemplateDefinition = {
       placeholders: nitroPlaceholders,
       files: nitroFiles,
       codemods: ['nitro/api/route', 'nitro/workflow'],
+    },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: nitroAiPlaceholders,
+      codemods: [
+        'nitro/ai/page',
+        'nitro/ai/route',
+        'nitro/ai/sequential-workflow',
+        'nitro/ai/orchestrator-workflow',
+      ],
     },
   },
 };

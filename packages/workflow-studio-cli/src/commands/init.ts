@@ -458,9 +458,9 @@ async function installWorkflowDeps({
   exampleName: string;
 }) {
   const baseDeps = ['workflow@latest'];
-  const aiDeps = ['ai@latest', 'zod@latest'];
+  const aiDeps = ['ai@^5.0.76', 'zod@^4.1.9'];
 
-  let deps: string[] = [...baseDeps];
+  const deps: string[] = [...baseDeps];
 
   // Add example-specific dependencies
   if (exampleName === 'ai') {

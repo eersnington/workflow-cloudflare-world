@@ -62,6 +62,19 @@ export default defineEventHandler(async (event) => {
 `,
 };
 
+const nuxtAiPlaceholders: TemplateFileFactory = {
+  'server/workflows/sequential-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+  'server/workflows/orchestrator-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+  'server/api/workflows.post.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_NUXT_AI_ROUTE__';
+`,
+  'app/app.vue': () => `<!-- __WORKFLOW_NUXT_AI_PAGE__ -->\n`,
+};
+
 export const nuxtTemplates: TemplateDefinition = {
   label: 'Nuxt',
   handlebars: 'nuxt',
@@ -70,6 +83,18 @@ export const nuxtTemplates: TemplateDefinition = {
       label: 'Minimal workflow starter',
       description: 'Hello-world workflow triggered from a Nuxt API route.',
       files: nuxtFiles,
+    },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: nuxtAiPlaceholders,
+      codemods: [
+        'nuxt/ai/page',
+        'nuxt/ai/route',
+        'nuxt/ai/sequential-workflow',
+        'nuxt/ai/orchestrator-workflow',
+      ],
     },
   },
 };

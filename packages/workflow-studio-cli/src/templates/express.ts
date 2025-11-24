@@ -75,5 +75,26 @@ export const expressTemplates: TemplateDefinition = {
       description: 'Hello-world workflow triggered from an Express route.',
       files: expressFiles,
     },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: {
+        'workflows/sequential-workflow.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+        'workflows/orchestrator-workflow.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+        'src/index.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_EXPRESS_AI_ROUTE__';
+`,
+      },
+      codemods: [
+        'express/ai/route',
+        'express/ai/sequential-workflow',
+        'express/ai/orchestrator-workflow',
+      ],
+    },
   },
 };

@@ -12,6 +12,19 @@ const svelteCronPlaceholders: TemplateFileFactory = {
 `,
 };
 
+const svelteAiPlaceholders: TemplateFileFactory = {
+  'workflows/sequential-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+  'workflows/orchestrator-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+  'src/routes/api/workflows/+server.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SVELTE_AI_ROUTE__';
+`,
+  'src/routes/+page.svelte': () => `<!-- __WORKFLOW_SVELTE_AI_PAGE__ -->\n`,
+};
+
 export const svelteTemplates: TemplateDefinition = {
   label: 'SvelteKit',
   handlebars: 'svelte',
@@ -40,6 +53,18 @@ export const POST: RequestHandler = async ({
 `,
       },
       codemods: ['svelte/minimal/page', 'svelte/minimal/workflow'],
+    },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: svelteAiPlaceholders,
+      codemods: [
+        'svelte/ai/page',
+        'svelte/ai/route',
+        'svelte/ai/sequential-workflow',
+        'svelte/ai/orchestrator-workflow',
+      ],
     },
     cron: {
       label: 'Cron orchestrator',

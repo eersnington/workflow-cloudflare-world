@@ -20,6 +20,18 @@ const honoFiles: TemplateFileFactory = {
   'nitro.config.ts': () => nitroConfig,
 };
 
+const honoAiPlaceholders: TemplateFileFactory = {
+  'workflows/sequential-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+  'workflows/orchestrator-workflow.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+  'src/index.ts': () =>
+    `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_HONO_AI_ROUTE__';
+`,
+};
+
 export const honoTemplates: TemplateDefinition = {
   label: 'Hono',
   handlebars: 'hono',
@@ -30,6 +42,17 @@ export const honoTemplates: TemplateDefinition = {
       placeholders: honoPlaceholders,
       files: honoFiles,
       codemods: ['hono/index/route', 'hono/workflow'],
+    },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: honoAiPlaceholders,
+      codemods: [
+        'hono/ai/route',
+        'hono/ai/sequential-workflow',
+        'hono/ai/orchestrator-workflow',
+      ],
     },
   },
 };

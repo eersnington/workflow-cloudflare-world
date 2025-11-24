@@ -72,5 +72,30 @@ export const viteTemplates: TemplateDefinition = {
         'Hello-world workflow triggered from a Vite + Nitro handler.',
       files: viteFiles,
     },
+    ai: {
+      label: 'AI Workflows',
+      description:
+        'Sequential marketing copy generation and orchestrator feature planning with AI SDK.',
+      placeholders: {
+        'workflows/sequential-workflow.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_SEQUENTIAL__';
+`,
+        'workflows/orchestrator-workflow.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_ORCHESTRATOR__';
+`,
+        'api/workflows.post.ts': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_VITE_AI_ROUTE__';
+`,
+        'src/App.tsx': () =>
+          `export const WORKFLOW_STUDIO_PLACEHOLDER = '__WORKFLOW_VITE_AI_PAGE__';
+`,
+      },
+      codemods: [
+        'vite/ai/page',
+        'vite/ai/route',
+        'vite/ai/sequential-workflow',
+        'vite/ai/orchestrator-workflow',
+      ],
+    },
   },
 };
