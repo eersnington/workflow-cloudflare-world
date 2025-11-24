@@ -81,26 +81,63 @@ async function findManifest(dataDir?: string | null): Promise<{
   manifest: WorkflowManifest;
 } | null> {
   const roots = deriveRootsFromEnv(dataDir);
+  const subdirs = ['', 'flow', 'step'];
+
+  const foundManifests: WorkflowManifest[] = [];
+  let lastPath = '';
 
   for (const root of roots) {
-    for (const file of MANIFEST_FILES) {
-      const fullPath = join(root, MANIFEST_DIR, file);
-      console.log(`Checking manifest path: ${fullPath}`);
-      if (!(await fileExists(fullPath))) {
-        continue;
-      }
-
-      try {
-        const content = await readFile(fullPath, 'utf8');
-        const manifest = JSON.parse(content) as WorkflowManifest;
-        return { path: fullPath, manifest };
-      } catch (error) {
-        console.error(`Failed to read workflow manifest at ${fullPath}`, error);
+    for (const subdir of subdirs) {
+      for (const file of MANIFEST_FILES) {
+        const fullPath = join(root, MANIFEST_DIR, subdir, file);
+        console.log(`Checking manifest path: ${fullPath}`);
+        if (await fileExists(fullPath)) {
+          try {
+            const content = await readFile(fullPath, 'utf8');
+            const manifest = JSON.parse(content) as WorkflowManifest;
+            foundManifests.push(manifest);
+            lastPath = fullPath;
+          } catch (error) {
+            console.error(
+              `Failed to read workflow manifest at ${fullPath}`,
+              error
+            );
+          }
+        }
       }
     }
   }
 
-  return null;
+  if (foundManifests.length === 0) {
+    return null;
+  }
+
+  // Merge all found manifests
+  const mergedManifest: WorkflowManifest = {
+    workflows: {},
+    steps: {},
+  };
+
+  for (const manifest of foundManifests) {
+    if (manifest.workflows) {
+      for (const [file, fns] of Object.entries(manifest.workflows)) {
+        mergedManifest.workflows![file] = {
+          ...mergedManifest.workflows![file],
+          ...fns,
+        };
+      }
+    }
+    if (manifest.steps) {
+      for (const [file, fns] of Object.entries(manifest.steps)) {
+        mergedManifest.steps![file] = {
+          ...mergedManifest.steps![file],
+          ...fns,
+        };
+      }
+    }
+  }
+
+  return { path: lastPath, manifest: mergedManifest };
 }
 
 function normalizeManifest(manifest: WorkflowManifest): WorkflowListItem[] {
