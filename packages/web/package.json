@@ -26,6 +26,7 @@
     "format": "biome format --write"
   },
   "dependencies": {
+    "@effect-atom/atom-react": "0.4.0",
     "@radix-ui/react-dialog": "1.1.15",
     "@radix-ui/react-scroll-area": "1.2.10",
     "@radix-ui/react-separator": "1.1.8",

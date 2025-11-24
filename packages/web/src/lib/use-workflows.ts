@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import type { WorldConfig } from '@/lib/config-world';
 import { getConfigParams } from '@/lib/config';
+import type { WorldConfig } from '@/lib/config-world';
+import { useEffect, useState } from 'react';
 
 export type WorkflowListItem = {
   id: string;

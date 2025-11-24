@@ -1,19 +1,17 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Settings } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogClose,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogDescription,
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -25,10 +23,12 @@ import {
 } from '@/components/ui/select';
 import { useQueryParamConfig, useUpdateConfigQueryParams } from '@/lib/config';
 import {
-  type ValidationError,
   validateWorldConfig,
+  type ValidationError,
   type WorldConfig,
 } from '@/lib/config-world';
+import { AlertCircle, Settings } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
 
 type SettingsDialogProps = {
   trigger?: React.ReactNode;

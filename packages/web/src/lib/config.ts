@@ -1,17 +1,22 @@
 'use client';
 
+import { Atom, useAtomSet, useAtomValue } from '@effect-atom/atom-react';
 import type { EnvMap } from '@workflow/web-shared/server';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import type { WorldConfig } from '@/lib/config-world';
 
 // Default configuration
-const DEFAULT_CONFIG: WorldConfig = {
+export const DEFAULT_CONFIG: WorldConfig = {
   backend: 'embedded',
   dataDir: './.next/workflow-data',
   port: '3000',
   env: 'production',
 };
+
+export const configAtom = Atom.make<WorldConfig>(DEFAULT_CONFIG).pipe(
+  Atom.keepAlive
+);
 
 // Config query param keys
 const CONFIG_PARAM_KEYS = [
@@ -142,3 +147,15 @@ export const worldConfigToEnvMap = (config: WorldConfig): EnvMap => {
     WORKFLOW_EMBEDDED_DATA_DIR: config.dataDir,
   };
 };
+
+export function useConfig() {
+  return useAtomValue(configAtom);
+}
+
+export function useSyncConfig(config: WorldConfig) {
+  const setConfig = useAtomSet(configAtom);
+
+  useEffect(() => {
+    setConfig(config);
+  }, [config, setConfig]);
+}
