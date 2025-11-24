@@ -262,6 +262,8 @@ const resolvePackageManager = async (
     label: `${meta.label} — ${meta.description}`,
   }));
 
+  const detected = detectPackageManager();
+
   if (packageManagerFlag) {
     if (!PACKAGE_MANAGERS[packageManagerFlag as PackageManagerName]) {
       throw new Error(
@@ -273,11 +275,6 @@ const resolvePackageManager = async (
     return packageManagerFlag as PackageManagerName;
   }
 
-  const detected = detectPackageManager();
-  if (detected) {
-    return detected;
-  }
-
   if (yes) {
     return (detected || DEFAULT_PACKAGE_MANAGER) as PackageManagerName;
   }
@@ -285,6 +282,7 @@ const resolvePackageManager = async (
   const selection = await select({
     message: 'Which package manager do you use?',
     options: entries,
+    initialValue: detected ?? undefined,
   });
 
   return ensureNotCancelled(selection) as PackageManagerName;
@@ -315,7 +313,7 @@ async function runCommand(
     successMessage,
     env,
     spinnerMessages,
-    spinnerIntervalMs = 5000,
+    spinnerIntervalMs = 2000,
   }: {
     cwd: string;
     label?: string;
