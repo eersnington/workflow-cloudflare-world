@@ -1,8 +1,8 @@
 import type { TemplateDefinition, TemplateFileFactory } from './types.js';
 
 const expressFiles: TemplateFileFactory = {
-  'workflows/user-signup.ts':
-    () => `import { FatalError, sleep } from 'workflow';
+  'workflows/user-signup.ts': () => `import { sleep } from 'workflow';
+import { FatalError } from 'workflow';
 
 export async function handleUserSignup(email: string) {
   "use workflow";
@@ -21,7 +21,7 @@ export async function handleUserSignup(email: string) {
 async function createUser(email: string) {
   "use step";
 
-  console.log(\`Creating user with email: \${email}\`);
+  console.log('Creating user with email: ' + email);
 
   return { id: crypto.randomUUID(), email };
 }
@@ -29,7 +29,7 @@ async function createUser(email: string) {
 async function sendWelcomeEmail(user: { id: string; email: string }) {
   "use step";
 
-  console.log(\`Sending welcome email to user: \${user.id}\`);
+  console.log('Sending welcome email to user: ' + user.id);
 
   if (Math.random() < 0.3) {
     throw new Error('Retryable!');
@@ -43,7 +43,7 @@ async function sendOnboardingEmail(user: { id: string; email: string }) {
     throw new FatalError('Invalid Email');
   }
 
-  console.log(\`Sending onboarding email to user: \${user.id}\`);
+  console.log('Sending onboarding email to user: ' + user.id);
 }
 `,
   'src/index.ts': () => `import express from "express";
