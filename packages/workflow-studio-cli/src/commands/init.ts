@@ -294,18 +294,38 @@ async function runCommand(
     label,
     successMessage,
     env,
+    spinnerMessages,
+    spinnerIntervalMs = 5000,
   }: {
     cwd: string;
     label?: string;
     successMessage?: string;
     env?: NodeJS.ProcessEnv;
+    spinnerMessages?: string[];
+    spinnerIntervalMs?: number;
   }
 ) {
   await new Promise<void>((resolvePromise, rejectPromise) => {
-    const quiet = Boolean(label);
+    const quiet = Boolean(label || (spinnerMessages && spinnerMessages.length));
     const spin = quiet ? spinner() : null;
-    if (spin && label) {
-      spin.start(label);
+    const messagePool = spinnerMessages
+      ? [...spinnerMessages].sort(() => Math.random() - 0.5)
+      : [];
+    const initialMessage = messagePool.shift() || label || '';
+    if (spin && initialMessage) {
+      spin.start(initialMessage);
+    }
+    let tickTimer: NodeJS.Timeout | null = null;
+    if (spin && messagePool.length > 0) {
+      tickTimer = setInterval(() => {
+        const next = messagePool.shift();
+        if (next && spin.message) {
+          spin.message(next);
+        }
+        if (!messagePool.length && tickTimer) {
+          clearInterval(tickTimer);
+        }
+      }, spinnerIntervalMs);
     }
     const child = spawn(resolveCommand(command), args, {
       cwd,
@@ -328,6 +348,9 @@ async function runCommand(
     child.on('close', (code) => {
       if (code === 0) {
         if (spin) {
+          if (tickTimer) {
+            clearInterval(tickTimer);
+          }
           spin.stop(successMessage || label || 'Done');
         }
         resolvePromise();
@@ -335,6 +358,9 @@ async function runCommand(
       }
       if (spin) {
         spin.stop('Command failed');
+      }
+      if (tickTimer) {
+        clearInterval(tickTimer);
       }
       const output = [stdout.trim(), stderr.trim()].filter(Boolean).join('\n');
       rejectPromise(
@@ -468,11 +494,47 @@ async function installWorkflowDeps({
   }
 
   const args = PACKAGE_MANAGERS[packageManager].installArgs(deps);
-  log.message(
-    pc.blue(`\n> ${packageManager} ${args.join(' ')} (${projectDir})`)
-  );
   await withWorkspaceFileHidden(projectDir, () =>
-    runCommand(packageManager, args, { cwd: projectDir })
+    runCommand(packageManager, args, {
+      cwd: projectDir,
+      label: 'Installing dependencies',
+      successMessage: 'Dependencies installed',
+      spinnerMessages: [
+        'Brewing durable workflows...',
+        'Get workflow pilled early into your life.',
+        'Teaching the AI some new workflow tricks...',
+        'Chasing down flaky steps and retrying...',
+        'Sharpening workflow directives for resilience...',
+        'Stress-testing idempotent steps...',
+        'Buffing checkpoints so resumes are smooth...',
+        'Herding workers back to the queue...',
+        'Coaching orchestrators to keep calm...',
+        'Lining up signals, sleeps, and spawns...',
+        'Packing snacks for sequential workflows...',
+        'Wrangling long-running jobs into durable runs...',
+        'Writing failure plans before failures happen...',
+        'Making retries polite and backoffy (with tiny bowties)...',
+        'Reminding steps to be stateless...',
+        'Encrypting run logs with a wink and a nod...',
+        'Calming down stuck runs with timeouts...',
+        'Pinning workflows to the timeline...',
+        'Teaching zod to guard your payloads...',
+        'Keeping determinism hydrated...',
+        'Aligning ids so resumes never forget...',
+        'Checking heartbeats on worker pools...',
+        'Consulting the ancient tome of orchestrators...',
+        'Casting a “no-flake” spell on step retriers...',
+        'Whispering secrets to the workflow scheduler...',
+        'Petting the friendly queue dragon...',
+        'Lighting incense for smooth resumptions...',
+        'Offering cookies to the idempotency gods...',
+        'Listening for ghost runs in the event bus...',
+        'Balancing the cosmic scales of retries...',
+        'Giving your workflows capes (for durability)...',
+        'Juggling signals, because why not...',
+        'Tucking long-running jobs into cozy queues...',
+      ],
+    })
   );
 }
 
