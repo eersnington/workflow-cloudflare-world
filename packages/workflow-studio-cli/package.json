@@ -1,6 +1,6 @@
 {
   "name": "workflow-studio",
-  "version": "0.1.7-alpha",
+  "version": "0.1.8-alpha",
   "description": "Devtools for Vercel Workflow DevKit",
   "type": "module",
   "bin": {
