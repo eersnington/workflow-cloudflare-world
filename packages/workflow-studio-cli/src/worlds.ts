@@ -4,7 +4,7 @@ import { spawn } from 'node:child_process';
 
 export const WORLD_OPTIONS = [
   {
-    value: 'local',
+    value: 'embedded',
     label: 'Local world (@workflow/world-local)',
     community: false,
   },
@@ -109,7 +109,7 @@ export async function promptWorldChoiceWithSkip(
 }
 
 const LOCAL_WORLD_ENV = {
-  WORKFLOW_TARGET_WORLD: 'local',
+  WORKFLOW_TARGET_WORLD: 'embedded',
 } as const;
 
 const ensureEndsWithNewline = (value: string) =>
@@ -492,7 +492,7 @@ const promptJazzSelfHostedConfig = async (): Promise<{
 export async function collectWorldEntries(
   world: WorldChoice
 ): Promise<Record<string, string>> {
-  if (world === 'local') {
+  if (world === 'embedded') {
     return { ...LOCAL_WORLD_ENV };
   }
   if (world === 'postgres') {
@@ -509,7 +509,7 @@ export async function collectWorldEntriesWithComments(
   comments: Record<string, string>;
   summary?: string[];
 }> {
-  if (world === 'local') {
+  if (world === 'embedded') {
     return {
       entries: { ...LOCAL_WORLD_ENV },
       comments: {
