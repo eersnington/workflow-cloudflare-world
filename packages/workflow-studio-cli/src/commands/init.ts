@@ -104,6 +104,15 @@ type PackageManagerName = keyof typeof PACKAGE_MANAGERS;
 
 const WORKSPACE_FILENAME = 'pnpm-workspace.yaml';
 
+const detectPackageManager = (): PackageManagerName | null => {
+  const ua = process.env.npm_config_user_agent || '';
+  if (ua.startsWith('pnpm')) return 'pnpm';
+  if (ua.startsWith('yarn')) return 'yarn';
+  if (ua.startsWith('bun')) return 'bun';
+  if (ua.startsWith('npm')) return 'npm';
+  return null;
+};
+
 const pathExists = async (path: string) => {
   try {
     await access(path);
@@ -264,8 +273,13 @@ const resolvePackageManager = async (
     return packageManagerFlag as PackageManagerName;
   }
 
+  const detected = detectPackageManager();
+  if (detected) {
+    return detected;
+  }
+
   if (yes) {
-    return DEFAULT_PACKAGE_MANAGER as PackageManagerName;
+    return (detected || DEFAULT_PACKAGE_MANAGER) as PackageManagerName;
   }
 
   const selection = await select({
@@ -284,6 +298,12 @@ const resolveCommand = (bin: string) => {
     return bin;
   }
   return bin.endsWith('.cmd') ? bin : `${bin}.cmd`;
+};
+
+const getWorkflowStudioCommand = (packageManager: PackageManagerName) => {
+  const executor = PACKAGE_MANAGERS[packageManager].createExecutor;
+  const parts = [executor.command, ...executor.args, 'workflow-studio', 'web'];
+  return parts.join(' ');
 };
 
 async function runCommand(
@@ -745,7 +765,7 @@ export async function runInitCommand(options: InitOptions) {
   const nextSteps = [
     usingCurrentDirectory ? null : `cd ${projectSpecifier}`,
     PACKAGE_MANAGERS[packageManager].runScript('dev'),
-    'npx workflow-studio web',
+    getWorkflowStudioCommand(packageManager),
   ].filter((step): step is string => Boolean(step));
 
   outro(
