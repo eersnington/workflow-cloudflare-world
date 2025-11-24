@@ -35,12 +35,7 @@ export async function POST(request: Request) {
 }
 `,
       },
-      codemods: [
-        'next/config/with-workflow',
-        'next/typescript/plugin',
-        'next/minimal/page',
-        'next/minimal/workflow',
-      ],
+      codemods: ['next/minimal/page', 'next/minimal/workflow'],
     },
     ai: {
       label: 'AI Workflows',
@@ -81,8 +76,6 @@ export async function POST(request: Request) {
 `,
       },
       codemods: [
-        'next/config/with-workflow',
-        'next/typescript/plugin',
         'next/ai/page',
         'next/ai/sequential-workflow',
         'next/ai/orchestrator-workflow',

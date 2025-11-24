@@ -9,10 +9,12 @@ import {
 import { dirname, join, relative } from 'node:path';
 import Handlebars from 'handlebars';
 
+export type RenderTemplateContext = Record<string, any>;
+
 export async function renderTemplate(
   templatePath: string,
   targetDir: string,
-  context: Record<string, any>
+  context: RenderTemplateContext
 ) {
   const entries = await readdir(templatePath, {
     recursive: true,

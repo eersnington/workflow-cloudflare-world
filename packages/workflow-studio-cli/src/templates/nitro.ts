@@ -37,12 +37,7 @@ export const nitroTemplates: TemplateDefinition = {
       description: 'Hello-world workflow triggered from a Nitro route.',
       placeholders: nitroPlaceholders,
       files: nitroFiles,
-      codemods: [
-        'nitro/config/with-workflow',
-        'nitro/api/route',
-        'nitro/workflow',
-        'nitro/package/scripts',
-      ],
+      codemods: ['nitro/api/route', 'nitro/workflow'],
     },
   },
 };

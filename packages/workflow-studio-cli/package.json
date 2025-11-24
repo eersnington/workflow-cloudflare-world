@@ -9,7 +9,8 @@
   },
   "files": [
     "dist",
-    "templates"
+    "templates",
+    "src/handlebars"
   ],
   "scripts": {
     "build": "tsc && chmod +x dist/index.js",

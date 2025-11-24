@@ -39,23 +39,13 @@ export const POST: RequestHandler = async ({
 };
 `,
       },
-      codemods: [
-        'svelte/vite/plugin',
-        'svelte/typescript/plugin',
-        'svelte/minimal/page',
-        'svelte/minimal/workflow',
-      ],
+      codemods: ['svelte/minimal/page', 'svelte/minimal/workflow'],
     },
     cron: {
       label: 'Cron orchestrator',
       description: 'Cron-style workflow that schedules work periodically.',
       placeholders: svelteCronPlaceholders,
-      codemods: [
-        'svelte/vite/plugin',
-        'svelte/typescript/plugin',
-        'svelte/cron/page',
-        'svelte/cron/workflow',
-      ],
+      codemods: ['svelte/cron/page', 'svelte/cron/workflow'],
     },
   },
 };

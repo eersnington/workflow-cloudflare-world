@@ -29,12 +29,7 @@ export const honoTemplates: TemplateDefinition = {
       description: 'Hello-world workflow triggered from a Hono route.',
       placeholders: honoPlaceholders,
       files: honoFiles,
-      codemods: [
-        'hono/index/route',
-        'hono/workflow',
-        'hono/tsconfig/plugin',
-        'hono/package/scripts',
-      ],
+      codemods: ['hono/index/route', 'hono/workflow'],
     },
   },
 };

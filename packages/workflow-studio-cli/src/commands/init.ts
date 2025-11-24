@@ -14,6 +14,10 @@ import { basename, dirname, join, relative, resolve } from 'node:path';
 import pc from 'picocolors';
 import { getCodemodGlobs, type CodemodId } from '../codemods.js';
 import {
+  renderTemplate,
+  type RenderTemplateContext,
+} from '../utils/handlebars.js';
+import {
   templates,
   type TemplateContext,
   type TemplateName,
@@ -36,6 +40,7 @@ import {
   type WorldChoice,
   type WorldSelection,
 } from '../worlds.js';
+import { fileURLToPath } from 'node:url';
 
 type InitOptions = {
   projectName?: string;
@@ -402,147 +407,60 @@ async function writeFactories({
   await writeTemplateFiles(targetDir, files);
 }
 
-async function runWithPackageManagerExecutor({
-  packageManager,
-  cli,
-  cliArgs,
-  cwd,
-  label,
-  successMessage,
-}: {
-  packageManager: PackageManagerName;
-  cli: string;
-  cliArgs: string[];
-  cwd: string;
-  label?: string;
-  successMessage?: string;
-}) {
-  const executor = PACKAGE_MANAGERS[packageManager].createExecutor;
-  const args = [...executor.args, cli, ...cliArgs];
-  await runCommand(executor.command, args, {
-    cwd,
-    label,
-    successMessage,
-  });
+const packageRoot = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  '..',
+  '..'
+);
+
+async function resolveHandlebarsTemplatePath(handlebarsName: string) {
+  const candidates = [
+    join(packageRoot, 'src', 'handlebars', handlebarsName),
+    join(packageRoot, 'handlebars', handlebarsName),
+  ];
+
+  for (const candidate of candidates) {
+    if (await pathExists(candidate)) {
+      return candidate;
+    }
+  }
+
+  throw new Error(
+    `Handlebars template "${handlebarsName}" not found. Looked in ${candidates.join(
+      ', '
+    )}`
+  );
 }
 
-async function scaffoldWithFrameworkCli({
-  template,
-  projectSpecifier,
-  packageManager,
-  cwd,
-  frameworkLabel,
+async function scaffoldWithHandlebars({
+  handlebarsName,
+  targetDir,
+  context,
 }: {
-  template: TemplateName;
-  projectSpecifier: string;
-  packageManager: PackageManagerName;
-  cwd: string;
-  frameworkLabel: string;
+  handlebarsName: string;
+  targetDir: string;
+  context: RenderTemplateContext;
 }) {
-  const label = `Scaffolding ${frameworkLabel} project`;
-  const successMessage = `${frameworkLabel} files created`;
-  if (template === 'nextjs') {
-    const flags = [
-      packageManager ? PACKAGE_MANAGERS[packageManager].nextFlag : '',
-    ].filter(Boolean) as string[];
-    const cliArgs = [
-      projectSpecifier,
-      '--typescript',
-      '--tailwind',
-      '--react-compiler',
-      '--eslint',
-      '--app',
-      '--yes',
-      ...flags,
-    ];
-    await withWorkspaceFileHidden(cwd, () =>
-      runWithPackageManagerExecutor({
-        packageManager,
-        cli: 'create-next-app@latest',
-        cliArgs,
-        cwd,
-        label,
-        successMessage,
-      })
-    );
-    return;
-  }
-
-  if (template === 'sveltekit') {
-    const cliArgs = [
-      'create',
-      projectSpecifier,
-      '--template=minimal',
-      '--types=ts',
-      '--no-add-ons',
-    ];
-    await withWorkspaceFileHidden(cwd, () =>
-      runWithPackageManagerExecutor({
-        packageManager,
-        cli: 'sv',
-        cliArgs,
-        cwd,
-        label,
-        successMessage,
-      })
-    );
-    return;
-  }
-
-  if (template === 'hono') {
-    const cliArgs = [projectSpecifier, '--template=nodejs'];
-    await withWorkspaceFileHidden(cwd, () =>
-      runWithPackageManagerExecutor({
-        packageManager,
-        cli: 'create-hono@latest',
-        cliArgs,
-        cwd,
-        label,
-        successMessage,
-      })
-    );
-    return;
-  }
-
-  if (template === 'nitro') {
-    const cliArgs = [projectSpecifier];
-    await withWorkspaceFileHidden(cwd, () =>
-      runWithPackageManagerExecutor({
-        packageManager,
-        cli: 'create-nitro-app@latest',
-        cliArgs,
-        cwd,
-        label,
-        successMessage,
-      })
-    );
-    return;
-  }
-
-  throw new Error(`Unsupported template "${template}"`);
+  const templatePath = await resolveHandlebarsTemplatePath(handlebarsName);
+  const spin = spinner();
+  spin.start(`Creating project files from ${handlebarsName} template`);
+  await renderTemplate(templatePath, targetDir, context);
+  spin.stop('Project files created');
 }
 
 async function installWorkflowDeps({
   packageManager,
   projectDir,
-  templateName,
   exampleName,
 }: {
   packageManager: PackageManagerName;
   projectDir: string;
-  templateName: TemplateName;
   exampleName: string;
 }) {
   const baseDeps = ['workflow@latest'];
   const aiDeps = ['ai@latest', 'zod@latest'];
-  const honoDeps = ['nitro@latest', 'rollup@latest'];
 
   let deps: string[] = [...baseDeps];
-
-  // Add template-specific dependencies
-  if (templateName === 'hono') {
-    deps.push(...honoDeps);
-  }
 
   // Add example-specific dependencies
   if (exampleName === 'ai') {
@@ -723,18 +641,16 @@ export async function runInitCommand(options: InitOptions) {
     skipEnvPrompt: Boolean(options.yes),
   });
 
-  await scaffoldWithFrameworkCli({
-    template: templateName,
-    projectSpecifier,
-    packageManager,
-    cwd: invocationDir,
-    frameworkLabel: template.label,
+  const handlebarsName = template.handlebars ?? templateName;
+  await scaffoldWithHandlebars({
+    handlebarsName,
+    targetDir,
+    context: { projectName: projectDirName } satisfies RenderTemplateContext,
   });
 
   await installWorkflowDeps({
     packageManager,
     projectDir: targetDir,
-    templateName,
     exampleName,
   });
 
