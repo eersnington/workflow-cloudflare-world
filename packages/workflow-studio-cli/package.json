@@ -30,6 +30,7 @@
   "devDependencies": {
     "@types/node": "catalog:",
     "@workflow/tsconfig": "workspace:*",
+    "execa": "9.6.0",
     "vitest": "catalog:"
   },
   "engines": {

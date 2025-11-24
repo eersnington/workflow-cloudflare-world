@@ -501,6 +501,12 @@ async function installWorkflowDeps({
   projectDir: string;
   exampleName: string;
 }) {
+  if (process.env.WORKFLOW_STUDIO_SKIP_INSTALL === '1') {
+    log.message(
+      pc.yellow('Skipping dependency install (WORKFLOW_STUDIO_SKIP_INSTALL=1)')
+    );
+    return;
+  }
   const baseDeps = ['workflow@latest'];
   const aiDeps = ['ai@^5.0.76', 'zod@^4.1.9'];
 
