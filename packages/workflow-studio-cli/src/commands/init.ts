@@ -21,7 +21,7 @@ import {
   templates,
   type TemplateContext,
   type TemplateName,
-} from '../templates.js';
+} from '../templates';
 import { runAstGrep } from '../utils/ast-grep.js';
 import { writeTemplateFiles } from '../utils/files.js';
 import {
