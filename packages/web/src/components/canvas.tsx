@@ -99,11 +99,11 @@ export function Canvas({ workflow, config }: CanvasProps) {
 
     const fileFunctions = allFunctions.filter((f) => f.file === workflow.file);
     return {
-      staticWorkflowNodes: fileFunctions.filter((f) => f.type === 'workflow'),
+      // Only show the selected workflow to avoid cluttering the canvas with other workflows in the same file
+      staticWorkflowNodes: [workflow],
       staticStepNodes: fileFunctions.filter((f) => f.type === 'step'),
     };
   }, [workflow, allFunctions]);
-
   const hasStaticSteps = staticStepNodes.length > 0;
 
   // Dynamic discovery (Fallback)
