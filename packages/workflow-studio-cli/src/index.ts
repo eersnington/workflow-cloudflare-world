@@ -18,7 +18,6 @@ async function showHelp() {
     '  init [name] [--template <framework>] [--example <example>] [--package-manager <pm>]'
   );
   log.message('  inspect <runs|steps|hooks> [...options]');
-  log.message('  start <workflow-name> [...args]');
   log.message('  web');
   log.message('  world');
   log.message('\nExamples:');
@@ -26,7 +25,6 @@ async function showHelp() {
     '  workflow-studio init my-app --template nextjs --example minimal'
   );
   log.message('  workflow-studio inspect runs --limit 5');
-  log.message('  workflow-studio start example');
   log.message('  workflow-studio web');
   log.message('  workflow-studio world');
 }
@@ -67,11 +65,6 @@ async function main() {
 
   if (command === 'inspect') {
     await proxyWorkflowCommand('inspect', rest);
-    return;
-  }
-
-  if (command === 'start') {
-    await proxyWorkflowCommand('start', rest);
     return;
   }
 
