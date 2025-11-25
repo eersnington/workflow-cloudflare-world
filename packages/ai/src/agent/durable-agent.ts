@@ -7,6 +7,7 @@ import {
   asSchema,
   type ModelMessage,
   type StopCondition,
+  type StreamTextOnStepFinishCallback,
   type ToolSet,
   type UIMessageChunk,
 } from 'ai';
@@ -83,6 +84,11 @@ export interface DurableAgentStreamOptions {
   stopWhen?:
     | StopCondition<NoInfer<ToolSet>>
     | Array<StopCondition<NoInfer<ToolSet>>>;
+
+  /**
+   * Callback function to be called after each step completes.
+   */
+  onStepFinish?: StreamTextOnStepFinishCallback<any>;
 }
 
 /**
@@ -147,6 +153,7 @@ export class DurableAgent {
       prompt: modelPrompt,
       stopConditions: options.stopWhen,
       sendStart: options.sendStart ?? true,
+      onStepFinish: options.onStepFinish,
     });
 
     let result = await iterator.next();
