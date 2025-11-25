@@ -36,55 +36,11 @@ const selectedWorkflowIdAtom = Atom.make<string | null>(null).pipe(
   Atom.keepAlive
 );
 
-const workflowsAtom = Atom.make<WorkflowsState>((get) => {
-  const config = get(configAtom);
-  const params = getConfigParams(config);
-  const queryString = params.toString();
-  const url = `/api/workflows${queryString ? `?${queryString}` : ''}`;
-  const controller = new AbortController();
-
-  get.addFinalizer(() => controller.abort());
-
-  // Start in loading state
-  get.setSelf({
-    workflows: [],
-    manifestPath: undefined,
-    loading: true,
-    error: null,
-  });
-
-  fetch(url, { cache: 'no-store', signal: controller.signal })
-    .then(async (res) => {
-      const json = (await res.json()) as
-        | {
-            workflows: WorkflowListItem[];
-            manifestPath?: string;
-            error?: string;
-          }
-        | undefined;
-      get.setSelf({
-        workflows: json?.workflows ?? [],
-        manifestPath: json?.manifestPath,
-        loading: false,
-        error: json?.error ?? null,
-      });
-    })
-    .catch((err) => {
-      if (controller.signal.aborted) return;
-      get.setSelf({
-        workflows: [],
-        manifestPath: undefined,
-        loading: false,
-        error: err instanceof Error ? err.message : String(err),
-      });
-    });
-
-  return {
-    workflows: [],
-    manifestPath: undefined,
-    loading: true,
-    error: null,
-  };
+const workflowsAtom = Atom.make<WorkflowsState>({
+  workflows: [],
+  manifestPath: undefined,
+  loading: true,
+  error: null,
 }).pipe(Atom.keepAlive);
 
 const selectedWorkflowAtom = Atom.make<WorkflowListItem | null>((get) => {
@@ -98,9 +54,53 @@ export function useNavigation(): NavigationState {
   const [viewMode, setViewMode] = useAtom(viewModeAtom);
   const selectedWorkflowId = useAtomValue(selectedWorkflowIdAtom);
   const setSelectedWorkflowId = useAtomSet(selectedWorkflowIdAtom);
+  const config = useAtomValue(configAtom);
+  const setWorkflows = useAtomSet(workflowsAtom);
   const { workflows, loading, error, manifestPath } =
     useAtomValue(workflowsAtom);
   const selectedWorkflow = useAtomValue(selectedWorkflowAtom);
+
+  // Client-side fetch of workflows to keep SSR/CSR markup consistent.
+  useEffect(() => {
+    const controller = new AbortController();
+    const params = getConfigParams(config);
+    const queryString = params.toString();
+    const url = `/api/workflows${queryString ? `?${queryString}` : ''}`;
+
+    setWorkflows((prev) => ({
+      ...prev,
+      loading: true,
+      error: null,
+    }));
+
+    fetch(url, { cache: 'no-store', signal: controller.signal })
+      .then(async (res) => {
+        const json = (await res.json()) as
+          | {
+              workflows: WorkflowListItem[];
+              manifestPath?: string;
+              error?: string;
+            }
+          | undefined;
+        setWorkflows({
+          workflows: json?.workflows ?? [],
+          manifestPath: json?.manifestPath,
+          loading: false,
+          error: json?.error ?? null,
+        });
+      })
+      .catch((err) => {
+        if (controller.signal.aborted) return;
+        setWorkflows({
+          workflows: [],
+          manifestPath: undefined,
+          loading: false,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+
+    return () => controller.abort();
+  }, [config, setWorkflows]);
 
   // Keep selection valid when the workflow list changes.
   useEffect(() => {
