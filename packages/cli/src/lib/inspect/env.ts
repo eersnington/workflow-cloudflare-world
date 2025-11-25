@@ -1,4 +1,4 @@
-import { access } from 'node:fs/promises';
+import { access, mkdir } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { logger } from '../config/log.js';
 import { getWorkflowConfig } from '../config/workflow-config.js';
@@ -110,13 +110,14 @@ export const inferEmbeddedWorldEnvVars = async () => {
       }
     }
 
-    logger.error(
-      'No workflow data directory found. Have you run any workflows yet?'
-    );
+    // Fall back to creating an empty data directory so the web UI can show an empty state
+    const fallbackPath = resolve(cwd, '.workflow-data');
+    await mkdir(fallbackPath, { recursive: true });
+    envVars.WORKFLOW_EMBEDDED_DATA_DIR = fallbackPath;
+    writeEnvVars(envVars);
     logger.warn(
-      `\nCheck whether your data is in any of:\n${possibleWorkflowDataPaths.map((p) => `  ${cwd}/${p}${repoRoot && repoRoot !== cwd ? `\n  ${repoRoot}/${p}` : ''}`).join('\n')}\n`
+      `No existing workflow data directory found. Starting with an empty data directory at ${fallbackPath}`
     );
-    throw new Error('No workflow data directory found');
   }
 };
 
