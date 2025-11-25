@@ -7,7 +7,7 @@ import {
   useAtomValue,
 } from '@effect-atom/atom-react';
 import { useEffect, useMemo } from 'react';
-import type { WorkflowListItem } from '@/lib/use-workflows';
+import type { WorkflowListItem } from '@/hooks/use-workflows';
 import { configAtom, getConfigParams } from '@/lib/config';
 
 type ViewMode = 'canvas' | 'observability';

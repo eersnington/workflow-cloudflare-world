@@ -1,7 +1,7 @@
 'use client';
 
 import { TooltipProvider } from '@radix-ui/react-tooltip';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ThemeProvider } from 'next-themes';
 import { useEffect } from 'react';
 import { AppSidebar } from '@/components/app-sidebar';
@@ -12,6 +12,17 @@ import {
   useQueryParamConfig,
   useSyncConfig,
 } from '@/lib/config';
+import {
+  eventIdParamAtom,
+  hookIdParamAtom,
+  idParamAtom,
+  resourceParamAtom,
+  runIdParamAtom,
+  stepIdParamAtom,
+  streamIdParamAtom,
+  themeParamAtom,
+} from '@/lib/url-params';
+import { useAtomValue } from '@effect-atom/atom-react';
 
 interface LayoutClientProps {
   children: React.ReactNode;
@@ -19,15 +30,16 @@ interface LayoutClientProps {
 
 function LayoutContent({ children }: LayoutClientProps) {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const config = useQueryParamConfig();
   useSyncConfig(config);
-  const id = searchParams.get('id');
-  const runId = searchParams.get('runId');
-  const stepId = searchParams.get('stepId');
-  const hookId = searchParams.get('hookId');
-  const resource = searchParams.get('resource');
-  const theme = searchParams.get('theme') || 'system';
+  const id = useAtomValue(idParamAtom);
+  const runId = useAtomValue(runIdParamAtom);
+  const stepId = useAtomValue(stepIdParamAtom);
+  const hookId = useAtomValue(hookIdParamAtom);
+  const streamId = useAtomValue(streamIdParamAtom);
+  const eventId = useAtomValue(eventIdParamAtom);
+  const resource = useAtomValue(resourceParamAtom);
+  const theme = useAtomValue(themeParamAtom) || 'system';
 
   // If initialized with a resource/id or direct ID params, we navigate to the appropriate page
   useEffect(() => {
@@ -42,6 +54,16 @@ function LayoutContent({ children }: LayoutClientProps) {
             sidebar: 'step',
             stepId,
           });
+        } else if (eventId) {
+          targetUrl = buildUrlWithConfig(`/run/${runId}`, config, {
+            sidebar: 'event',
+            eventId,
+          });
+        } else if (streamId) {
+          targetUrl = buildUrlWithConfig(
+            `/run/${runId}/streams/${streamId}`,
+            config
+          );
         } else if (hookId) {
           // Open run with hook sidebar
           targetUrl = buildUrlWithConfig(`/run/${runId}`, config, {
@@ -99,7 +121,7 @@ function LayoutContent({ children }: LayoutClientProps) {
     }
 
     router.push(targetUrl);
-  }, [resource, id, runId, stepId, hookId, router, config]);
+  }, [resource, id, runId, stepId, hookId, streamId, eventId, router, config]);
 
   return (
     <ThemeProvider

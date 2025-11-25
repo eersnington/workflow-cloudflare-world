@@ -25,7 +25,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
-import type { WorkflowListItem } from '@/lib/use-workflows';
+import type { WorkflowListItem } from '@/hooks/use-workflows';
 
 type CanvasProps = {
   workflow?: WorkflowListItem | null;

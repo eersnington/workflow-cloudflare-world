@@ -6,8 +6,10 @@ import { HooksTable } from '@/components/hooks-table';
 import { useNavigation } from '@/components/navigation-store';
 import { RunsTable } from '@/components/runs-table';
 import { buildUrlWithConfig, useQueryParamConfig } from '@/lib/config';
+import { hookIdParamAtom, sidebarParamAtom } from '@/lib/url-params';
+import { useAtomValue } from '@effect-atom/atom-react';
 import { ReactFlowProvider } from '@xyflow/react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 
 function ObservabilityView({
   config,
@@ -45,12 +47,11 @@ function ObservabilityView({
 
 export default function Home() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const config = useQueryParamConfig();
   const { viewMode, selectedWorkflow } = useNavigation();
 
-  const sidebar = searchParams.get('sidebar');
-  const hookId = searchParams.get('hookId') || searchParams.get('hook');
+  const sidebar = useAtomValue(sidebarParamAtom);
+  const hookId = useAtomValue(hookIdParamAtom);
   const selectedHookId = sidebar === 'hook' && hookId ? hookId : undefined;
 
   const handleRunClick = (runId: string, streamId?: string) => {

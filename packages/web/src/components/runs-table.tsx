@@ -26,6 +26,11 @@ import {
 } from '@/components/ui/tooltip';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
+import {
+  statusFilterParamAtom,
+  workflowFilterParamAtom,
+} from '@/lib/url-params';
+import { useAtomSet, useAtomValue } from '@effect-atom/atom-react';
 import { parseWorkflowName } from '@workflow/core/parse-name';
 import { getErrorMessage, useWorkflowRuns } from '@workflow/web-shared';
 import type { WorkflowRunStatus } from '@workflow/world';
@@ -37,8 +42,8 @@ import {
   ChevronRight,
   RefreshCw,
 } from 'lucide-react';
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useEffect, useMemo, useState } from 'react';
 import { RelativeTime } from './display-utils/relative-time';
 import { StatusBadge } from './display-utils/status-badge';
 import { TableSkeleton } from './display-utils/table-skeleton';
@@ -65,16 +70,20 @@ const statusMap: Record<WorkflowRunStatus, { label: string; color: string }> = {
 export function RunsTable({ config, onRunClick }: RunsTableProps) {
   const router = useRouter();
   const pathname = usePathname();
-  const searchParams = useSearchParams();
+  const workflowParam = useAtomValue(workflowFilterParamAtom);
+  const statusParam = useAtomValue(statusFilterParamAtom);
+  const setWorkflowParam = useAtomSet(workflowFilterParamAtom);
+  const setStatusParam = useAtomSet(statusFilterParamAtom);
   // Validate status parameter - only allow known valid statuses or 'all'
-  const rawStatus = searchParams.get('status');
+  const rawStatus = statusParam;
   const validStatuses = Object.keys(statusMap) as WorkflowRunStatus[];
   const status: WorkflowRunStatus | 'all' | undefined =
     rawStatus === 'all' ||
     (rawStatus && validStatuses.includes(rawStatus as WorkflowRunStatus))
       ? (rawStatus as WorkflowRunStatus | 'all')
       : undefined;
-  const workflowNameFilter = searchParams.get('workflow') as string | 'all';
+  const workflowNameFilter =
+    (workflowParam as string | 'all' | null) || ('all' as const);
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [lastRefreshTime, setLastRefreshTime] = useState<Date | null>(
     () => new Date()
@@ -130,16 +139,6 @@ export function RunsTable({ config, onRunClick }: RunsTableProps) {
     setSortOrder((prev) => (prev === 'desc' ? 'asc' : 'desc'));
   };
 
-  const createQueryString = useCallback(
-    (name: string, value: string) => {
-      const params = new URLSearchParams(searchParams.toString());
-      params.set(name, value);
-
-      return params.toString();
-    },
-    [searchParams]
-  );
-
   return (
     <div>
       <div className="flex items-center justify-between my-4">
@@ -161,14 +160,12 @@ export function RunsTable({ config, onRunClick }: RunsTableProps) {
                 value={workflowNameFilter ?? 'all'}
                 onValueChange={(value) => {
                   if (value === 'all') {
-                    const params = new URLSearchParams(searchParams.toString());
-                    params.delete('workflow');
-                    params.delete('status');
-                    router.push(`${pathname}?${params.toString()}`);
+                    setWorkflowParam('');
+                    setStatusParam('');
+                    router.push(pathname);
                   } else {
-                    router.push(
-                      `${pathname}?${createQueryString('workflow', value)}`
-                    );
+                    setWorkflowParam(value);
+                    router.push(pathname);
                   }
                 }}
                 disabled={loading}
@@ -194,15 +191,9 @@ export function RunsTable({ config, onRunClick }: RunsTableProps) {
                       value={status || 'all'}
                       onValueChange={(value) => {
                         if (value === 'all') {
-                          const params = new URLSearchParams(
-                            searchParams.toString()
-                          );
-                          params.delete('status');
-                          router.push(`${pathname}?${params.toString()}`);
+                          setStatusParam('');
                         } else {
-                          router.push(
-                            `${pathname}?${createQueryString('status', value)}`
-                          );
+                          setStatusParam(value);
                         }
                       }}
                       disabled={
