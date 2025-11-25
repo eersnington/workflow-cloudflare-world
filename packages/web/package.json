@@ -48,6 +48,7 @@
     "@workflow/core": "workspace:*",
     "@workflow/web-shared": "workspace:*",
     "@workflow/world": "workspace:*",
+    "babel-plugin-react-compiler": "1.0.0",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
     "date-fns": "4.1.0",
