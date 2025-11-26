@@ -30,6 +30,7 @@ import type { WorkflowListItem } from '@/hooks/use-workflows';
 type CanvasProps = {
   workflow?: WorkflowListItem | null;
   config: WorldConfig;
+  workflows: WorkflowListItem[];
 };
 
 const nodeTypes = {
@@ -89,21 +90,27 @@ const edgeTypes = {
   temporary: EdgeComponent.Temporary,
 };
 
-export function Canvas({ workflow, config }: CanvasProps) {
-  const { workflows: allFunctions } = useNavigation();
+export function Canvas({
+  workflow,
+  config,
+  workflows: allWorkflows,
+}: CanvasProps) {
+  const { workflows: navigationWorkflows } = useNavigation();
   const env = useMemo(() => worldConfigToEnvMap(config), [config]);
 
-  // Static discovery
+  // Static discovery (prefer manifest v2 data passed in)
   const { staticWorkflowNodes, staticStepNodes } = useMemo(() => {
     if (!workflow) return { staticWorkflowNodes: [], staticStepNodes: [] };
 
-    const fileFunctions = allFunctions.filter((f) => f.file === workflow.file);
+    const manifestItems = allWorkflows.length
+      ? allWorkflows
+      : navigationWorkflows;
+    const fileItems = manifestItems.filter((f) => f.file === workflow.file);
     return {
-      // Only show the selected workflow to avoid cluttering the canvas with other workflows in the same file
       staticWorkflowNodes: [workflow],
-      staticStepNodes: fileFunctions.filter((f) => f.type === 'step'),
+      staticStepNodes: fileItems.filter((f) => f.type === 'step'),
     };
-  }, [workflow, allFunctions]);
+  }, [workflow, allWorkflows, navigationWorkflows]);
   const hasStaticSteps = staticStepNodes.length > 0;
 
   // Dynamic discovery (Fallback)
