@@ -158,6 +158,25 @@ function collectWorkflowSteps(
   const seen = new Set<ts.Symbol>();
 
   const visit = (node: ts.Node) => {
+    // Record any identifier reference to a known step, even when passed as a callback/tool
+    if (ts.isIdentifier(node)) {
+      const sym = checker.getSymbolAtLocation(node);
+      if (sym) {
+        const resolved = resolveAliasedSymbol(checker, sym);
+        const stepMeta = stepMap.get(resolved);
+        if (stepMeta && !seen.has(resolved)) {
+          seen.add(resolved);
+          steps.push({
+            id: stepId(baseDir, stepMeta),
+            name: stepMeta.name,
+            file: normalizePath(baseDir, stepMeta.file),
+            range: stepMeta.range,
+            order: order++,
+          });
+        }
+      }
+    }
+
     if (ts.isCallExpression(node)) {
       const sym = checker.getSymbolAtLocation(node.expression);
       if (sym) {
