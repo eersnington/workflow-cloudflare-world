@@ -44,7 +44,25 @@ async function fileExists(path: string) {
   }
 }
 
-function deriveRootsFromEnv(paramDataDir?: string | null): string[] {
+type Framework = 'next' | 'unknown';
+
+async function detectFramework(baseDir: string): Promise<Framework> {
+  try {
+    const pkg = JSON.parse(
+      await readFile(join(baseDir, 'package.json'), 'utf8')
+    ) as {
+      dependencies?: Record<string, string>;
+      devDependencies?: Record<string, string>;
+    };
+    const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+    if (deps?.next) return 'next';
+  } catch {
+    // ignore
+  }
+  return 'unknown';
+}
+
+async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
   const roots = new Set<string>();
 
   const manifestPath = process.env.WORKFLOW_MANIFEST_PATH;
@@ -60,24 +78,30 @@ function deriveRootsFromEnv(paramDataDir?: string | null): string[] {
   const dataDir = paramDataDir || process.env.WORKFLOW_EMBEDDED_DATA_DIR;
   if (dataDir) {
     const resolved = resolve(dataDir);
-    roots.add(resolved); // data dir itself (for manifest.v2 at root)
+    roots.add(resolved);
     roots.add(dirname(resolved));
-    // If dataDir is like .next/workflow-data, parent is .next, grandparent is root
     roots.add(resolve(resolved, '..', '..'));
-
-    for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
-      const idx = resolved.lastIndexOf(suffix);
-      if (idx !== -1) {
-        const root = resolve(resolved.slice(0, idx));
-        roots.add(root);
-        // Check Next.js app dir pattern
-        roots.add(join(root, 'app'));
-        roots.add(join(root, 'src/app'));
-      }
-    }
   }
 
-  roots.add(process.cwd());
+  // Walk upward from the execution cwd and add common data dirs per level
+  let current = resolve(process.cwd());
+  for (let i = 0; i < 4; i++) {
+    roots.add(current);
+
+    const framework = await detectFramework(current);
+    if (framework === 'next') {
+      roots.add(join(current, '.next/workflow-data'));
+      roots.add(join(current, '.next/.workflow-data'));
+    }
+
+    for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
+      roots.add(join(current, suffix));
+    }
+
+    const parent = dirname(current);
+    if (parent === current) break;
+    current = parent;
+  }
 
   return Array.from(roots);
 }
@@ -86,7 +110,7 @@ async function findManifest(dataDir?: string | null): Promise<{
   path: string;
   manifest: WorkflowManifestV2;
 } | null> {
-  const roots = deriveRootsFromEnv(dataDir);
+  const roots = await deriveRoots(dataDir);
   const subdirs = ['', 'flow', 'step'];
 
   const foundManifests: WorkflowManifestV2[] = [];
