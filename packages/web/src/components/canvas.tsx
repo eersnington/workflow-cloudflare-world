@@ -137,9 +137,10 @@ export function Canvas({
 
     // Layout constants
     const startY = 50;
-    const stepStartY = 300;
-    const itemGapX = 400;
+    const stepGapY = 180;
     const centerX = 400;
+    const workflowGapX = 260;
+    const stepStartY = 200;
 
     // 1. Workflow Nodes
     // Use static workflow nodes if available, otherwise assume the selected workflow is the only one
@@ -151,7 +152,7 @@ export function Canvas({
         id: wf.id,
         type: 'workflow',
         position: {
-          x: centerX + (index - (workflowNodes.length - 1) / 2) * itemGapX,
+          x: centerX + (index - (workflowNodes.length - 1) / 2) * workflowGapX,
           y: startY,
         },
         data: {
@@ -208,12 +209,11 @@ export function Canvas({
       });
     } else {
       stepNodesToRender.forEach((step, index) => {
-        const xPos =
-          centerX + (index - (stepNodesToRender.length - 1) / 2) * itemGapX;
+        const yPos = startY + 150 + index * stepGapY;
         nodes.push({
           id: step.id,
           type: 'step',
-          position: { x: xPos, y: stepStartY },
+          position: { x: centerX, y: yPos },
           data: {
             title: step.name,
             file: step.file,
@@ -221,15 +221,24 @@ export function Canvas({
           },
         });
 
-        workflowNodes.forEach((wf) => {
-          edges.push({
-            id: `${wf.id}-${step.id}`,
-            source: wf.id,
-            target: step.id,
-            type: 'temporary',
-            style: { stroke: 'var(--border)' },
+        if (index === 0) {
+          workflowNodes.forEach((wf) => {
+            edges.push({
+              id: `${wf.id}-${step.id}`,
+              source: wf.id,
+              target: step.id,
+              type: 'animated',
+            });
           });
-        });
+        } else {
+          const prevStep = stepNodesToRender[index - 1];
+          edges.push({
+            id: `${prevStep.id}-${step.id}`,
+            source: prevStep.id,
+            target: step.id,
+            type: 'animated',
+          });
+        }
       });
     }
 
