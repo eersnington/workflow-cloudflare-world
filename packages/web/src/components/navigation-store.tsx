@@ -9,6 +9,7 @@ import {
 import { useEffect, useMemo } from 'react';
 import type { WorkflowListItem } from '@/hooks/use-workflows';
 import { configAtom, getConfigParams } from '@/lib/config';
+import { useWorkflows } from '@/hooks/use-workflows';
 
 type ViewMode = 'canvas' | 'observability';
 
@@ -55,52 +56,20 @@ export function useNavigation(): NavigationState {
   const selectedWorkflowId = useAtomValue(selectedWorkflowIdAtom);
   const setSelectedWorkflowId = useAtomSet(selectedWorkflowIdAtom);
   const config = useAtomValue(configAtom);
+  const { data, loading, error } = useWorkflows(config);
   const setWorkflows = useAtomSet(workflowsAtom);
-  const { workflows, loading, error, manifestPath } =
-    useAtomValue(workflowsAtom);
+  const { workflows, manifestPath } = useAtomValue(workflowsAtom);
   const selectedWorkflow = useAtomValue(selectedWorkflowAtom);
 
-  // Client-side fetch of workflows to keep SSR/CSR markup consistent.
+  // Sync fetched workflows into atom state for consumers.
   useEffect(() => {
-    const controller = new AbortController();
-    const params = getConfigParams(config);
-    const queryString = params.toString();
-    const url = `/api/workflows${queryString ? `?${queryString}` : ''}`;
-
-    setWorkflows((prev) => ({
-      ...prev,
-      loading: true,
-      error: null,
-    }));
-
-    fetch(url, { cache: 'no-store', signal: controller.signal })
-      .then(async (res) => {
-        const json = (await res.json()) as
-          | {
-              workflows: WorkflowListItem[];
-              manifestPath?: string;
-              error?: string;
-            }
-          | undefined;
-        setWorkflows({
-          workflows: json?.workflows ?? [],
-          manifestPath: json?.manifestPath,
-          loading: false,
-          error: json?.error ?? null,
-        });
-      })
-      .catch((err) => {
-        if (controller.signal.aborted) return;
-        setWorkflows({
-          workflows: [],
-          manifestPath: undefined,
-          loading: false,
-          error: err instanceof Error ? err.message : String(err),
-        });
-      });
-
-    return () => controller.abort();
-  }, [config, setWorkflows]);
+    setWorkflows({
+      workflows: data?.workflows ?? [],
+      manifestPath: data?.manifestPath,
+      loading,
+      error,
+    });
+  }, [data, loading, error, setWorkflows]);
 
   // Keep selection valid when the workflow list changes.
   useEffect(() => {
