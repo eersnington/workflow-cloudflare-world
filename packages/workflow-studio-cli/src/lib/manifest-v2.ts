@@ -155,6 +155,7 @@ function collectWorkflowSteps(
 ): ManifestStep[] {
   const steps: ManifestStep[] = [];
   let order = 1;
+  const seen = new Set<ts.Symbol>();
 
   const visit = (node: ts.Node) => {
     if (ts.isCallExpression(node)) {
@@ -162,7 +163,8 @@ function collectWorkflowSteps(
       if (sym) {
         const resolved = resolveAliasedSymbol(checker, sym);
         const stepMeta = stepMap.get(resolved);
-        if (stepMeta) {
+        if (stepMeta && !seen.has(resolved)) {
+          seen.add(resolved);
           steps.push({
             id: stepId(baseDir, stepMeta),
             name: stepMeta.name,
@@ -236,10 +238,18 @@ function createProgram(cwd: string): ts.Program {
   });
 }
 
-async function resolveDataDir(workingDir: string): Promise<string> {
+async function resolveDataDir(workingDir: string): Promise<string | null> {
   const fromEnv = process.env.WORKFLOW_EMBEDDED_DATA_DIR;
   if (fromEnv) {
-    return isAbsolute(fromEnv) ? fromEnv : resolve(workingDir, fromEnv);
+    const resolved = isAbsolute(fromEnv)
+      ? fromEnv
+      : resolve(workingDir, fromEnv);
+    try {
+      await access(resolved);
+      return resolved;
+    } catch {
+      return null;
+    }
   }
 
   const candidates = [
@@ -259,10 +269,8 @@ async function resolveDataDir(workingDir: string): Promise<string> {
     }
   }
 
-  // Fallback: create a local .workflow-data if nothing exists
-  const fallback = resolve(workingDir, '.workflow-data');
-  await mkdir(fallback, { recursive: true });
-  return fallback;
+  // No existing data dir found; avoid creating a new one
+  return null;
 }
 
 export async function generateManifestV2(
@@ -303,6 +311,14 @@ export async function generateManifestV2(
     };
 
     const dataDir = await resolveDataDir(workingDir);
+    if (!dataDir) {
+      log.warn(
+        pc.yellow(
+          'No existing workflow data directory found; skipping manifest.v2 generation'
+        )
+      );
+      return null;
+    }
     const manifestPath = join(dataDir, 'manifest.v2.json');
     await mkdir(dirname(manifestPath), { recursive: true });
     await writeFile(manifestPath, JSON.stringify(manifest, null, 2), 'utf8');
