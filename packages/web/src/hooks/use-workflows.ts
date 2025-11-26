@@ -12,10 +12,19 @@ export type WorkflowListItem = {
 };
 
 type WorkflowResponse =
-  | { workflows: WorkflowListItem[]; manifestPath?: string; error?: string }
+  | {
+      workflows: WorkflowListItem[];
+      manifestPath?: string;
+      error?: string;
+    }
   | undefined;
 
-export function useWorkflows(config?: WorldConfig) {
+type UseWorkflowsOptions = {
+  refreshKey?: any;
+  forceBuild?: boolean;
+};
+
+export function useWorkflows(config?: WorldConfig, opts?: UseWorkflowsOptions) {
   const [data, setData] = useState<WorkflowResponse>();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -25,7 +34,20 @@ export function useWorkflows(config?: WorldConfig) {
     setLoading(true);
     setError(null);
 
-    const params = config ? getConfigParams(config) : new URLSearchParams();
+    const params = new URLSearchParams();
+    if (config) {
+      Object.entries(config).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.set(key, String(value));
+        }
+      });
+    }
+    if (opts?.refreshKey !== undefined) {
+      params.set('_', String(opts.refreshKey));
+    }
+    if (opts?.forceBuild) {
+      params.set('forceBuild', '1');
+    }
     const queryString = params.toString();
     const url = `/api/workflows${queryString ? `?${queryString}` : ''}`;
 
@@ -48,7 +70,7 @@ export function useWorkflows(config?: WorldConfig) {
     return () => {
       controller.abort();
     };
-  }, [config]); // Re-fetch when config changes
+  }, [config, opts?.refreshKey, opts?.forceBuild]); // Re-fetch when config changes or refreshKey changes
 
   return {
     data,

@@ -1,7 +1,8 @@
-import { access, readFile, readdir } from 'node:fs/promises';
+import { access, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseStepName, parseWorkflowName } from '@workflow/core/parse-name';
 import { NextResponse } from 'next/server';
+import { generateManifestV2 } from '../../../../../workflow-studio-cli/src/lib/manifest-v2';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,6 +28,8 @@ export type WorkflowListItem = {
   type: 'workflow' | 'step';
 };
 
+export const revalidate = 0;
+
 const MANIFEST_DIRS = ['', '.well-known/workflow/v1'];
 const MANIFEST_FILES = ['manifest.v2.json'];
 const KNOWN_DATA_DIR_SUFFIXES = [
@@ -41,6 +44,15 @@ async function fileExists(path: string) {
     return true;
   } catch {
     return false;
+  }
+}
+
+async function fileMtimeMs(path: string): Promise<number | null> {
+  try {
+    const { mtimeMs } = await stat(path);
+    return mtimeMs;
+  } catch {
+    return null;
   }
 }
 
@@ -91,8 +103,42 @@ function frameworkDataDirs(
   }
 }
 
+const ALL_DATA_DIR_SUFFIXES = Array.from(
+  new Set([
+    ...KNOWN_DATA_DIR_SUFFIXES,
+    ...frameworkDataDirs('next'),
+    ...frameworkDataDirs('sveltekit'),
+    ...frameworkDataDirs('nitro'),
+    ...frameworkDataDirs('nuxt'),
+  ])
+).sort((a, b) => b.length - a.length);
+
+function deriveWorkingDirFromRoot(root: string): string {
+  for (const suffix of ALL_DATA_DIR_SUFFIXES) {
+    if (root.endsWith(suffix)) {
+      return root.slice(0, -suffix.length);
+    }
+  }
+  return root;
+}
+
+async function regenerateManifest(workingDir: string): Promise<string | null> {
+  try {
+    return await generateManifestV2(workingDir);
+  } catch (error) {
+    console.error(`Failed to regenerate manifest for ${workingDir}`, error);
+    return null;
+  }
+}
+
 async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
   const roots = new Set<string>();
+
+  if (paramDataDir) {
+    const resolved = resolve(paramDataDir);
+    roots.add(resolved);
+    return Array.from(roots);
+  }
 
   const manifestPath = process.env.WORKFLOW_MANIFEST_PATH;
   if (manifestPath) {
@@ -104,7 +150,7 @@ async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
     roots.add(resolve(projectRoot));
   }
 
-  const dataDir = paramDataDir || process.env.WORKFLOW_EMBEDDED_DATA_DIR;
+  const dataDir = process.env.WORKFLOW_EMBEDDED_DATA_DIR;
   if (dataDir) {
     const resolved = resolve(dataDir);
     roots.add(resolved);
@@ -114,10 +160,8 @@ async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
 
   // Walk upward from the execution cwd and add framework-specific + generic data dirs per level
   let current = resolve(process.cwd());
-  const visitedLevels: string[] = [];
   for (let i = 0; i < 5; i++) {
     roots.add(current);
-    visitedLevels.push(current);
 
     const framework = await detectFramework(current);
     for (const suffix of frameworkDataDirs(framework)) {
@@ -132,42 +176,26 @@ async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
     current = parent;
   }
 
-  // Workspace-aware shallow scan: look one level under the top-most visited root
-  const topRoot = visitedLevels.at(-1);
-  if (topRoot) {
-    try {
-      const entries = await readdir(topRoot, { withFileTypes: true });
-      for (const entry of entries) {
-        if (!entry.isDirectory()) continue;
-        const base = join(topRoot, entry.name);
-        // Add generic data dir candidates
-        for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
-          roots.add(join(base, suffix));
-        }
-        // Add framework-specific candidates based on that workspace's package.json (best effort)
-        const framework = await detectFramework(base);
-        for (const suffix of frameworkDataDirs(framework)) {
-          roots.add(join(base, suffix));
-        }
-      }
-    } catch {
-      // best-effort
-    }
-  }
-
   return Array.from(roots);
 }
 
 async function findManifest(dataDir?: string | null): Promise<{
   path: string;
   manifest: WorkflowManifestV2;
+  stale: boolean;
 } | null> {
   const roots = await deriveRoots(dataDir);
-  const subdirs = ['', 'flow', 'step'];
+  const subdirs = dataDir ? [''] : ['', 'flow', 'step'];
 
-  const foundManifests: { manifest: WorkflowManifestV2; path: string }[] = [];
+  const found: {
+    manifest: WorkflowManifestV2;
+    path: string;
+    stale: boolean;
+    workingDirHint: string;
+  }[] = [];
 
   for (const root of roots) {
+    const workingDirHint = deriveWorkingDirFromRoot(root);
     for (const manifestDir of MANIFEST_DIRS) {
       for (const subdir of subdirs) {
         for (const file of MANIFEST_FILES) {
@@ -178,7 +206,26 @@ async function findManifest(dataDir?: string | null): Promise<{
               const content = await readFile(fullPath, 'utf8');
               const manifest = JSON.parse(content) as WorkflowManifestV2;
               if (manifest.version === 2) {
-                foundManifests.push({ manifest, path: fullPath });
+                const manifestMtime = await fileMtimeMs(fullPath);
+                let stale = false;
+                if (manifestMtime) {
+                  const manifestRoot = resolve(fullPath, '..', '..');
+                  const files = new Set<string>();
+                  manifest.workflows.forEach((wf) => {
+                    files.add(resolve(manifestRoot, wf.file));
+                    wf.steps.forEach((s) =>
+                      files.add(resolve(manifestRoot, s.file))
+                    );
+                  });
+                  for (const f of files) {
+                    const mtime = await fileMtimeMs(f);
+                    if (mtime && mtime > manifestMtime + 5) {
+                      stale = true;
+                      break;
+                    }
+                  }
+                }
+                found.push({ manifest, path: fullPath, stale, workingDirHint });
               }
             } catch (error) {
               console.error(
@@ -192,14 +239,11 @@ async function findManifest(dataDir?: string | null): Promise<{
     }
   }
 
-  if (foundManifests.length === 0) {
+  if (found.length === 0) {
     return null;
   }
 
-  return {
-    path: foundManifests[foundManifests.length - 1].path,
-    manifest: foundManifests[foundManifests.length - 1].manifest,
-  };
+  return found[found.length - 1];
 }
 
 function normalizeManifest(manifest: WorkflowManifestV2): WorkflowListItem[] {
@@ -222,8 +266,14 @@ function normalizeManifest(manifest: WorkflowManifestV2): WorkflowListItem[] {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const dataDir = searchParams.get('dataDir');
+  const forceBuild = searchParams.get('forceBuild') === '1';
 
-  const located = await findManifest(dataDir);
+  let located = await findManifest(dataDir);
+
+  if (forceBuild && dataDir) {
+    await regenerateManifest(deriveWorkingDirFromRoot(dataDir));
+    located = await findManifest(dataDir);
+  }
 
   if (!located) {
     return NextResponse.json(
@@ -232,7 +282,7 @@ export async function GET(request: Request) {
         error:
           'No workflow manifest found. Run `workflow build` to generate `.well-known/workflow/v1/manifest.json`.',
       },
-      { status: 200 }
+      { status: 200, headers: { 'Cache-Control': 'no-store' } }
     );
   }
 
@@ -242,7 +292,11 @@ export async function GET(request: Request) {
     {
       workflows,
       manifestPath: located.path,
+      error: located.stale
+        ? 'Workflow manifest appears stale. Run `workflow build` (or watch) to regenerate.'
+        : undefined,
+      stale: located.stale,
     },
-    { status: 200 }
+    { status: 200, headers: { 'Cache-Control': 'no-store' } }
   );
 }

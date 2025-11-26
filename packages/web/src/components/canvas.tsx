@@ -21,11 +21,14 @@ import {
 import { Panel } from '@/components/ai-elements/panel';
 import { Toolbar } from '@/components/ai-elements/toolbar';
 import { useNavigation } from '@/components/navigation-store';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { RotateCcw } from 'lucide-react';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
 import type { WorkflowListItem } from '@/hooks/use-workflows';
+import { useEffect, useState } from 'react';
+import { useWorkflows } from '@/hooks/use-workflows';
+import { Badge } from './ui/badge';
 
 type CanvasProps = {
   workflow?: WorkflowListItem | null;
@@ -47,12 +50,7 @@ const nodeTypes = {
         </NodeDescription>
       </NodeHeader>
       <NodeContent>
-        <div className="flex flex-col gap-2">
-          <Badge variant="default" className="w-fit">
-            use workflow
-          </Badge>
-          <p className="text-xs text-muted-foreground break-all">{data.file}</p>
-        </div>
+        <p className="text-xs text-muted-foreground break-all">{data.file}</p>
       </NodeContent>
       <NodeFooter className="bg-primary/5 border-t-primary/20">
         <div className="flex items-center justify-between w-full">
@@ -95,16 +93,27 @@ export function Canvas({
   config,
   workflows: allWorkflows,
 }: CanvasProps) {
+  const [reloadKey, setReloadKey] = useState<number | null>(null);
   const { workflows: navigationWorkflows } = useNavigation();
+  const {
+    data: reloadData,
+    loading: reloadLoading,
+    error: reloadError,
+  } = useWorkflows(
+    config,
+    reloadKey !== null ? { refreshKey: reloadKey, forceBuild: true } : undefined
+  );
   const env = useMemo(() => worldConfigToEnvMap(config), [config]);
 
   // Static discovery (prefer manifest v2 data passed in)
   const { staticWorkflowNodes, staticStepNodes } = useMemo(() => {
     if (!workflow) return { staticWorkflowNodes: [], staticStepNodes: [] };
 
-    const manifestItems = allWorkflows.length
-      ? allWorkflows
-      : navigationWorkflows;
+    const manifestItems = reloadData?.workflows?.length
+      ? reloadData.workflows
+      : allWorkflows.length
+        ? allWorkflows
+        : navigationWorkflows;
     const fileItems = manifestItems.filter((f) => f.file === workflow.file);
     return {
       staticWorkflowNodes: [workflow],
@@ -270,8 +279,21 @@ export function Canvas({
                 {workflow.file}
               </span>
             ) : (
-              <span className="text-xs">Select a workflow to visualize</span>
+              <span className="text-sm">Select a workflow to visualize</span>
             )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="gap-1"
+              onClick={() => setReloadKey(Date.now())}
+              disabled={reloadLoading}
+            >
+              <RotateCcw className="h-4 w-4" />
+              {reloadLoading ? 'Reloading…' : 'Reload'}
+            </Button>
+            {reloadError ? (
+              <span className="text-xs text-destructive">Reload failed</span>
+            ) : null}
           </div>
         </Panel>
         <Controls />
