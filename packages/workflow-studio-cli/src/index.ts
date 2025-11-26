@@ -4,6 +4,7 @@ import { parseArgs } from 'node:util';
 import pc from 'picocolors';
 import { runInitCommand } from './commands/init.js';
 import { proxyWorkflowCommand } from './commands/proxy.js';
+import { generateManifestV2 } from './lib/manifest-v2.js';
 import { runWorldCommand } from './commands/world.js';
 
 const [command, ...rest] = process.argv.slice(2);
@@ -73,6 +74,10 @@ async function main() {
       log.error(pc.red('The "web" command does not accept arguments.'));
       process.exitCode = 1;
       return;
+    }
+    const manifestPath = await generateManifestV2(process.cwd());
+    if (manifestPath) {
+      log.message(pc.cyan(`Generated workflow manifest v2 at ${manifestPath}`));
     }
     await proxyWorkflowCommand('web', []);
     return;
