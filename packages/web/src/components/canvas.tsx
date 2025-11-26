@@ -5,30 +5,20 @@ import {
   useWorkflowTraceViewerData,
 } from '@workflow/web-shared';
 import type { Edge, Node, PanelPosition } from '@xyflow/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Canvas as FlowCanvas } from '@/components/ai-elements/canvas';
 import { Connection } from '@/components/ai-elements/connection';
 import { Controls } from '@/components/ai-elements/controls';
 import { Edge as EdgeComponent } from '@/components/ai-elements/edge';
-import {
-  Node as WorkflowNode,
-  NodeContent,
-  NodeDescription,
-  NodeFooter,
-  NodeHeader,
-  NodeTitle,
-} from '@/components/ai-elements/node';
+import { FlowNodeCard } from '@/components/ai-elements/node';
 import { Panel } from '@/components/ai-elements/panel';
-import { Toolbar } from '@/components/ai-elements/toolbar';
 import { useNavigation } from '@/components/navigation-store';
 import { Button } from '@/components/ui/button';
 import { RotateCcw } from 'lucide-react';
 import { worldConfigToEnvMap } from '@/lib/config';
 import type { WorldConfig } from '@/lib/config-world';
 import type { WorkflowListItem } from '@/hooks/use-workflows';
-import { useEffect, useState } from 'react';
 import { useWorkflows } from '@/hooks/use-workflows';
-import { Badge } from './ui/badge';
 
 type CanvasProps = {
   workflow?: WorkflowListItem | null;
@@ -42,44 +32,10 @@ const nodeTypes = {
   }: {
     data: { title: string; file: string; id: string };
   }) => (
-    <WorkflowNode handles={{ target: false, source: true }}>
-      <NodeHeader className="bg-primary/10 border-b-primary/20">
-        <NodeTitle className="text-base font-mono">{data.title}</NodeTitle>
-        <NodeDescription className="text-xs text-muted-foreground font-mono truncate">
-          {data.id}
-        </NodeDescription>
-      </NodeHeader>
-      <NodeContent>
-        <p className="text-xs text-muted-foreground break-all">{data.file}</p>
-      </NodeContent>
-      <NodeFooter className="bg-primary/5 border-t-primary/20">
-        <div className="flex items-center justify-between w-full">
-          <span className="text-xs text-muted-foreground">Entry Point</span>
-        </div>
-      </NodeFooter>
-      <Toolbar>
-        <Button size="sm" variant="ghost">
-          View Code
-        </Button>
-      </Toolbar>
-    </WorkflowNode>
+    <FlowNodeCard variant="workflow" title={data.title} subtitle={data.file} />
   ),
   step: ({ data }: { data: { title: string; file: string; id: string } }) => (
-    <WorkflowNode handles={{ target: true, source: true }}>
-      <NodeHeader>
-        <NodeTitle className="text-base font-mono">{data.title}</NodeTitle>
-        <NodeDescription className="text-xs text-muted-foreground font-mono truncate">
-          {data.id}
-        </NodeDescription>
-      </NodeHeader>
-      <NodeContent>
-        <div className="flex flex-col gap-2">
-          <Badge variant="secondary" className="w-fit">
-            use step
-          </Badge>
-        </div>
-      </NodeContent>
-    </WorkflowNode>
+    <FlowNodeCard variant="step" title={data.title} subtitle={data.file} />
   ),
 };
 
@@ -119,7 +75,7 @@ export function Canvas({
       staticWorkflowNodes: [workflow],
       staticStepNodes: fileItems.filter((f) => f.type === 'step'),
     };
-  }, [workflow, allWorkflows, navigationWorkflows]);
+  }, [workflow, allWorkflows, navigationWorkflows, reloadData]);
   const hasStaticSteps = staticStepNodes.length > 0;
 
   // Dynamic discovery (Fallback)
@@ -237,6 +193,7 @@ export function Canvas({
               source: wf.id,
               target: step.id,
               type: 'animated',
+              style: { stroke: 'rgba(37,99,235,0.9)' },
             });
           });
         } else {
@@ -246,6 +203,7 @@ export function Canvas({
             source: prevStep.id,
             target: step.id,
             type: 'animated',
+            style: { stroke: 'rgba(34,197,94,0.9)' },
           });
         }
       });
