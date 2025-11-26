@@ -1,4 +1,4 @@
-import { access, readFile } from 'node:fs/promises';
+import { access, readFile, readdir } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseStepName, parseWorkflowName } from '@workflow/core/parse-name';
 import { NextResponse } from 'next/server';
@@ -44,7 +44,13 @@ async function fileExists(path: string) {
   }
 }
 
-type Framework = 'next' | 'unknown';
+type Framework =
+  | 'next'
+  | 'sveltekit'
+  | 'nitro'
+  | 'nuxt'
+  | 'generic'
+  | 'unknown';
 
 async function detectFramework(baseDir: string): Promise<Framework> {
   try {
@@ -56,10 +62,33 @@ async function detectFramework(baseDir: string): Promise<Framework> {
     };
     const deps = { ...pkg.dependencies, ...pkg.devDependencies };
     if (deps?.next) return 'next';
+    if (deps?.['@sveltejs/kit']) return 'sveltekit';
+    if (deps?.nitropack || deps?.nitro) return 'nitro';
+    if (deps?.nuxt) return 'nuxt';
+    if (deps?.express || deps?.vite || deps?.hono) return 'generic';
   } catch {
     // ignore
   }
   return 'unknown';
+}
+
+function frameworkDataDirs(
+  framework: Framework | 'sveltekit' | 'nitro' | 'nuxt' | 'generic'
+) {
+  switch (framework) {
+    case 'next':
+      return ['.next/workflow-data', '.next/.workflow-data'];
+    case 'sveltekit':
+      return ['.svelte-kit/workflow-data'];
+    case 'nitro':
+      return ['.nitro/workflow-data'];
+    case 'nuxt':
+      return ['.nuxt/workflow-data', '.output/workflow-data'];
+    case 'generic':
+    case 'unknown':
+    default:
+      return [];
+  }
 }
 
 async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
@@ -83,17 +112,17 @@ async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
     roots.add(resolve(resolved, '..', '..'));
   }
 
-  // Walk upward from the execution cwd and add common data dirs per level
+  // Walk upward from the execution cwd and add framework-specific + generic data dirs per level
   let current = resolve(process.cwd());
-  for (let i = 0; i < 4; i++) {
+  const visitedLevels: string[] = [];
+  for (let i = 0; i < 5; i++) {
     roots.add(current);
+    visitedLevels.push(current);
 
     const framework = await detectFramework(current);
-    if (framework === 'next') {
-      roots.add(join(current, '.next/workflow-data'));
-      roots.add(join(current, '.next/.workflow-data'));
+    for (const suffix of frameworkDataDirs(framework)) {
+      roots.add(join(current, suffix));
     }
-
     for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
       roots.add(join(current, suffix));
     }
@@ -101,6 +130,29 @@ async function deriveRoots(paramDataDir?: string | null): Promise<string[]> {
     const parent = dirname(current);
     if (parent === current) break;
     current = parent;
+  }
+
+  // Workspace-aware shallow scan: look one level under the top-most visited root
+  const topRoot = visitedLevels.at(-1);
+  if (topRoot) {
+    try {
+      const entries = await readdir(topRoot, { withFileTypes: true });
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        const base = join(topRoot, entry.name);
+        // Add generic data dir candidates
+        for (const suffix of KNOWN_DATA_DIR_SUFFIXES) {
+          roots.add(join(base, suffix));
+        }
+        // Add framework-specific candidates based on that workspace's package.json (best effort)
+        const framework = await detectFramework(base);
+        for (const suffix of frameworkDataDirs(framework)) {
+          roots.add(join(base, suffix));
+        }
+      }
+    } catch {
+      // best-effort
+    }
   }
 
   return Array.from(roots);
@@ -113,8 +165,7 @@ async function findManifest(dataDir?: string | null): Promise<{
   const roots = await deriveRoots(dataDir);
   const subdirs = ['', 'flow', 'step'];
 
-  const foundManifests: WorkflowManifestV2[] = [];
-  let lastPath = '';
+  const foundManifests: { manifest: WorkflowManifestV2; path: string }[] = [];
 
   for (const root of roots) {
     for (const manifestDir of MANIFEST_DIRS) {
@@ -127,9 +178,8 @@ async function findManifest(dataDir?: string | null): Promise<{
               const content = await readFile(fullPath, 'utf8');
               const manifest = JSON.parse(content) as WorkflowManifestV2;
               if (manifest.version === 2) {
-                foundManifests.push(manifest);
+                foundManifests.push({ manifest, path: fullPath });
               }
-              lastPath = fullPath;
             } catch (error) {
               console.error(
                 `Failed to read workflow manifest at ${fullPath}`,
@@ -146,13 +196,9 @@ async function findManifest(dataDir?: string | null): Promise<{
     return null;
   }
 
-  if (foundManifests.length === 0) {
-    return null;
-  }
-
   return {
-    path: lastPath,
-    manifest: foundManifests[foundManifests.length - 1],
+    path: foundManifests[foundManifests.length - 1].path,
+    manifest: foundManifests[foundManifests.length - 1].manifest,
   };
 }
 
