@@ -960,6 +960,9 @@ importers:
       picocolors:
         specifier: ^1.0.0
         version: 1.1.1
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
