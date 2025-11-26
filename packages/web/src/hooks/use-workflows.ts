@@ -21,7 +21,7 @@ export function useWorkflows(config?: WorldConfig) {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    let isMounted = true;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
@@ -29,24 +29,24 @@ export function useWorkflows(config?: WorldConfig) {
     const queryString = params.toString();
     const url = `/api/workflows${queryString ? `?${queryString}` : ''}`;
 
-    fetch(url, { cache: 'no-store' })
+    fetch(url, { cache: 'no-store', signal: controller.signal })
       .then(async (res) => {
         const json = (await res.json()) as WorkflowResponse;
-        if (!isMounted) return;
         setData(json);
         setError(json?.error ?? null);
       })
       .catch((err) => {
-        if (!isMounted) return;
+        if (controller.signal.aborted) return;
         setError(err instanceof Error ? err.message : String(err));
+        setData(undefined);
       })
       .finally(() => {
-        if (!isMounted) return;
+        if (controller.signal.aborted) return;
         setLoading(false);
       });
 
     return () => {
-      isMounted = false;
+      controller.abort();
     };
   }, [config]); // Re-fetch when config changes
 
