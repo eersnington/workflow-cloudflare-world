@@ -10,6 +10,7 @@ import { hookIdParamAtom, sidebarParamAtom } from '@/lib/url-params';
 import { useAtomValue } from '@effect-atom/atom-react';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useRouter } from 'next/navigation';
+import { useWorkflows } from '@/hooks/use-workflows';
 
 function ObservabilityView({
   config,
@@ -49,6 +50,7 @@ export default function Home() {
   const router = useRouter();
   const config = useQueryParamConfig();
   const { viewMode, selectedWorkflow } = useNavigation();
+  const { data: workflowsData } = useWorkflows(config);
 
   const sidebar = useAtomValue(sidebarParamAtom);
   const hookId = useAtomValue(hookIdParamAtom);
@@ -90,7 +92,11 @@ export default function Home() {
         </div>
       ) : (
         <div className="h-full w-full">
-          <Canvas workflow={selectedWorkflow} config={config} />
+          <Canvas
+            workflow={selectedWorkflow}
+            config={config}
+            workflows={workflowsData?.workflows ?? []}
+          />
         </div>
       )}
     </ReactFlowProvider>
