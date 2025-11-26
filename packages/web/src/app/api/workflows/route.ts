@@ -10,9 +10,24 @@ type ManifestFileEntry = Record<
   { workflowId?: string; stepId?: string }
 >;
 
-type WorkflowManifest = {
+type WorkflowManifestV1 = {
   workflows?: Record<string, ManifestFileEntry>;
   steps?: Record<string, ManifestFileEntry>;
+};
+
+type WorkflowManifestV2 = {
+  version: 2;
+  workflows: {
+    id: string;
+    name: string;
+    file: string;
+    steps: {
+      id: string;
+      name: string;
+      file: string;
+      order: number;
+    }[];
+  }[];
 };
 
 export type WorkflowListItem = {
@@ -22,8 +37,12 @@ export type WorkflowListItem = {
   type: 'workflow' | 'step';
 };
 
-const MANIFEST_DIR = '.well-known/workflow/v1';
-const MANIFEST_FILES = ['manifest.json', 'manifest.debug.json'];
+const MANIFEST_DIRS = ['', '.well-known/workflow/v1'];
+const MANIFEST_FILES = [
+  'manifest.v2.json', // preferred
+  'manifest.json',
+  'manifest.debug.json',
+];
 const KNOWN_DATA_DIR_SUFFIXES = [
   '.next/workflow-data',
   '.workflow-data',
@@ -76,32 +95,38 @@ function deriveRootsFromEnv(paramDataDir?: string | null): string[] {
   return Array.from(roots);
 }
 
-async function findManifest(dataDir?: string | null): Promise<{
+async function findManifest(
+  dataDir?: string | null
+): Promise<{
   path: string;
-  manifest: WorkflowManifest;
+  manifest: WorkflowManifestV1 | WorkflowManifestV2;
 } | null> {
   const roots = deriveRootsFromEnv(dataDir);
   const subdirs = ['', 'flow', 'step'];
 
-  const foundManifests: WorkflowManifest[] = [];
+  const foundManifests: Array<WorkflowManifestV1 | WorkflowManifestV2> = [];
   let lastPath = '';
 
   for (const root of roots) {
-    for (const subdir of subdirs) {
-      for (const file of MANIFEST_FILES) {
-        const fullPath = join(root, MANIFEST_DIR, subdir, file);
-        console.log(`Checking manifest path: ${fullPath}`);
-        if (await fileExists(fullPath)) {
-          try {
-            const content = await readFile(fullPath, 'utf8');
-            const manifest = JSON.parse(content) as WorkflowManifest;
-            foundManifests.push(manifest);
-            lastPath = fullPath;
-          } catch (error) {
-            console.error(
-              `Failed to read workflow manifest at ${fullPath}`,
-              error
-            );
+    for (const manifestDir of MANIFEST_DIRS) {
+      for (const subdir of subdirs) {
+        for (const file of MANIFEST_FILES) {
+          const fullPath = join(root, manifestDir, subdir, file);
+          console.log(`Checking manifest path: ${fullPath}`);
+          if (await fileExists(fullPath)) {
+            try {
+              const content = await readFile(fullPath, 'utf8');
+              const manifest = JSON.parse(content) as
+                | WorkflowManifestV1
+                | WorkflowManifestV2;
+              foundManifests.push(manifest);
+              lastPath = fullPath;
+            } catch (error) {
+              console.error(
+                `Failed to read workflow manifest at ${fullPath}`,
+                error
+              );
+            }
           }
         }
       }
@@ -112,13 +137,19 @@ async function findManifest(dataDir?: string | null): Promise<{
     return null;
   }
 
-  // Merge all found manifests
-  const mergedManifest: WorkflowManifest = {
+  const v2 = foundManifests.find(
+    (m): m is WorkflowManifestV2 => (m as any).version === 2
+  );
+  if (v2) {
+    return { path: lastPath, manifest: v2 };
+  }
+
+  const mergedManifest: WorkflowManifestV1 = {
     workflows: {},
     steps: {},
   };
 
-  for (const manifest of foundManifests) {
+  for (const manifest of foundManifests as WorkflowManifestV1[]) {
     if (manifest.workflows) {
       for (const [file, fns] of Object.entries(manifest.workflows)) {
         mergedManifest.workflows![file] = {
@@ -140,21 +171,45 @@ async function findManifest(dataDir?: string | null): Promise<{
   return { path: lastPath, manifest: mergedManifest };
 }
 
-function normalizeManifest(manifest: WorkflowManifest): WorkflowListItem[] {
+function normalizeManifest(
+  manifest: WorkflowManifestV1 | WorkflowManifestV2
+): WorkflowListItem[] {
+  if ((manifest as WorkflowManifestV2).version === 2) {
+    const m = manifest as WorkflowManifestV2;
+    return m.workflows.flatMap((wf) => [
+      {
+        id: wf.id,
+        name: wf.name,
+        file: wf.file,
+        type: 'workflow' as const,
+      },
+      ...wf.steps.map((s) => ({
+        id: s.id,
+        name: s.name,
+        file: s.file,
+        type: 'step' as const,
+      })),
+    ]);
+  }
+
   const items: WorkflowListItem[] = [];
 
-  // Process Workflows
-  if (manifest.workflows) {
-    for (const [relativeFile, functions] of Object.entries(
-      manifest.workflows
-    )) {
-      for (const [, entry] of Object.entries(functions)) {
-        if (!entry?.workflowId) continue;
+  const v1 = manifest as WorkflowManifestV1;
 
-        const parsed = parseWorkflowName(entry.workflowId);
+  if (v1.workflows) {
+    for (const [relativeFile, functions] of Object.entries(v1.workflows)) {
+      for (const [, value] of Object.entries(functions)) {
+        const entry = value ?? {};
+        const workflowIdValue =
+          typeof (entry as any).workflowId === 'string'
+            ? (entry as any).workflowId
+            : undefined;
+        if (!workflowIdValue) continue;
+
+        const parsed = parseWorkflowName(workflowIdValue);
         items.push({
-          id: entry.workflowId,
-          name: parsed?.shortName ?? entry.workflowId,
+          id: workflowIdValue,
+          name: parsed?.shortName ?? workflowIdValue,
           file: relativeFile,
           type: 'workflow',
         });
@@ -162,16 +217,20 @@ function normalizeManifest(manifest: WorkflowManifest): WorkflowListItem[] {
     }
   }
 
-  // Process Steps
-  if (manifest.steps) {
-    for (const [relativeFile, functions] of Object.entries(manifest.steps)) {
-      for (const [, entry] of Object.entries(functions)) {
-        if (!entry?.stepId) continue;
+  if (v1.steps) {
+    for (const [relativeFile, functions] of Object.entries(v1.steps)) {
+      for (const [, value] of Object.entries(functions)) {
+        const entry = value ?? {};
+        const stepIdValue =
+          typeof (entry as any).stepId === 'string'
+            ? (entry as any).stepId
+            : undefined;
+        if (!stepIdValue) continue;
 
-        const parsed = parseStepName(entry.stepId);
+        const parsed = parseStepName(stepIdValue);
         items.push({
-          id: entry.stepId,
-          name: parsed?.shortName ?? entry.stepId,
+          id: stepIdValue,
+          name: parsed?.shortName ?? stepIdValue,
           file: relativeFile,
           type: 'step',
         });
