@@ -2,7 +2,7 @@ import { access, readFile, stat } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { parseStepName, parseWorkflowName } from '@workflow/core/parse-name';
 import { NextResponse } from 'next/server';
-import { generateManifestV2 } from '../../../../../workflow-studio-cli/src/lib/manifest-v2';
+import { generateManifestV2 } from '../../../../../workflow-studio/src/lib/manifest-v2';
 
 export const dynamic = 'force-dynamic';
 
